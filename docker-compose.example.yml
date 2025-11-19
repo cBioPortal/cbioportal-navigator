@@ -24,7 +24,7 @@ services:
   # cBioPortal Navigator MCP Server
   cbioportal-navigator:
     # Use pre-built image from GitHub Container Registry
-    image: ghcr.io/YOUR_USERNAME/cbioportal-navigator:latest
+    image: ghcr.io/fuzhaoyuan/cbioportal-navigator:latest
     # Or build locally:
     # build:
     #   context: .
@@ -37,6 +37,12 @@ services:
     environment:
       - CBIOPORTAL_BASE_URL=https://www.cbioportal.org
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
 volumes:
   librechat-data:
