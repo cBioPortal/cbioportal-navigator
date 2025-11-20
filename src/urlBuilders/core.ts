@@ -3,7 +3,7 @@
  * Adapted from src/shared/api/urls.ts
  */
 
-import { getConfig, trimTrailingSlash } from './config.js';
+import { getConfig, trimTrailingSlash, removeProtocol } from './config.js';
 
 export interface QueryParams {
     [key: string]:
@@ -68,7 +68,8 @@ export function buildCBioPortalPageUrl(
 
     const config = getConfig();
     const protocol = config.protocol;
-    const host = trimTrailingSlash(config.baseUrl);
+    // Remove any protocol prefix from baseUrl to avoid duplication (e.g., https://https://...)
+    const host = trimTrailingSlash(removeProtocol(config.baseUrl));
 
     let url = `${protocol}//${host}`;
 

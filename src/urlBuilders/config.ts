@@ -7,7 +7,7 @@ export interface UrlConfig {
 }
 
 let config: UrlConfig = {
-    baseUrl: process.env.CBIOPORTAL_BASE_URL || 'www.cbioportal.org',
+    baseUrl: process.env.CBIOPORTAL_BASE_URL || 'https://www.cbioportal.org',
     protocol: 'https:',
 };
 
@@ -21,4 +21,12 @@ export function setConfig(newConfig: Partial<UrlConfig>): void {
 
 export function trimTrailingSlash(str: string): string {
     return str.replace(/\/$/g, '');
+}
+
+/**
+ * Remove protocol prefix (http:// or https://) from URL string
+ * Handles multiple protocol prefixes (e.g., https://https://)
+ */
+export function removeProtocol(str: string): string {
+    return str.replace(/^(https?:\/\/)+/i, '');
 }
