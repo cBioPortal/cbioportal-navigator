@@ -2,6 +2,15 @@
  * Shared types for cBioPortal Navigator tools
  */
 
+import type {
+    StudyViewFilter,
+    GeneFilterQuery,
+    GeneFilter,
+} from 'cbioportal-ts-api-client';
+
+// Re-export for convenience
+export type { GeneFilterQuery, GeneFilter };
+
 /**
  * Base parameters for study identification
  */
@@ -11,11 +20,49 @@ export interface StudyIdentificationParams {
 }
 
 /**
+ * Configuration for scatter plot horizontal/vertical axis selection
+ */
+export interface PlotsSelectionParam {
+    selectedGeneOption?: number; // Entrez gene ID
+    selectedGenesetOption?: string; // Geneset identifier
+    selectedGenericAssayOption?: string; // Generic assay identifier
+    dataType?: string; // Molecular profile type or 'clinical_attribute'
+    selectedDataSourceOption?: string; // Clinical attribute or data source ID
+    mutationCountBy?: string; // 'MutationType' or 'MutatedVsWildType'
+    structuralVariantCountBy?: string; // 'VariantType' or 'MutatedVsWildType'
+    logScale?: 'true' | 'false'; // Boolean as string in URL
+    [key: string]: any; // Allow additional fields for extensibility
+}
+
+/**
+ * Configuration for scatter plot point coloring
+ */
+export interface PlotsColoringParam {
+    selectedOption?: string; // Coloring attribute identifier
+    logScale?: 'true' | 'false'; // Boolean as string in URL
+    colorByMutationType?: 'true' | 'false'; // Boolean as string
+    colorByCopyNumber?: 'true' | 'false'; // Boolean as string
+    colorBySv?: 'true' | 'false'; // Boolean as string for structural variants
+    [key: string]: any; // Allow additional fields for extensibility
+}
+
+/**
  * Parameters for StudyView navigation
  */
 export interface StudyViewParams extends StudyIdentificationParams {
     tab?: string;
-    filters?: Record<string, any>;
+
+    // Comprehensive filter object (placed in URL hash)
+    filterJson?: StudyViewFilter;
+
+    // Legacy single-attribute filtering (query params)
+    filterAttributeId?: string;
+    filterValues?: string; // "value1,value2" or "10-20,30-40" for ranges
+
+    // Plots tab configuration (query params)
+    plotsHorzSelection?: PlotsSelectionParam;
+    plotsVertSelection?: PlotsSelectionParam;
+    plotsColoringSelection?: PlotsColoringParam;
 }
 
 /**

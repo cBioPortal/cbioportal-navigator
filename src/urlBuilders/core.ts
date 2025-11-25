@@ -19,7 +19,8 @@ export interface QueryParams {
 export interface BuildUrlParams {
     pathname?: string;
     query?: QueryParams;
-    hash?: string;
+    hash?: string; // Simple hash string
+    hashParams?: Record<string, any>; // Structured hash parameters (e.g., filterJson)
 }
 
 /**
@@ -87,7 +88,23 @@ export function buildCBioPortalPageUrl(
         }
     }
 
-    if (params.hash) {
+    // Handle structured hash parameters (e.g., filterJson)
+    // Matches cbioportal-frontend StudyViewPage.tsx:405-410
+    if (params.hashParams) {
+        const hashPairs = Object.entries(params.hashParams)
+            .filter(([_, v]) => v !== undefined && v !== null)
+            .map(([k, v]) => {
+                // JSON.stringify for objects, no encodeURIComponent needed
+                // Browser handles URL encoding automatically for hash fragments
+                const value =
+                    typeof v === 'object' ? JSON.stringify(v) : String(v);
+                return `${k}=${value}`;
+            });
+        if (hashPairs.length > 0) {
+            url += '#' + hashPairs.join('&');
+        }
+    } else if (params.hash) {
+        // Legacy simple hash string
         const hash = params.hash.startsWith('#')
             ? params.hash
             : '#' + params.hash;

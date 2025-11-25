@@ -76,6 +76,14 @@ export class CbioportalApiClient {
             patientId,
         });
     }
+
+    /**
+     * Get the underlying CBioPortalAPI instance for direct access
+     * Use this for methods not wrapped by CbioportalApiClient
+     */
+    getRawApi(): CBioPortalAPI {
+        return this.api;
+    }
 }
 
 // Singleton instance
