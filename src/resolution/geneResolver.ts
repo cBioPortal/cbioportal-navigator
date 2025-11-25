@@ -4,7 +4,6 @@
  */
 
 import { apiClient } from '../api/client.js';
-import { geneCache } from '../api/cache.js';
 
 export class GeneResolver {
     /**
@@ -13,18 +12,10 @@ export class GeneResolver {
     async validate(geneSymbol: string): Promise<boolean> {
         const normalizedSymbol = geneSymbol.toUpperCase();
 
-        // Check cache first
-        const cached = geneCache.get(normalizedSymbol);
-        if (cached !== null) {
-            return cached;
-        }
-
         try {
             await apiClient.getGene(normalizedSymbol);
-            geneCache.set(normalizedSymbol, true);
             return true;
         } catch (error) {
-            geneCache.set(normalizedSymbol, false);
             return false;
         }
     }

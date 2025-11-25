@@ -4,7 +4,6 @@
  */
 
 import { apiClient } from '../api/client.js';
-import { studyCache } from '../api/cache.js';
 
 export interface ResolvedStudy {
     studyId: string;
@@ -20,12 +19,6 @@ export class StudyResolver {
      * Returns studies where any keyword matches studyId, name, description, or cancer type
      */
     async search(keywords: string[]): Promise<ResolvedStudy[]> {
-        const cacheKey = `search:${keywords.join(',')}`;
-        const cached = studyCache.get(cacheKey);
-        if (cached) {
-            return cached;
-        }
-
         const allStudies = await apiClient.getAllStudies();
 
         const matches = allStudies.filter((study) => {
@@ -42,34 +35,23 @@ export class StudyResolver {
             return keywords.some((kw) => searchText.includes(kw.toLowerCase()));
         });
 
-        const results = matches.map((study) => ({
+        return matches.map((study) => ({
             studyId: study.studyId,
             name: study.name,
             description: study.description,
             cancerType: study.cancerType?.name,
             allSampleCount: study.allSampleCount,
         }));
-
-        studyCache.set(cacheKey, results);
-        return results;
     }
 
     /**
      * Validate if a study ID exists
      */
     async validate(studyId: string): Promise<boolean> {
-        const cacheKey = `validate:${studyId}`;
-        const cached = studyCache.get(cacheKey);
-        if (cached !== null) {
-            return cached;
-        }
-
         try {
             await apiClient.getStudy(studyId);
-            studyCache.set(cacheKey, true);
             return true;
         } catch (error) {
-            studyCache.set(cacheKey, false);
             return false;
         }
     }
@@ -78,23 +60,14 @@ export class StudyResolver {
      * Get study details by ID
      */
     async getById(studyId: string): Promise<ResolvedStudy> {
-        const cacheKey = `study:${studyId}`;
-        const cached = studyCache.get(cacheKey);
-        if (cached) {
-            return cached;
-        }
-
         const study = await apiClient.getStudy(studyId);
-        const result = {
+        return {
             studyId: study.studyId,
             name: study.name,
             description: study.description,
             cancerType: study.cancerType?.name,
             allSampleCount: study.allSampleCount,
         };
-
-        studyCache.set(cacheKey, result);
-        return result;
     }
 }
 

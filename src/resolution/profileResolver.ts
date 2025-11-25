@@ -4,7 +4,6 @@
  */
 
 import { apiClient } from '../api/client.js';
-import { profileCache } from '../api/cache.js';
 
 export type AlterationType =
     | 'mutation'
@@ -44,12 +43,6 @@ export class ProfileResolver {
         studyId: string,
         alterationType: AlterationType = 'mutation'
     ): Promise<ResolvedProfile | null> {
-        const cacheKey = `profile:${studyId}:${alterationType}`;
-        const cached = profileCache.get(cacheKey);
-        if (cached) {
-            return cached;
-        }
-
         try {
             const profiles = await apiClient.getMolecularProfiles(studyId);
             const targetType = this.mapAlterationType(alterationType);
@@ -60,19 +53,15 @@ export class ProfileResolver {
             );
 
             if (!profile) {
-                profileCache.set(cacheKey, null);
                 return null;
             }
 
-            const result: ResolvedProfile = {
+            return {
                 molecularProfileId: profile.molecularProfileId,
                 molecularAlterationType: profile.molecularAlterationType,
                 name: profile.name,
                 description: profile.description,
             };
-
-            profileCache.set(cacheKey, result);
-            return result;
         } catch (error) {
             console.error(
                 `Error fetching profiles for study ${studyId}:`,
@@ -86,23 +75,14 @@ export class ProfileResolver {
      * Get all molecular profiles for a study
      */
     async getAllForStudy(studyId: string): Promise<ResolvedProfile[]> {
-        const cacheKey = `profiles:${studyId}`;
-        const cached = profileCache.get(cacheKey);
-        if (cached) {
-            return cached;
-        }
-
         try {
             const profiles = await apiClient.getMolecularProfiles(studyId);
-            const results = profiles.map((p) => ({
+            return profiles.map((p) => ({
                 molecularProfileId: p.molecularProfileId,
                 molecularAlterationType: p.molecularAlterationType,
                 name: p.name,
                 description: p.description,
             }));
-
-            profileCache.set(cacheKey, results);
-            return results;
         } catch (error) {
             console.error(
                 `Error fetching profiles for study ${studyId}:`,
