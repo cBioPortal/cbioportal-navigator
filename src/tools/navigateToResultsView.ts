@@ -24,28 +24,35 @@ export const navigateToResultsViewTool = {
     description: `Navigate to cBioPortal ResultsView page - gene alteration analysis across samples.
 
 WHAT IS RESULTSVIEW:
-ResultsView (also known as OncoPrint or Query Page) analyzes specific genes across samples:
+ResultsView (also known as Query Page) analyzes specific gene alterations across samples:
 - OncoPrint matrix: visual display of multi-gene alteration patterns
 - Mutation details: amino acid changes, functional impact, frequency statistics
 - Copy number analysis: amplifications and deletions distribution
-- Co-occurrence analysis: mutually exclusive or co-occurring relationships between genes
-- Survival analysis: stratified by genotype groups
+- Co-occurrence analysis: mutually exclusive or co-occurring relationships between gene alterations
+- Custom plots: bar charts and scatter plots of clinical and genomic data
+- Comparison analysis: compare clinical/genomic attributes between groups defined by gene alterations
 - Gene co-expression: mRNA/protein expression correlations and dependencies
 
 AVAILABLE TABS:
-- oncoprint: Alteration matrix visualization (default)
-- mutations: Detailed mutation table with protein changes
-- cna: Copy number alteration data and frequencies
-- plots: Scatter plots (expression, mutation count, clinical attributes)
-- survival: Kaplan-Meier curves stratified by alterations
-- coexpression: Gene co-expression analysis
-- enrichments: Pathway enrichment analysis
-- pathways: Pathway diagrams with alterations
+For all studies with genomic alteration data:
+    - oncoprint: Alteration matrix visualization (default).
+    - cancerTypesSummary: Summary of alterations by cancer type.
+    - plots: Customizable bar and scatter plots of clinical and genomic data
+    - mutations: Detailed mutation table and lollipop plot for each query gene.
+    - comparison: Compare attributes between groups defined by gene alterations. Comparisons default to altered vs non-altered groups, but custom groups based on specific alteration patterns can also be created.
+    - pathways/pathwaymapper: Pathway diagrams with alterations. Only useful if queried genes are in the available pathways.
+    - pathways/ndex-cancer-pathways: NDEx cancer pathways with alterations. Only useful if queried genes are in the available pathways.
+    - downloads: Data download options
+For specific studies or queries:
+    - mutualExclusivity: Statistical analysis of co-occurrence and exclusivity between query genes/alterations. Available when multiple genes/alterations are queried.
+    - structuralVariants: Structural variant details. Available if SV data exists.
+    - coexpression: Explore genes whose mRNA/miRNA/protein levels correlate with query genes. Available if mRNA, miRNA, or protein expression data exists.
+    - cnSegments: Copy number segments visualization using the Integrated Genomics Viewer (IGV). Available if segment data exists.
 
 PARAMETERS:
 - studyId: Direct study ID (e.g., "luad_tcga") OR
 - studyKeywords: Array of keywords to search studies (e.g., ["TCGA", "lung"])
-- genes: REQUIRED - Array of gene symbols (at least 1)
+- genes: REQUIRED - Array of gene symbols (at least 1) 
 - caseSetId: Optional case set ID (defaults to {studyId}_all for all samples)
 - zScoreThreshold: Optional Z-score threshold for expression data
 - rppaScoreThreshold: Optional RPPA score threshold for protein data
