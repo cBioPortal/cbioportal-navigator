@@ -1,6 +1,27 @@
 /**
- * Study Resolver
- * Handles study ID resolution and validation
+ * Study identification and validation resolver.
+ *
+ * This module provides functionality to search for cancer studies by keywords
+ * and validate study IDs against the cBioPortal API. It enables flexible study
+ * identification through either exact IDs or fuzzy keyword matching across
+ * study metadata (name, description, cancer type).
+ *
+ * @remarks
+ * Key exports:
+ * - `StudyResolver`: Class with search, validation, and retrieval methods
+ * - `studyResolver`: Singleton instance for convenient access
+ * - `ResolvedStudy`: Interface for study metadata
+ *
+ * Methods:
+ * - `search(keywords)`: Find studies matching any keyword in metadata
+ * - `validate(studyId)`: Check if a study ID exists
+ * - `getById(studyId)`: Retrieve complete study details
+ *
+ * Search behavior:
+ * Keywords are matched case-insensitively against studyId, name, description,
+ * and cancer type. A study matches if any keyword appears in any field.
+ *
+ * @packageDocumentation
  */
 
 import { apiClient } from '../api/client.js';

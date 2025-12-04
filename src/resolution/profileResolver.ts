@@ -1,6 +1,32 @@
 /**
- * Molecular Profile Resolver
- * Handles molecular profile resolution for studies
+ * Molecular profile resolution for study data types.
+ *
+ * This module resolves molecular profiles (data types) available in cBioPortal
+ * studies, mapping user-friendly alteration type names to cBioPortal's internal
+ * molecular alteration types. Used to determine available data and provide
+ * metadata for URL construction.
+ *
+ * @remarks
+ * Key exports:
+ * - `ProfileResolver`: Class with profile resolution methods
+ * - `profileResolver`: Singleton instance for convenient access
+ * - `AlterationType`: User-friendly alteration type names
+ * - `ResolvedProfile`: Interface for profile metadata
+ *
+ * Methods:
+ * - `getForStudy(studyId, type)`: Get specific profile type for a study
+ * - `getAllForStudy(studyId)`: Get all available profiles for a study
+ * - `mapAlterationType(type)`: Convert friendly names to cBioPortal types
+ *
+ * Supported alteration types:
+ * - mutation → MUTATION_EXTENDED
+ * - cna → COPY_NUMBER_ALTERATION
+ * - fusion → FUSION
+ * - mrna → MRNA_EXPRESSION
+ * - protein → PROTEIN_LEVEL
+ * - methylation → METHYLATION
+ *
+ * @packageDocumentation
  */
 
 import { apiClient } from '../api/client.js';

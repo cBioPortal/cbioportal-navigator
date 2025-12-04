@@ -1,6 +1,26 @@
 /**
- * MCP Tool: route_to_target_page
- * Main router tool that routes to specific page navigation tools
+ * Main router MCP tool that delegates to specialized navigation tools.
+ *
+ * This tool acts as the primary entry point for cBioPortal navigation,
+ * analyzing user intent to determine the appropriate target page type
+ * (study, patient, or results) and routing the request to the corresponding
+ * specialized tool. It includes comprehensive documentation to guide AI
+ * assistants in choosing the correct page type based on user queries.
+ *
+ * @remarks
+ * Key exports:
+ * - `routeToTargetPageTool`: Tool definition with detailed routing guidance
+ * - `handleRouteToTargetPage()`: Handler that delegates to specialized tools
+ *
+ * Routing logic:
+ * - targetPage='study' → delegates to navigateToStudyView (cohort overview)
+ * - targetPage='patient' → delegates to navigateToPatientView (individual patient)
+ * - targetPage='results' → delegates to navigateToResultsView (gene analysis)
+ *
+ * The tool provides extensive inline documentation explaining when to use each
+ * page type, including use cases, example queries, and key features for each.
+ *
+ * @packageDocumentation
  */
 
 import { z } from 'zod';

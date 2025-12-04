@@ -1,5 +1,26 @@
 /**
- * Shared types for cBioPortal Navigator tools
+ * TypeScript type definitions for MCP tools and responses.
+ *
+ * This module defines all shared types used across the navigation tools,
+ * including parameter interfaces for different page types, response formats,
+ * and specialized configuration objects for plots and filters. It re-exports
+ * types from the cBioPortal API client for convenience.
+ *
+ * @remarks
+ * Key type categories:
+ * - Parameter types: StudyViewParams, PatientViewParams, ResultsViewParams
+ * - Response types: SuccessResponse, AmbiguityResponse, ErrorResponse, ToolResponse
+ * - Configuration types: PlotsSelectionParam, PlotsColoringParam
+ * - Base types: StudyIdentificationParams
+ *
+ * Re-exported from cbioportal-ts-api-client:
+ * - StudyViewFilter: Comprehensive filter object for study views
+ * - GeneFilterQuery, GeneFilter: Gene filtering structures
+ *
+ * All tool handlers use ToolResponse as their return type, which is a union
+ * of success, ambiguity, and error responses.
+ *
+ * @packageDocumentation
  */
 
 import type {

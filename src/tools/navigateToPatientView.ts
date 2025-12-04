@@ -1,6 +1,28 @@
 /**
- * MCP Tool: navigate_to_patientview
- * Navigate to cBioPortal PatientView page
+ * MCP tool for navigating to cBioPortal PatientView pages.
+ *
+ * PatientView displays comprehensive data for individual patients or samples,
+ * including clinical timeline, genomic alterations, pathways, tissue images,
+ * and treatment information. This tool constructs URLs to navigate to specific
+ * patients with optional tab selection and cohort navigation support.
+ *
+ * @remarks
+ * Key exports:
+ * - `navigateToPatientViewTool`: Tool definition with schema and documentation
+ * - `handleNavigateToPatientView()`: MCP tool handler
+ * - `navigateToPatientView()`: Core navigation logic
+ *
+ * Features:
+ * - Requires studyId and either patientId or sampleId
+ * - Supports tabs: summary, clinicalData, genomicTracks, pathways, tissueImage, trialMatch
+ * - Navigation IDs (navIds) for browsing through patient cohorts
+ *
+ * Architecture:
+ * Uses studyResolver for study validation and buildPatientUrl for URL
+ * construction. Returns success response with URL and metadata, or error
+ * response for validation failures.
+ *
+ * @packageDocumentation
  */
 
 import { z } from 'zod';

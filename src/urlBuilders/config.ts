@@ -1,5 +1,24 @@
 /**
- * Configuration for URL building
+ * Global configuration for cBioPortal URL construction.
+ *
+ * This module manages the base URL configuration used by all URL builders,
+ * allowing dynamic configuration through environment variables or programmatic
+ * updates. It provides utilities for URL string manipulation.
+ *
+ * @remarks
+ * Key exports:
+ * - `UrlConfig`: Interface for configuration structure
+ * - `getConfig()`: Retrieve current configuration
+ * - `setConfig()`: Update configuration (partial updates supported)
+ * - `trimTrailingSlash()`: Remove trailing slashes from URLs
+ * - `removeProtocol()`: Strip protocol prefixes from URLs
+ *
+ * Configuration:
+ * The base URL defaults to https://www.cbioportal.org and can be overridden
+ * via the CBIOPORTAL_BASE_URL environment variable or by calling setConfig().
+ * This enables support for private cBioPortal instances.
+ *
+ * @packageDocumentation
  */
 export interface UrlConfig {
     baseUrl: string;

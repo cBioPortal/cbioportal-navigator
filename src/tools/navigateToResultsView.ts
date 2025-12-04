@@ -1,6 +1,30 @@
 /**
- * MCP Tool: navigate_to_resultsview
- * Navigate to cBioPortal ResultsView page
+ * MCP tool for navigating to cBioPortal ResultsView (OncoPrint) pages.
+ *
+ * ResultsView analyzes specific genes across samples, displaying alteration
+ * patterns through OncoPrint matrices, mutation details, copy number analysis,
+ * co-occurrence patterns, survival curves, and expression correlations. This
+ * tool handles study resolution, gene validation, and complex URL construction.
+ *
+ * @remarks
+ * Key exports:
+ * - `navigateToResultsViewTool`: Tool definition with schema and documentation
+ * - `handleNavigateToResultsView()`: MCP tool handler
+ * - `navigateToResultsView()`: Core navigation logic
+ *
+ * Features:
+ * - Study resolution via keywords or direct studyId
+ * - Batch gene validation (filters out invalid genes)
+ * - Supports tabs: oncoprint, mutations, cna, plots, survival, coexpression, enrichments, pathways
+ * - Optional case set selection and Z-score thresholds
+ * - Default case set: {studyId}_all (all samples)
+ *
+ * Architecture:
+ * Uses studyResolver for study identification, geneResolver for gene validation,
+ * profileResolver for metadata, and buildResultsUrl for URL construction. Returns
+ * success response with validated genes, or ambiguity/error responses.
+ *
+ * @packageDocumentation
  */
 
 import { z } from 'zod';

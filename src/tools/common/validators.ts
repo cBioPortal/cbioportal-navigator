@@ -1,5 +1,21 @@
 /**
- * Shared validation utilities for tools
+ * Input validation utilities for tool parameter verification.
+ *
+ * This module provides reusable validation functions for common parameter
+ * patterns across navigation tools, ensuring consistent error messages and
+ * validation logic. Used by tool handlers before processing requests.
+ *
+ * @remarks
+ * Key exports:
+ * - `validateStudyIdentification()`: Ensures either studyId or studyKeywords provided
+ * - `requireEitherOr()`: Validates at least one of two parameters exists
+ *
+ * Validation pattern:
+ * All validators return an object with `valid: boolean` and optional `error: string`.
+ * This allows tool handlers to check validation results and return appropriate
+ * error responses when validation fails.
+ *
+ * @packageDocumentation
  */
 
 import type { StudyIdentificationParams } from './types.js';

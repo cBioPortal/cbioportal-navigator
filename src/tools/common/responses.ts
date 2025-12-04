@@ -1,5 +1,27 @@
 /**
- * Response formatting utilities for tools
+ * Response builder utilities for consistent tool output formatting.
+ *
+ * This module provides factory functions to create standardized response
+ * objects for MCP tool handlers. All tools return one of three response
+ * types: success (with URL and metadata), ambiguity (multiple matches
+ * requiring user selection), or error (with details).
+ *
+ * @remarks
+ * Key exports:
+ * - `createSuccessResponse()`: Success response with URL and metadata
+ * - `createAmbiguityResponse()`: Response for multiple matches (e.g., study search)
+ * - `createErrorResponse()`: Error response with message and optional details
+ *
+ * Response structure:
+ * All responses include a `success` boolean. Success responses include `url`
+ * and `metadata` fields. Ambiguity responses include `needsSelection: true`,
+ * a message, and an array of options. Error responses include an `error`
+ * message and optional `details` object.
+ *
+ * This standardization ensures consistent error handling and response parsing
+ * across all navigation tools.
+ *
+ * @packageDocumentation
  */
 
 import type {

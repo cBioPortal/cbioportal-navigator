@@ -1,5 +1,29 @@
 /**
- * Study View URL builders
+ * StudyView page URL construction.
+ *
+ * This module builds URLs for cBioPortal StudyView pages, which display
+ * cohort-level overview and analysis. It supports comprehensive filtering
+ * via filterJson, legacy single-attribute filtering, plots configuration,
+ * and tab selection.
+ *
+ * @remarks
+ * Key exports:
+ * - `buildStudyUrl()`: Main function to construct StudyView URLs
+ * - `StudyUrlOptions`: Interface for URL construction parameters
+ *
+ * URL structure:
+ * /study[/tab]?id=studyId&filterAttributeId=...#filterJson={...}
+ *
+ * Filter handling:
+ * - filterJson: Comprehensive StudyViewFilter object (placed in hash)
+ * - filterAttributeId + filterValues: Legacy filtering (placed in query)
+ *
+ * Plots configuration:
+ * - plotsHorzSelection, plotsVertSelection: Axis selections
+ * - plotsColoringSelection: Point coloring configuration
+ * All plots parameters are JSON-stringified and placed in query string.
+ *
+ * @packageDocumentation
  */
 
 import { buildCBioPortalPageUrl, QueryParams, BuildUrlParams } from './core.js';

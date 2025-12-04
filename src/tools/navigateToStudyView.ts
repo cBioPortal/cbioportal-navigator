@@ -1,6 +1,30 @@
 /**
- * MCP Tool: navigate_to_studyview
- * Navigate to cBioPortal StudyView page
+ * MCP tool for navigating to cBioPortal StudyView pages.
+ *
+ * StudyView provides cohort-level overview and analysis of cancer research
+ * studies, including statistics, clinical features, survival analysis, and
+ * custom visualizations. This tool handles study resolution, tab validation,
+ * complex filtering, and plots configuration to generate properly formatted URLs.
+ *
+ * @remarks
+ * Key exports:
+ * - `navigateToStudyViewTool`: Tool definition with schema and documentation
+ * - `handleNavigateToStudyView()`: MCP tool handler
+ * - `navigateToStudyView()`: Core navigation logic
+ *
+ * Features:
+ * - Study resolution via keywords or direct studyId
+ * - Tab validation (summary, clinicalData, cnSegments, plots)
+ * - Complex filtering via filterJson (StudyViewFilter object)
+ * - Legacy filtering via filterAttributeId + filterValues
+ * - Plots configuration (axis selection, coloring)
+ *
+ * Architecture:
+ * Uses studyResolver for study identification, tabValidator for data availability
+ * checks, and buildStudyUrl for URL construction. Returns success response with
+ * URL and metadata, ambiguity response for multiple matches, or error response.
+ *
+ * @packageDocumentation
  */
 
 import { z } from 'zod';

@@ -1,6 +1,26 @@
 /**
- * cBioPortal Navigator - MCP Server
- * Creates MCP server instance with registered tools
+ * MCP server factory and tool registration hub.
+ *
+ * This module creates and configures the MCP server instance by registering
+ * all available navigation tools. It acts as the central configuration point
+ * connecting the MCP protocol layer with the cBioPortal navigation tools.
+ *
+ * @remarks
+ * Key exports:
+ * - `createMcpServer()`: Factory function that returns a configured McpServer instance
+ *
+ * Registered tools:
+ * - `route_to_target_page`: Main router that delegates to specialized tools
+ * - `navigate_to_studyview`: Study overview page navigation
+ * - `navigate_to_patientview`: Patient detail page navigation
+ * - `navigate_to_resultsview`: Results/OncoPrint page navigation
+ *
+ * Architecture:
+ * The server is stateless and can be instantiated per-request (HTTP mode) or
+ * as a long-lived instance (stdio mode). Each tool registration includes its
+ * name, schema, and handler function.
+ *
+ * @packageDocumentation
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';

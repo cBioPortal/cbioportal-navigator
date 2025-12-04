@@ -1,6 +1,30 @@
 /**
- * Gene Resolver
- * Handles gene symbol validation
+ * Gene symbol validation resolver.
+ *
+ * This module validates gene symbols (Hugo gene symbols or Entrez IDs) against
+ * the cBioPortal API. It supports both single gene validation and batch
+ * validation with automatic filtering of invalid genes, ensuring that only
+ * valid gene symbols are used in URL construction.
+ *
+ * @remarks
+ * Key exports:
+ * - `GeneResolver`: Class with validation and retrieval methods
+ * - `geneResolver`: Singleton instance for convenient access
+ *
+ * Methods:
+ * - `validate(geneSymbol)`: Check if a single gene symbol is valid
+ * - `validateBatch(geneSymbols)`: Validate multiple genes, return only valid ones
+ * - `getGeneInfo(geneSymbol)`: Retrieve detailed gene information
+ *
+ * Normalization:
+ * All gene symbols are automatically normalized to uppercase for consistency
+ * with cBioPortal conventions.
+ *
+ * Batch validation:
+ * Rather than failing on invalid genes, validateBatch filters them out and
+ * returns only valid ones, allowing requests to proceed with partial matches.
+ *
+ * @packageDocumentation
  */
 
 import { apiClient } from '../api/client.js';

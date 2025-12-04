@@ -1,5 +1,28 @@
 /**
- * Patient/Sample View URL builders
+ * PatientView page URL construction.
+ *
+ * This module builds URLs for cBioPortal PatientView pages, which display
+ * detailed information for individual patients or samples including clinical
+ * timeline, genomic alterations, pathways, and tissue images.
+ *
+ * @remarks
+ * Key exports:
+ * - `buildPatientUrl()`: Main function to construct PatientView URLs
+ * - `PatientUrlOptions`: Interface for URL construction parameters
+ *
+ * URL structure:
+ * /patient[/tab]?studyId=...&caseId=...#navCaseIds=...
+ *
+ * Required parameters:
+ * - studyId: Study identifier
+ * - caseId OR sampleId: At least one must be provided
+ *
+ * Navigation support:
+ * The navIds parameter enables cohort navigation, allowing users to browse
+ * through multiple patients sequentially. Nav IDs are formatted as
+ * "studyId:patientId" and placed in the hash fragment.
+ *
+ * @packageDocumentation
  */
 
 import { buildCBioPortalPageUrl, QueryParams } from './core.js';

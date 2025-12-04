@@ -1,6 +1,29 @@
 /**
- * Core URL building functions
- * Adapted from src/shared/api/urls.ts
+ * Core URL construction utilities for cBioPortal pages.
+ *
+ * This module provides the foundational URL building logic used by all
+ * page-specific URL builders. It handles query parameter serialization,
+ * hash parameter construction, and complete URL assembly with proper
+ * protocol and host handling.
+ *
+ * @remarks
+ * Key exports:
+ * - `buildCBioPortalPageUrl()`: Main function to construct complete URLs
+ * - `serializeQueryParams()`: Convert parameter objects to query strings
+ * - `QueryParams`: Type for query parameter objects
+ * - `BuildUrlParams`: Type for URL construction parameters
+ *
+ * URL structure:
+ * URLs are built as: {protocol}//{host}{pathname}?{query}#{hash}
+ * - Arrays are comma-separated in query strings
+ * - Objects are JSON-stringified in query/hash parameters
+ * - Hash parameters support structured data (e.g., filterJson)
+ *
+ * Protocol handling:
+ * The function strips any protocol prefixes from the base URL to avoid
+ * duplication (e.g., https://https://...) when combining with configured protocol.
+ *
+ * @packageDocumentation
  */
 
 import { getConfig, trimTrailingSlash, removeProtocol } from './config.js';

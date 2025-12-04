@@ -1,6 +1,34 @@
 /**
- * cBioPortal API Client
- * Wrapper around cbioportal-ts-api-client for MCP server usage
+ * HTTP client wrapper for cBioPortal API interactions.
+ *
+ * This module provides a simplified interface to the cBioPortal REST API by
+ * wrapping the cbioportal-ts-api-client library. It exposes commonly used
+ * operations for retrieving studies, genes, patients, molecular profiles,
+ * and case sets, abstracting away the complexity of direct API calls.
+ *
+ * @remarks
+ * Key exports:
+ * - `CbioportalApiClient`: Wrapper class around CBioPortalAPI
+ * - `apiClient`: Singleton instance configured with environment-based base URL
+ *
+ * API methods:
+ * - `getAllStudies()`: Fetch all available cancer studies
+ * - `getStudy(studyId)`: Retrieve specific study details
+ * - `getGene(geneId)`: Validate and retrieve gene information
+ * - `getMolecularProfiles(studyId)`: Get molecular data types for a study
+ * - `getCaseLists(studyId)`: Get sample sets/cohorts for a study
+ * - `getPatientsInStudy(studyId)`: List all patients in a study
+ * - `getPatient(studyId, patientId)`: Get specific patient details
+ * - `getSamplesForPatient(studyId, patientId)`: Get samples for a patient
+ * - `getRawApi()`: Access underlying CBioPortalAPI for advanced operations
+ *
+ * Configuration:
+ * The base URL is determined by (in priority order):
+ * 1. Constructor parameter
+ * 2. CBIOPORTAL_API_URL environment variable
+ * 3. Default: https://www.cbioportal.org
+ *
+ * @packageDocumentation
  */
 
 import { CBioPortalAPI } from 'cbioportal-ts-api-client';

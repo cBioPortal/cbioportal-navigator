@@ -1,8 +1,29 @@
 #!/usr/bin/env node
 
 /**
- * cBioPortal Navigator Entry Point
- * Supports both stdio (for local MCP) and HTTP (for remote deployment)
+ * Application entry point for cBioPortal Navigator MCP server.
+ *
+ * This file initializes the MCP server with support for two transport modes:
+ * stdio mode for local Claude Desktop integration, and HTTP mode for remote
+ * deployments like LibreChat. The transport mode is determined by the
+ * MCP_TRANSPORT environment variable, defaulting to stdio.
+ *
+ * @remarks
+ * Key components:
+ * - `startStdio()`: Starts MCP server with StdioServerTransport for Claude Desktop
+ * - `startHttp()`: Starts Express server with StreamableHTTPServerTransport for remote clients
+ * - `main()`: Entry point that selects transport mode based on environment
+ *
+ * Environment variables:
+ * - `MCP_TRANSPORT`: Transport mode ('stdio' or 'http'), defaults to 'stdio'
+ * - `CBIOPORTAL_BASE_URL`: Base URL for cBioPortal instance, defaults to https://www.cbioportal.org
+ * - `PORT`: HTTP server port, defaults to 8002 (HTTP mode only)
+ *
+ * HTTP mode endpoints:
+ * - `GET /health`: Health check endpoint returning service status
+ * - `POST /mcp`: MCP protocol endpoint for tool invocations
+ *
+ * @packageDocumentation
  */
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';

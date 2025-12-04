@@ -1,6 +1,28 @@
 /**
- * Tab Validator
- * Validates tab availability for studies based on data existence
+ * Tab availability validator for StudyView pages.
+ *
+ * This module validates whether specific tabs are available for a given study
+ * by checking data existence before URL generation. This prevents generating
+ * URLs that would redirect to the default tab, providing a better user
+ * experience by catching unavailable tabs early.
+ *
+ * @remarks
+ * Key exports:
+ * - `validateTabAvailability()`: Async function to check tab availability
+ * - `TabValidationResult`: Interface for validation results
+ *
+ * Validation rules:
+ * - summary, plots: Always available (no validation needed)
+ * - clinicalData: Requires samples to exist
+ * - cnSegments: Requires copy number segment data
+ * - Unknown tabs: Allowed (frontend handles validation)
+ *
+ * Error handling:
+ * If validation fails due to API errors, the function returns `available: true`
+ * to allow navigation rather than blocking the user. This ensures graceful
+ * degradation when the API is unavailable or slow.
+ *
+ * @packageDocumentation
  */
 
 import { apiClient } from '../api/client.js';

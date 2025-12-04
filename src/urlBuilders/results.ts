@@ -1,5 +1,31 @@
 /**
- * Results View URL builders
+ * ResultsView (OncoPrint) page URL construction.
+ *
+ * This module builds URLs for cBioPortal ResultsView pages, which analyze
+ * specific genes across samples with alteration visualizations, mutation
+ * details, survival analysis, and expression correlations. It handles
+ * complex URL construction with numerous optional parameters.
+ *
+ * @remarks
+ * Key exports:
+ * - `buildResultsUrl()`: Main function to construct ResultsView URLs
+ * - `ResultsUrlOptions`: Interface for URL construction parameters
+ *
+ * URL structure:
+ * /results[/tab]?cancer_study_list=...&gene_list=...&case_set_id=...&...
+ *
+ * Required parameters:
+ * - studies: Array of study IDs
+ * - genes: Array of gene symbols (space-separated in URL)
+ * - caseSelection: Type ('all', 'case_set', 'custom'), IDs, or specific set
+ *
+ * Optional parameters (25+):
+ * - Z-score thresholds for expression data
+ * - OncoPrint sorting and clustering options
+ * - Plots configuration (axis selection, coloring)
+ * - Profile filters and display options
+ *
+ * @packageDocumentation
  */
 
 import { buildCBioPortalPageUrl, QueryParams } from './core.js';
