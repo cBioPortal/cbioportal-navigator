@@ -13,7 +13,6 @@ import {
     createErrorResponse,
 } from './common/responses.js';
 import type { ToolResponse } from './common/types.js';
-import { buildCompleteGeneFilterQuery } from './common/filterHelpers.js';
 
 /**
  * Tool definition for MCP registration
@@ -62,13 +61,7 @@ Filtering (optional):
      Example: {attributeId: "AGE", values: [{start: 40, end: 60}]}
    - geneFilters: Filter by gene mutations or alterations
      Example: {molecularProfileIds: ["study_mutations"], geneQueries: [[{hugoGeneSymbol: "TP53"}]]}
-
-     IMPORTANT: You only need to provide hugoGeneSymbol for each gene query.
-     The navigator automatically fills in required default fields (includeDriver: true,
-     includeVUS: true, includeGermline: true, includeSomatic: true, etc.).
-
-     Advanced: Override defaults by explicitly providing field values.
-     Example: {hugoGeneSymbol: "KRAS", includeDriver: false, alterations: ["AMP"]}
+     Full GeneFilterQuery structure with all fields is supported.
    - genomicDataFilters: Filter by genomic data values (CNV, expression, etc.)
    - mutationDataFilters: Filter by mutation properties
    - sampleIdentifiers: Specific sample selection
@@ -115,13 +108,9 @@ Complex filtering (use filterJson):
   studyId: "luad_tcga", filterJson: {
     geneFilters: [{
       molecularProfileIds: ["luad_tcga_mutations"],
-      geneQueries: [[{hugoGeneSymbol: "TP53"}]]  // Minimal syntax - defaults auto-applied!
+      geneQueries: [[{hugoGeneSymbol: "TP53"}]]
     }]
   }
-
-  Note: The navigator automatically adds all required GeneFilterQuery fields
-  with sensible defaults. This minimal syntax works because we handle the
-  frontend's strict type requirements for you.
 - "Filter by age 40-60 AND stage III/IV" →
   filterJson: {
     clinicalDataFilters: [
@@ -261,55 +250,6 @@ export async function handleNavigateToStudyView(
 }
 
 /**
- * Transform filterJson to ensure all GeneFilterQuery objects have complete fields.
- *
- * This prevents frontend errors by automatically applying default values to
- * incomplete geneFilter queries. Only geneFilters are transformed; other filter
- * types pass through unchanged.
- */
-function transformFilterJson(
-    filterJson: Record<string, any>
-): Record<string, any> {
-    if (!filterJson.geneFilters || !Array.isArray(filterJson.geneFilters)) {
-        return filterJson;
-    }
-
-    const transformed = { ...filterJson };
-
-    try {
-        transformed.geneFilters = filterJson.geneFilters.map(
-            (geneFilter: any) => {
-                if (
-                    !geneFilter.geneQueries ||
-                    !Array.isArray(geneFilter.geneQueries)
-                ) {
-                    return geneFilter;
-                }
-
-                return {
-                    ...geneFilter,
-                    geneQueries: geneFilter.geneQueries.map(
-                        (orGroup: any[]) => {
-                            if (!Array.isArray(orGroup)) {
-                                return orGroup;
-                            }
-                            return orGroup.map((query: any) =>
-                                buildCompleteGeneFilterQuery(query)
-                            );
-                        }
-                    ),
-                };
-            }
-        );
-    } catch (error) {
-        console.error('Failed to transform geneFilters:', error);
-        return filterJson; // Return original on error (backwards compatible)
-    }
-
-    return transformed;
-}
-
-/**
  * Main navigation logic for StudyView
  */
 async function navigateToStudyView(
@@ -375,17 +315,11 @@ async function navigateToStudyView(
         }
     }
 
-    // Transform filterJson to ensure complete GeneFilterQuery objects
-    // This prevents frontend errors when required fields are missing
-    const transformedFilterJson = params.filterJson
-        ? transformFilterJson(params.filterJson)
-        : undefined;
-
     // Build URL with all parameters
     const url = buildStudyUrl({
         studyIds: studyId,
         tab: params.tab,
-        filterJson: transformedFilterJson, // Use transformed version
+        filterJson: params.filterJson,
         filterAttributeId: params.filterAttributeId,
         filterValues: params.filterValues,
         plotsHorzSelection: params.plotsHorzSelection,
