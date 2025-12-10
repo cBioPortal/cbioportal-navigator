@@ -106,16 +106,19 @@ KEY FEATURES:
 DECISION FLOWCHART
 ═══════════════════════════════════════════════════════════════════════════════
 
-Question 1: Does the user mention specific gene(s)?
+Question 1: Does the user mention specific gene name(s)?
 ├─ YES → targetPage: 'results'
 │        (Gene-focused analysis)
 │
-└─ NO → Question 2: Is it about a specific patient/case?
-        ├─ YES → targetPage: 'patient'
-        │        (Individual patient focus)
+└─ NO → Question 1b: Is this a discovery question about genes (which/what/how many genes...)?
+        ├─ YES → targetPage: 'study' (for unbiased gene discovery)
         │
-        └─ NO → targetPage: 'study'
-                 (Cohort/study overview)
+        └─ NO → Question 2: Is it about a specific patient/case?
+                ├─ YES → targetPage: 'patient'
+                │        (Individual patient focus)
+                │
+                └─ NO → targetPage: 'study'
+                        (Cohort/study overview)
 
 
 ═══════════════════════════════════════════════════════════════════════════════
