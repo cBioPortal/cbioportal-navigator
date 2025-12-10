@@ -34,7 +34,6 @@ import { profileResolver } from '../resolution/profileResolver.js';
 import { buildResultsUrl } from '../urlBuilders/results.js';
 import {
     createSuccessResponse,
-    createAmbiguityResponse,
     createErrorResponse,
 } from './common/responses.js';
 import type { ToolResponse } from './common/types.js';
@@ -74,31 +73,29 @@ For specific studies or queries:
     - cnSegments: Copy number segments visualization using the Integrated Genomics Viewer (IGV). Available if segment data exists.
 
 PARAMETERS:
-- studyId: Direct study ID (e.g., "luad_tcga") OR
-- studyKeywords: Array of keywords to search studies (e.g., ["TCGA", "lung"])
-- genes: REQUIRED - Array of gene symbols (at least 1) 
+- studyIds: REQUIRED - Array of validated study IDs (e.g., ["luad_tcga"] or ["luad_tcga", "brca_tcga"])
+  * For single study: ["luad_tcga"]
+  * For cross-study analysis: ["luad_tcga", "lusc_tcga", "brca_tcga"]
+  * These should be pre-resolved by resolve_and_route tool
+- genes: REQUIRED - Array of gene symbols (at least 1)
 - caseSetId: Optional case set ID (defaults to {studyId}_all for all samples)
 - zScoreThreshold: Optional Z-score threshold for expression data
 - rppaScoreThreshold: Optional RPPA score threshold for protein data
 - tab: Optionally specify which analysis tab to open
 
 TYPICAL USE CASES:
-- "Show me TP53 and KRAS mutations in lung cancer"
-- "Analyze EGFR alterations in TCGA LUAD"
-- "Find co-occurring mutations with BRAF in melanoma"
-- "Compare mutation patterns of PIK3CA and AKT1"
-- "Survival analysis for patients with EGFR mutations"`,
+- "Show me TP53 and KRAS mutations in lung cancer" → studyIds: ["luad_tcga"], genes: ["TP53", "KRAS"]
+- "Analyze EGFR alterations in TCGA LUAD" → studyIds: ["luad_tcga"], genes: ["EGFR"]
+- "Compare TP53 mutations across TCGA lung studies" → studyIds: ["luad_tcga", "lusc_tcga"], genes: ["TP53"]
+- "Find co-occurring mutations with BRAF in melanoma" → studyIds: ["skcm_tcga"], genes: ["BRAF", ...]
+- "Survival analysis for patients with EGFR mutations" → studyIds: ["luad_tcga"], genes: ["EGFR"], tab: "survival"`,
     inputSchema: {
-        studyKeywords: z
+        studyIds: z
             .array(z.string())
-            .optional()
+            .min(1)
             .describe(
-                'Keywords to search for studies (e.g., ["TCGA", "lung"])'
+                'Array of validated study IDs (e.g., ["luad_tcga"] or ["luad_tcga", "lusc_tcga"] for cross-study). These should be pre-resolved by route_to_target_page tool.'
             ),
-        studyId: z
-            .string()
-            .optional()
-            .describe('Direct study ID (e.g., "luad_tcga")'),
         genes: z
             .array(z.string())
             .min(1)
@@ -133,10 +130,7 @@ TYPICAL USE CASES:
 
 // Infer type from Zod schema
 type NavigateToResultsViewInput = {
-    studyKeywords?: z.infer<
-        typeof navigateToResultsViewTool.inputSchema.studyKeywords
-    >;
-    studyId?: z.infer<typeof navigateToResultsViewTool.inputSchema.studyId>;
+    studyIds: z.infer<typeof navigateToResultsViewTool.inputSchema.studyIds>;
     genes: z.infer<typeof navigateToResultsViewTool.inputSchema.genes>;
     caseSetId?: z.infer<typeof navigateToResultsViewTool.inputSchema.caseSetId>;
     tab?: z.infer<typeof navigateToResultsViewTool.inputSchema.tab>;
@@ -186,46 +180,11 @@ export async function handleNavigateToResultsView(
 async function navigateToResultsView(
     params: NavigateToResultsViewInput
 ): Promise<ToolResponse> {
-    let studyId: string;
+    const { studyIds } = params;
 
-    // 1. Resolve study ID
-    if (params.studyId) {
-        const isValid = await studyResolver.validate(params.studyId);
-        if (!isValid) {
-            return createErrorResponse(
-                `Study ID "${params.studyId}" not found`
-            );
-        }
-        studyId = params.studyId;
-    } else if (params.studyKeywords && params.studyKeywords.length > 0) {
-        const matches = await studyResolver.search(params.studyKeywords);
+    // studyIds are already validated by router, no need to validate again
 
-        if (matches.length === 0) {
-            return createErrorResponse('No matching studies found', {
-                searchTerms: params.studyKeywords,
-            });
-        }
-
-        if (matches.length > 1) {
-            return createAmbiguityResponse(
-                'Multiple studies found. Please specify which one:',
-                matches.map((s) => ({
-                    studyId: s.studyId,
-                    name: s.name,
-                    description: s.description,
-                    sampleCount: s.allSampleCount,
-                }))
-            );
-        }
-
-        studyId = matches[0].studyId;
-    } else {
-        return createErrorResponse(
-            'Either studyId or studyKeywords must be provided'
-        );
-    }
-
-    // 2. Validate genes
+    // 1. Validate genes
     if (!params.genes || params.genes.length === 0) {
         return createErrorResponse('At least one gene must be provided');
     }
@@ -247,15 +206,22 @@ async function navigateToResultsView(
         );
     }
 
-    // 3. Get molecular profile (optional, for metadata)
-    const profile = await profileResolver.getForStudy(studyId, 'mutation');
+    // 2. Determine case set ID
+    // For single study: use {studyId}_all (e.g., "luad_tcga_all")
+    // For multi-study: use "all"
+    // User can override with params.caseSetId
+    let caseSetId: string;
+    if (params.caseSetId) {
+        caseSetId = params.caseSetId;
+    } else if (studyIds.length === 1) {
+        caseSetId = `${studyIds[0]}_all`;
+    } else {
+        caseSetId = 'all';
+    }
 
-    // 4. Determine case set ID
-    const caseSetId = params.caseSetId || `${studyId}_all`;
-
-    // 5. Build URL
+    // 3. Build URL (supports multiple studies)
     const url = buildResultsUrl({
-        studies: [studyId],
+        studies: studyIds,
         genes: validGenes,
         caseSelection: {
             type: 'case_set',
@@ -265,13 +231,26 @@ async function navigateToResultsView(
     });
 
     // Get study details for metadata
-    const studyDetails = await studyResolver.getById(studyId);
+    const studyDetails = await Promise.all(
+        studyIds.map((id) => studyResolver.getById(id))
+    );
+
+    // Get molecular profiles (optional, for metadata)
+    const profiles = await Promise.all(
+        studyIds.map((id) => profileResolver.getForStudy(id, 'mutation'))
+    );
 
     return createSuccessResponse(url, {
-        studyId,
-        studyName: studyDetails.name,
+        studyIds,
+        studies: studyDetails.map((s) => ({
+            studyId: s.studyId,
+            name: s.name,
+            sampleCount: s.allSampleCount,
+        })),
         genes: validGenes,
         caseSetId,
-        molecularProfileId: profile?.molecularProfileId,
+        molecularProfiles: profiles
+            .filter((p) => p)
+            .map((p) => p!.molecularProfileId),
     });
 }

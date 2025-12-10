@@ -33,7 +33,6 @@ import { buildStudyUrl } from '../urlBuilders/study.js';
 import { validateTabAvailability } from '../resolution/tabValidator.js';
 import {
     createSuccessResponse,
-    createAmbiguityResponse,
     createErrorResponse,
 } from './common/responses.js';
 import type { ToolResponse } from './common/types.js';
@@ -70,9 +69,11 @@ CONDITIONALLY AVAILABLE: clinicalData, cnSegments (validated automatically)
 
 PARAMETERS:
 
-Study Selection (required - pick one):
-- studyId: Direct study ID (e.g., "luad_tcga") OR
-- studyKeywords: Array of keywords to search studies (e.g., ["TCGA", "lung"])
+Study Selection (required):
+- studyIds: Array of validated study IDs (e.g., ["luad_tcga", "brca_tcga"])
+  * For single study: ["luad_tcga"]
+  * For cross-study analysis: ["luad_tcga", "lusc_tcga"]
+  * These should be pre-resolved by route_to_target_page tool
 
 Tab Selection (optional):
 - tab: Specific tab to navigate to
@@ -116,20 +117,21 @@ Plots Configuration (optional - for plots tab):
 TYPICAL USE CASES:
 
 Basic navigation:
-- "Show me the TCGA lung cancer study" → studyKeywords: ["TCGA", "lung"]
-- "Navigate to BRCA study clinical data" → studyId: "brca_tcga", tab: "clinicalData"
-- "Show CN segments for LUAD study" → studyId: "luad_tcga", tab: "cnSegments"
+- "Show me the TCGA lung cancer study" → studyIds: ["luad_tcga"]
+- "Navigate to BRCA study clinical data" → studyIds: ["brca_tcga"], tab: "clinicalData"
+- "Show CN segments for LUAD study" → studyIds: ["luad_tcga"], tab: "cnSegments"
   (Will validate if CN data exists before generating URL)
+- "Compare TCGA lung adenocarcinoma and squamous" → studyIds: ["luad_tcga", "lusc_tcga"]
 
 Simple filtering (use filterAttributeId/filterValues):
 - "Filter lung study by patients age 40-60" →
-  studyKeywords: ["TCGA", "lung"], filterAttributeId: "AGE", filterValues: "40-60"
+  studyIds: ["luad_tcga"], filterAttributeId: "AGE", filterValues: "40-60"
 - "Show only female patients" →
-  studyId: "brca_tcga", filterAttributeId: "SEX", filterValues: "Female"
+  studyIds: ["brca_tcga"], filterAttributeId: "SEX", filterValues: "Female"
 
 Complex filtering (use filterJson):
 - "Show LUAD patients with TP53 mutations" →
-  studyId: "luad_tcga", filterJson: {
+  studyIds: ["luad_tcga"], filterJson: {
     geneFilters: [{
       molecularProfileIds: ["luad_tcga_mutations"],
       geneQueries: [[{hugoGeneSymbol: "TP53"}]]
@@ -145,7 +147,7 @@ Complex filtering (use filterJson):
 
 Plots configuration:
 - "Open plots tab with age vs survival" →
-  studyId: "luad_tcga", tab: "plots",
+  studyIds: ["luad_tcga"], tab: "plots",
   plotsHorzSelection: {dataType: "clinical_attribute", selectedDataSourceOption: "AGE"},
   plotsVertSelection: {dataType: "clinical_attribute", selectedDataSourceOption: "OS_MONTHS"}
 
@@ -154,16 +156,12 @@ Tab validation examples:
 - Request clinicalData for study WITHOUT samples → Error returned
 - Request summary or plots → Always works, no validation needed`,
     inputSchema: {
-        studyKeywords: z
+        studyIds: z
             .array(z.string())
-            .optional()
+            .min(1)
             .describe(
-                'Keywords to search for studies (e.g., ["TCGA", "lung"])'
+                'Array of validated study IDs (e.g., ["luad_tcga"] or ["luad_tcga", "lusc_tcga"] for cross-study). These should be pre-resolved by route_to_target_page tool.'
             ),
-        studyId: z
-            .string()
-            .optional()
-            .describe('Direct study ID (e.g., "luad_tcga")'),
         tab: z
             .enum(['summary', 'clinicalData', 'cnSegments', 'plots'])
             .optional()
@@ -218,10 +216,7 @@ Tab validation examples:
 
 // Infer type from Zod schema
 type NavigateToStudyViewInput = {
-    studyKeywords?: z.infer<
-        typeof navigateToStudyViewTool.inputSchema.studyKeywords
-    >;
-    studyId?: z.infer<typeof navigateToStudyViewTool.inputSchema.studyId>;
+    studyIds: z.infer<typeof navigateToStudyViewTool.inputSchema.studyIds>;
     tab?: z.infer<typeof navigateToStudyViewTool.inputSchema.tab>;
     filterJson?: z.infer<typeof navigateToStudyViewTool.inputSchema.filterJson>;
     filterAttributeId?: z.infer<
@@ -279,59 +274,32 @@ export async function handleNavigateToStudyView(
 async function navigateToStudyView(
     params: NavigateToStudyViewInput
 ): Promise<ToolResponse> {
-    let studyId: string;
+    const { studyIds } = params;
 
-    // Resolve study ID
-    if (params.studyId) {
-        // Direct ID provided, validate it
-        const isValid = await studyResolver.validate(params.studyId);
-        if (!isValid) {
-            return createErrorResponse(
-                `Study ID "${params.studyId}" not found`
-            );
-        }
-        studyId = params.studyId;
-    } else if (params.studyKeywords && params.studyKeywords.length > 0) {
-        // Search by keywords
-        const matches = await studyResolver.search(params.studyKeywords);
-
-        if (matches.length === 0) {
-            return createErrorResponse('No matching studies found', {
-                searchTerms: params.studyKeywords,
-            });
-        }
-
-        if (matches.length > 1) {
-            // Return options for user to choose
-            return createAmbiguityResponse(
-                'Multiple studies found. Please specify which one:',
-                matches.map((s) => ({
-                    studyId: s.studyId,
-                    name: s.name,
-                    description: s.description,
-                    sampleCount: s.allSampleCount,
-                }))
-            );
-        }
-
-        studyId = matches[0].studyId;
-    } else {
-        return createErrorResponse(
-            'Either studyId or studyKeywords must be provided'
+    // studyIds are already validated by router, no need to validate again
+    // Just validate tab availability for each study if needed
+    if (params.tab && params.tab !== 'summary' && params.tab !== 'plots') {
+        // Only validate for conditionally available tabs (clinicalData, cnSegments)
+        const validationResults = await Promise.all(
+            studyIds.map(async (id) => ({
+                studyId: id,
+                validation: await validateTabAvailability(id, params.tab!),
+            }))
         );
-    }
 
-    // Validate tab availability if tab specified
-    if (params.tab && params.tab !== 'summary') {
-        const validation = await validateTabAvailability(studyId, params.tab);
+        const unavailableStudies = validationResults.filter(
+            (r) => !r.validation.available
+        );
 
-        if (!validation.available) {
+        if (unavailableStudies.length > 0) {
             return createErrorResponse(
-                `Tab "${params.tab}" is not available for study "${studyId}"`,
+                `Tab "${params.tab}" is not available for some studies`,
                 {
-                    reason: validation.reason,
+                    unavailableStudies: unavailableStudies.map((s) => ({
+                        studyId: s.studyId,
+                        reason: s.validation.reason,
+                    })),
                     requestedTab: params.tab,
-                    studyId,
                     suggestion:
                         'Try "summary" or "plots" tabs which are always available',
                 }
@@ -339,9 +307,9 @@ async function navigateToStudyView(
         }
     }
 
-    // Build URL with all parameters
+    // Build URL with all parameters (supports multiple studies)
     const url = buildStudyUrl({
-        studyIds: studyId,
+        studyIds: studyIds,
         tab: params.tab,
         filterJson: params.filterJson,
         filterAttributeId: params.filterAttributeId,
@@ -352,11 +320,17 @@ async function navigateToStudyView(
     });
 
     // Get study details for metadata
-    const studyDetails = await studyResolver.getById(studyId);
+    const studyDetails = await Promise.all(
+        studyIds.map((id) => studyResolver.getById(id))
+    );
 
     return createSuccessResponse(url, {
-        studyId,
-        studyName: studyDetails.name,
+        studyIds,
+        studies: studyDetails.map((s) => ({
+            studyId: s.studyId,
+            name: s.name,
+            sampleCount: s.allSampleCount,
+        })),
         tab: params.tab,
         hasFilters: !!(params.filterJson || params.filterAttributeId),
         hasPlotsConfig: !!(

@@ -10,7 +10,7 @@
  * - `createMcpServer()`: Factory function that returns a configured McpServer instance
  *
  * Registered tools:
- * - `route_to_target_page`: Main router that delegates to specialized tools
+ * - `resolve_and_route`: Main router that delegates to specialized tools
  * - `navigate_to_studyview`: Study overview page navigation
  * - `navigate_to_patientview`: Patient detail page navigation
  * - `navigate_to_resultsview`: Results/OncoPrint page navigation
@@ -25,9 +25,9 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
-    routeToTargetPageTool,
-    handleRouteToTargetPage,
-} from './tools/routeToTargetPage.js';
+    resolveAndRouteTool,
+    handleResolveAndRoute,
+} from './tools/resolveAndRoute.js';
 import {
     navigateToStudyViewTool,
     handleNavigateToStudyView,
@@ -52,13 +52,13 @@ export function createMcpServer(): McpServer {
 
     // Register the main router tool
     server.registerTool(
-        routeToTargetPageTool.name,
+        resolveAndRouteTool.name,
         {
-            title: routeToTargetPageTool.title,
-            description: routeToTargetPageTool.description,
-            inputSchema: routeToTargetPageTool.inputSchema,
+            title: resolveAndRouteTool.title,
+            description: resolveAndRouteTool.description,
+            inputSchema: resolveAndRouteTool.inputSchema,
         },
-        handleRouteToTargetPage
+        handleResolveAndRoute
     );
 
     // Register specialized navigation tools

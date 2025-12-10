@@ -59,19 +59,31 @@ AVAILABLE TABS:
 - tissueImage: Pathology image viewer
 - trialMatch: Clinical trial matching results
 
+MULTI-STUDY SUPPORT:
+When multiple studyIds are provided, this tool generates a separate PatientView URL
+for each study. This is useful when you want to view the same patient ID across
+different studies or compare patients from different cohorts.
+
 TYPICAL USE CASES:
-- "Show me patient TCGA-001 from LUAD study"
-- "Navigate to sample TCGA-001-01A in the study"
-- "Open the genomic tracks for this patient"
-- "Display clinical timeline for patient ID 12345"
+- "Show me patient TCGA-001 from LUAD study" → studyIds: ["luad_tcga"], patientId: "TCGA-001"
+- "View patient TCGA-001 across lung studies" → studyIds: ["luad_tcga", "lusc_tcga"], patientId: "TCGA-001"
+- "Navigate to sample TCGA-001-01A" → studyIds: ["luad_tcga"], sampleId: "TCGA-001-01A"
+- "Open genomic tracks for this patient" → studyIds: ["luad_tcga"], patientId: "TCGA-001", tab: "genomicTracks"
 
 PARAMETERS:
-- studyId is REQUIRED
+- studyIds: REQUIRED - Array of validated study IDs (e.g., ["luad_tcga"] or ["luad_tcga", "brca_tcga"])
+  * These should be pre-resolved by route_to_target_page tool
+  * A separate URL will be generated for each study
 - Provide either patientId OR sampleId (at least one required)
 - Optionally specify a tab to open directly
 - navIds can be provided to enable navigation through a cohort`,
     inputSchema: {
-        studyId: z.string().describe('Study ID (required)'),
+        studyIds: z
+            .array(z.string())
+            .min(1)
+            .describe(
+                'Array of validated study IDs (e.g., ["luad_tcga"] or ["luad_tcga", "brca_tcga"]). These should be pre-resolved by route_to_target_page tool. A separate URL will be generated for each study.'
+            ),
         patientId: z.string().optional().describe('Patient/case identifier'),
         sampleId: z.string().optional().describe('Sample identifier'),
         tab: z
@@ -99,7 +111,7 @@ PARAMETERS:
 
 // Infer type from Zod schema
 type NavigateToPatientViewInput = {
-    studyId: z.infer<typeof navigateToPatientViewTool.inputSchema.studyId>;
+    studyIds: z.infer<typeof navigateToPatientViewTool.inputSchema.studyIds>;
     patientId?: z.infer<typeof navigateToPatientViewTool.inputSchema.patientId>;
     sampleId?: z.infer<typeof navigateToPatientViewTool.inputSchema.sampleId>;
     tab?: z.infer<typeof navigateToPatientViewTool.inputSchema.tab>;
@@ -144,9 +156,7 @@ export async function handleNavigateToPatientView(
 async function navigateToPatientView(
     params: NavigateToPatientViewInput
 ): Promise<ToolResponse> {
-    if (!params.studyId) {
-        return createErrorResponse('studyId is required for patient page');
-    }
+    const { studyIds } = params;
 
     if (!params.patientId && !params.sampleId) {
         return createErrorResponse(
@@ -154,26 +164,51 @@ async function navigateToPatientView(
         );
     }
 
-    // Validate study exists
-    const isValid = await studyResolver.validate(params.studyId);
-    if (!isValid) {
-        return createErrorResponse(`Study ID "${params.studyId}" not found`);
-    }
+    // studyIds are already validated by router, no need to validate again
 
-    // Build URL
-    const url = buildPatientUrl({
-        studyId: params.studyId,
-        caseId: params.patientId,
-        sampleId: params.sampleId,
-        tab: params.tab,
-        navIds: params.navIds as
-            | Array<{ patientId: string; studyId: string }>
-            | undefined,
+    // Build URLs for each study
+    const patientUrls = studyIds.map((studyId) => {
+        const url = buildPatientUrl({
+            studyId,
+            caseId: params.patientId,
+            sampleId: params.sampleId,
+            tab: params.tab,
+            navIds: params.navIds as
+                | Array<{ patientId: string; studyId: string }>
+                | undefined,
+        });
+        return { studyId, url };
     });
 
-    return createSuccessResponse(url, {
-        studyId: params.studyId,
+    // Get study details for metadata
+    const studyDetails = await Promise.all(
+        studyIds.map((id) => studyResolver.getById(id))
+    );
+
+    // Build a user-friendly message
+    const urlDescriptions = patientUrls
+        .map((item, index) => {
+            const study = studyDetails[index];
+            const identifier = params.patientId
+                ? `patient ${params.patientId}`
+                : `sample ${params.sampleId}`;
+            return `- ${study.name} (${item.studyId}): ${identifier}\n  URL: ${item.url}`;
+        })
+        .join('\n\n');
+
+    const message =
+        studyIds.length === 1
+            ? patientUrls[0].url
+            : `Generated ${studyIds.length} PatientView URLs:\n\n${urlDescriptions}`;
+
+    return createSuccessResponse(message, {
+        patientUrls: patientUrls.map((item, index) => ({
+            studyId: item.studyId,
+            studyName: studyDetails[index].name,
+            url: item.url,
+        })),
         patientId: params.patientId,
         sampleId: params.sampleId,
+        tab: params.tab,
     });
 }
