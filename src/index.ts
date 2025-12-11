@@ -86,7 +86,7 @@ async function startHttp() {
     });
 
     // MCP endpoint with Streamable HTTP transport
-    app.post('/mcp', async (req, res) => {
+    app.all('/mcp', async (req, res) => {
         try {
             // Create new server and transport for each request (stateless mode)
             const server = createMcpServer();
