@@ -28,15 +28,15 @@
  */
 
 import { z } from 'zod';
-import { studyResolver } from '../resolution/studyResolver.js';
-import { geneResolver } from '../resolution/geneResolver.js';
-import { profileResolver } from '../resolution/profileResolver.js';
-import { buildResultsUrl } from '../urlBuilders/results.js';
+import { studyResolver } from '../../shared/resolvers/studyResolver.js';
+import { geneResolver } from '../../shared/resolvers/geneResolver.js';
+import { profileResolver } from '../../shared/resolvers/profileResolver.js';
+import { buildResultsUrl } from './urlBuilder.js';
 import {
     createSuccessResponse,
     createErrorResponse,
-} from './common/responses.js';
-import type { ToolResponse } from './common/types.js';
+} from '../../shared/utils/responses.js';
+import type { ToolResponse } from '../../shared/utils/types.js';
 
 /**
  * Tool definition for MCP registration

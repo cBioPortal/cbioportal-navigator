@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/shared/schemas/types/**/*.d.ts"
+  ]
+}

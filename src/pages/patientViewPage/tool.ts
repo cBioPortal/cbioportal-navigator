@@ -26,13 +26,13 @@
  */
 
 import { z } from 'zod';
-import { studyResolver } from '../resolution/studyResolver.js';
-import { buildPatientUrl } from '../urlBuilders/patient.js';
+import { studyResolver } from '../../shared/resolvers/studyResolver.js';
+import { buildPatientUrl } from './urlBuilder.js';
 import {
     createSuccessResponse,
     createErrorResponse,
-} from './common/responses.js';
-import type { ToolResponse } from './common/types.js';
+} from '../../shared/utils/responses.js';
+import type { ToolResponse } from '../../shared/utils/types.js';
 
 /**
  * Tool definition for MCP registration

@@ -28,14 +28,19 @@
  */
 
 import { z } from 'zod';
-import { studyResolver } from '../resolution/studyResolver.js';
-import { buildStudyUrl } from '../urlBuilders/study.js';
-import { validateTabAvailability } from '../resolution/tabValidator.js';
+import { studyResolver } from '../../shared/resolvers/studyResolver.js';
+import { buildStudyUrl } from './urlBuilder.js';
+import { validateTabAvailability } from './tabValidator.js';
 import {
     createSuccessResponse,
     createErrorResponse,
-} from './common/responses.js';
-import type { ToolResponse } from './common/types.js';
+} from '../../shared/utils/responses.js';
+import type { ToolResponse } from '../../shared/utils/types.js';
+import { studyViewFilterSchema } from '../../shared/schemas/cbioportal.js';
+import {
+    plotsSelectionParamSchema,
+    plotsColoringParamSchema,
+} from './schemas.js';
 
 /**
  * Tool definition for MCP registration
@@ -168,8 +173,8 @@ Tab validation examples:
             .describe('Specific tab to navigate to'),
 
         // Comprehensive filtering
-        filterJson: z
-            .record(z.any())
+        filterJson: studyViewFilterSchema
+            .partial()
             .optional()
             .describe(
                 'Comprehensive StudyViewFilter object for complex multi-attribute filtering. Supports clinicalDataFilters, geneFilters, genomicDataFilters, genomicProfiles, mutationDataFilters, sampleIdentifiers, and 15+ more filter types. See examples in tool description.'
@@ -191,22 +196,19 @@ Tab validation examples:
             ),
 
         // Plots configuration
-        plotsHorzSelection: z
-            .record(z.any())
+        plotsHorzSelection: plotsSelectionParamSchema
             .optional()
             .describe(
                 'Horizontal axis configuration for plots tab. Fields: selectedGeneOption (number), dataType (string), selectedDataSourceOption (string), logScale ("true"/"false").'
             ),
 
-        plotsVertSelection: z
-            .record(z.any())
+        plotsVertSelection: plotsSelectionParamSchema
             .optional()
             .describe(
                 'Vertical axis configuration for plots tab. Same structure as plotsHorzSelection.'
             ),
 
-        plotsColoringSelection: z
-            .record(z.any())
+        plotsColoringSelection: plotsColoringParamSchema
             .optional()
             .describe(
                 'Point coloring configuration for plots tab. Fields: selectedOption (string), colorByMutationType ("true"/"false"), colorByCopyNumber ("true"/"false").'

@@ -26,7 +26,11 @@
  * @packageDocumentation
  */
 
-import { buildCBioPortalPageUrl, QueryParams, BuildUrlParams } from './core.js';
+import {
+    buildCBioPortalPageUrl,
+    QueryParams,
+    BuildUrlParams,
+} from '../../shared/utils/urlBuilder.js';
 
 export interface StudyUrlOptions {
     studyIds: string | string[];

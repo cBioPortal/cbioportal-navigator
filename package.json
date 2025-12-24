@@ -15,7 +15,8 @@
     "watch": "tsc --watch",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
-    "prepare": "husky"
+    "prepare": "husky",
+    "generate:schemas": "ts-to-zod --skipValidation node_modules/cbioportal-ts-api-client/dist/generated/CBioPortalAPIInternal.d.ts src/shared/schemas/cbioportal.ts"
   },
   "keywords": [
     "cbioportal",
@@ -39,6 +40,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^15.5.2",
     "prettier": "^3.6.2",
+    "ts-to-zod": "^5.1.0",
     "tsx": "^4.7.0",
     "typescript": "^4.0.3"
   },

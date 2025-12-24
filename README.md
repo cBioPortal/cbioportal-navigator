@@ -38,6 +38,14 @@ cbioportal-navigator/
 │   │       ├── types.ts              # Tool response types
 │   │       ├── responses.ts          # Response builders
 │   │       └── validators.ts         # Input validators
+│   ├── schemas/                      # Type definitions & Zod schema generation
+│   │   ├── README.md                 # Schema generation guide
+│   │   ├── types/                    # TypeScript type definitions
+│   │   │   ├── StudyViewFilter.d.ts  # StudyViewFilter types from cBioPortal API
+│   │   │   └── PlotsConfig.d.ts      # Plots configuration types
+│   │   └── generated/                # Auto-generated Zod schemas (ts-to-zod)
+│   │       ├── StudyViewFilterSchemas.ts
+│   │       └── PlotsConfigSchemas.ts
 │   ├── resolution/                   # Entity resolvers
 │   │   ├── studyResolver.ts          # Study search and validation
 │   │   ├── geneResolver.ts           # Gene validation
@@ -247,12 +255,41 @@ The server automatically selects the transport mode based on the `MCP_TRANSPORT`
 
 AGPL-3.0-or-later
 
+## Development
+
+### Schema Generation
+
+This project uses [ts-to-zod](https://github.com/fabien0102/ts-to-zod) to automatically generate Zod validation schemas from TypeScript type definitions, providing strict type safety for MCP tool inputs.
+
+**Quick Reference:**
+
+```bash
+# Regenerate all schemas
+npm run generate:schemas
+
+# Build project
+npm run build
+```
+
+**For detailed schema development guide**, see [`src/schemas/README.md`](src/shared/schemas/README.md)
+
+### Available Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run build` | Compile TypeScript to dist/ |
+| `npm run watch` | Auto-rebuild on file changes |
+| `npm run dev` | Run with tsx (no build needed) |
+| `npm start` | Run compiled version (requires build first) |
+| `npm run generate:schemas` | Regenerate all Zod schemas from type definitions |
+
 ## Contributing
 
 Contributions welcome! Please ensure:
 - TypeScript code compiles without errors
 - Changes are tested with both Claude Desktop and LibreChat
 - Documentation is updated accordingly
+- If modifying schemas, run `npm run generate:schemas` before committing
 
 ## Troubleshooting
 

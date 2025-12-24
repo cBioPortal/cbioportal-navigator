@@ -25,7 +25,7 @@
  * @packageDocumentation
  */
 
-import { apiClient } from '../api/client.js';
+import { apiClient } from '../../shared/api/client.js';
 
 export interface TabValidationResult {
     available: boolean;

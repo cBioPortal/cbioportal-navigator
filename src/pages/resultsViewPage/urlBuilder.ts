@@ -28,7 +28,10 @@
  * @packageDocumentation
  */
 
-import { buildCBioPortalPageUrl, QueryParams } from './core.js';
+import {
+    buildCBioPortalPageUrl,
+    QueryParams,
+} from '../../shared/utils/urlBuilder.js';
 
 export interface ResultsUrlOptions {
     studies: string[];
