@@ -37,4 +37,4 @@ ENV MCP_TRANSPORT=http
 EXPOSE 8002
 
 # Start server in HTTP mode
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/server/index.js"]

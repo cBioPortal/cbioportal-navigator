@@ -27,29 +27,48 @@ cBioPortal Navigator bridges the gap between natural language cancer genomics qu
 ```
 cbioportal-navigator/
 ├── src/
-│   ├── index.ts                      # Entry point (stdio/HTTP mode selection)
-│   ├── server.ts                     # MCP server creation and tool registration
-│   ├── tools/
-│   │   ├── routeToTargetPage.ts      # Main router tool (routes to specialized tools)
-│   │   ├── navigateToStudyView.ts    # StudyView page navigation
-│   │   ├── navigateToPatientView.ts  # PatientView page navigation
-│   │   ├── navigateToResultsView.ts  # ResultsView page navigation
-│   │   └── common/                   # Shared tool utilities
-│   │       ├── types.ts              # Tool response types
-│   │       ├── responses.ts          # Response builders
-│   │       └── validators.ts         # Input validators
-│   ├── resolution/                   # Entity resolvers
-│   │   ├── studyResolver.ts          # Study search and validation
-│   │   ├── geneResolver.ts           # Gene validation
-│   │   └── profileResolver.ts        # Molecular profile lookup
-│   ├── urlBuilders/                  # URL construction logic
-│   │   ├── config.ts                 # Base URL configuration
-│   │   ├── core.ts                   # Core URL utilities
-│   │   ├── study.ts                  # StudyView URL builder
-│   │   ├── patient.ts                # PatientView URL builder
-│   │   └── results.ts                # ResultsView URL builder
-│   └── api/                          # cBioPortal API client
-│       └── client.ts                 # HTTP client wrapper
+│   ├── server/                       # Server layer (user-facing)
+│   │   ├── index.ts                  # Application entry point
+│   │   ├── mcp/                      # MCP server infrastructure
+│   │   │   ├── server.ts             # MCP server creation and setup
+│   │   │   ├── toolRegistry.ts       # Tool registration
+│   │   │   └── resourceRegistry.ts   # Resource registration
+│   │   └── chat/                     # Chat Completions API
+│   │       ├── handler.ts            # Request handler (streaming & non-streaming)
+│   │       ├── mcp-client/           # MCP client integration
+│   │       ├── providers/            # Multi-provider support
+│   │       └── config/               # API key resolution logic
+│   ├── domain/                       # Domain layer (business logic)
+│   │   ├── shared/                   # Shared types and utilities for all domain tools
+│   │   │   ├── types.ts              # MCP tool parameter and response types
+│   │   │   ├── responses.ts          # Response builders for MCP tools
+│   │   │   └── validators.ts         # Parameter validation utilities
+│   │   ├── router/                   # Main routing tool
+│   │   │   └── tool.ts               # resolve_and_route tool
+│   │   ├── studyView/                # StudyView domain
+│   │   │   ├── tool.ts               # navigate_to_studyview
+│   │   │   ├── urlBuilder.ts         # URL construction logic
+│   │   │   ├── tabValidator.ts       # Tab availability validation
+│   │   │   ├── schemas/              # Manually maintained Zod schemas
+│   │   │   └── resources/            # MCP resources
+│   │   ├── patientView/              # PatientView domain
+│   │   │   ├── tool.ts               # navigate_to_patientview
+│   │   │   └── urlBuilder.ts         # URL construction logic
+│   │   └── resultsView/              # ResultsView domain
+│   │       ├── tool.ts               # navigate_to_resultsview
+│   │       └── urlBuilder.ts         # URL construction logic
+│   └── infrastructure/               # Infrastructure layer (API-facing)
+│       ├── api/                      # cBioPortal API clients
+│       │   ├── client.ts             # Main API client
+│       │   └── studyViewData.ts      # StudyView-specific API calls
+│       ├── resolvers/                # Entity resolvers
+│       │   ├── studyResolver.ts      # Study search and validation
+│       │   ├── geneResolver.ts       # Gene validation
+│       │   └── profileResolver.ts    # Molecular profile lookup
+│       └── utils/                    # Core infrastructure utilities
+│           ├── config.ts             # Configuration management (baseUrl, protocol)
+│           └── urlBuilder.ts         # Core URL construction utilities
+├── DEVELOPMENT.md                    # Development status and architecture docs
 ├── Dockerfile                        # Multi-stage Docker build
 ├── docker-compose.example.yml        # Docker Compose template
 ├── librechat.example.yaml            # LibreChat MCP configuration
@@ -86,77 +105,137 @@ cbioportal-navigator/
 
    **Important**: Use absolute path (not relative like `~/` or `./`)
 
-3. **Restart Claude Desktop** → Look for 🔌 icon
+3. **Restart Claude Desktop** → Look for MCP connection icon
 
-#### Development Mode
+### Option 2: Standalone MCP Server (Docker)
 
-For development with auto-reload (stdio mode):
+Run Navigator as a standalone MCP server that AI agents can connect to via HTTP.
 
-```bash
-npm run dev
-```
+**Quick Start**:
 
-For HTTP mode development:
-
-```bash
-MCP_TRANSPORT=http PORT=8002 npm run dev
-```
-
-### Option 2: Server Deployment with LibreChat
-
-**Quick Start** (4 steps):
-
-1. **Setup config files**:
+1. **Start the MCP server**:
    ```bash
-   cp docker-compose.example.yml docker-compose.yml
+   docker compose -f docker-compose.mcp.yml up -d
+   ```
+
+2. **Verify it's running**:
+   ```bash
+   # Check health
+   curl http://localhost:8002/health
+
+   # View logs
+   docker compose -f docker-compose.mcp.yml logs -f
+   ```
+
+3. **Connect from AI agents**:
+   - MCP endpoint: `http://localhost:8002/mcp`
+   - Use with MCP-compatible tools like Claude Code or custom agents
+
+**Configuration**:
+
+Edit `docker-compose.mcp.yml` to customize:
+```yaml
+environment:
+  - MCP_TRANSPORT=http
+  - PORT=8002
+  - CBIOPORTAL_BASE_URL=https://www.cbioportal.org  # Change if using private instance
+```
+
+**Stop the server**:
+```bash
+docker compose -f docker-compose.mcp.yml down
+```
+
+### Option 3: LibreChat Integration (Docker)
+
+Navigator integrates with LibreChat via Docker Compose, supporting multiple AI providers (Claude, Gemini, GPT) with a single endpoint configuration.
+
+**Quick Start**:
+
+1. **Configure API keys in LibreChat's `.env` file**:
+   ```bash
+   # Edit /path/to/LibreChat/.env
+   ANTHROPIC_API_KEY=sk-ant-...
+   GOOGLE_KEY=AIzaSy...
+   OPENAI_API_KEY=sk-proj-...
+   ```
+
+2. **Setup configuration files**:
+   ```bash
+   cp docker-compose.example.yml docker-compose.override.yml
    cp librechat.example.yaml librechat.yaml
    ```
 
-2. **Configure docker-compose.yml**:
-
-   Choose one image source:
+3. **Edit `docker-compose.override.yml`**:
    ```yaml
-   # Option A: Use pre-built image
-   image: ghcr.io/YOUR_USERNAME/cbioportal-navigator:latest
+   services:
+     cbioportal-navigator:
+       # Use pre-built GitHub image
+       # Or build locally: docker build -t cbioportal-navigator:latest .
+       image: ghcr.io/YOUR_USERNAME/cbioportal-navigator:latest
+       container_name: cbioportal-navigator
+       ports:
+         - "8002:8002"
+       environment:
+         - MCP_TRANSPORT=http
+         - PORT=8002
+         # API keys shared from LibreChat .env
+         - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+         - GOOGLE_API_KEY=${GOOGLE_KEY}
+         - OPENAI_API_KEY=${OPENAI_API_KEY}
+       restart: unless-stopped
+       networks:
+         - default
 
-   # Option B: Build locally
-   build:
-     context: .
-     dockerfile: Dockerfile
+     api:
+       volumes:
+         - ./librechat.yaml:/app/librechat.yaml:ro
    ```
 
-   Add your API keys:
+4. **Edit `librechat.yaml`**:
    ```yaml
-   librechat:
-     environment:
-       - ANTHROPIC_API_KEY=your_key_here
-       - OPENAI_API_KEY=your_key_here
+   endpoints:
+     custom:
+       - name: 'cBioPortal Navigator'
+         apiKey: 'dummy'  # Navigator uses env vars, not this value
+         baseURL: 'http://cbioportal-navigator:8002/v1'
+         models:
+           default:
+             - 'claude-sonnet-4-5'
+             - 'claude-opus-4-5'
+             - 'gemini-2.0-flash'
+             - 'gpt-4o'
+           fetch: true
+         modelDisplayLabel: 'cBioPortal Navigator'
    ```
 
-3. **Start services**:
+5. **Start services** (from LibreChat directory):
    ```bash
-   docker-compose up -d
+   # If currently running, docker compose down
+   docker compose up -d
    ```
 
-4. **Verify**:
-   - LibreChat UI: http://localhost:3080
-   - Health check: http://localhost:8002/health
-   - View logs: `docker-compose logs -f cbioportal-navigator`
+6. **Usage**:
+   - Open LibreChat: http://localhost:3080
+   - Select "cBioPortal Navigator" from the endpoint dropdown
+   - Choose any model (all use correct API keys automatically)
+   - Ask: "Show me TCGA lung cancer mutations in EGFR"
 
-**LibreChat MCP Configuration** (`librechat.yaml`):
-```yaml
-mcpServers:
-  cbioportal-navigator:
-    type: streamable-http
-    url: "http://cbioportal-navigator:8002/mcp"
-```
+**How it works**:
+- Navigator detects provider from model name (claude-* → Anthropic, gemini-* → Google, gpt-* → OpenAI)
+- Uses corresponding environment variable for each provider
+- Single endpoint supports all models without per-model configuration
 
-**Optional - Environment Variables**:
-```yaml
-# In docker-compose.yml
-cbioportal-navigator:
-  environment:
-    - CBIOPORTAL_BASE_URL=https://www.cbioportal.org  # Change if using custom instance
+**Troubleshooting**:
+```bash
+# View Navigator logs
+docker compose logs -f cbioportal-navigator
+
+# Test health endpoint
+curl http://localhost:8002/health
+
+# Check available models
+curl http://localhost:8002/v1/models
 ```
 
 ## Environment Variables
@@ -164,75 +243,54 @@ cbioportal-navigator:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `CBIOPORTAL_BASE_URL` | Base URL of cBioPortal instance | `https://www.cbioportal.org` |
+| `MCP_TRANSPORT` | Transport mode (`stdio` or `http`) | `stdio` |
+| `PORT` | HTTP server port (HTTP mode only) | `8002` |
+| `ANTHROPIC_API_KEY` | Anthropic API key (for Claude models) | - |
+| `GOOGLE_API_KEY` | Google API key (for Gemini models) | - |
+| `OPENAI_API_KEY` | OpenAI API key (for GPT models) | - |
 | `NODE_ENV` | Environment mode | `production` (in Docker) |
 
-## Tool Usage Flow
-
-When connected to an AI assistant (e.g., Claude):
-
-### Example 1: Gene Mutation Analysis
-
-**User Query**: "Show me TP53 mutations in TCGA lung adenocarcinoma"
-
-**AI Processing**:
-1. Recognizes: Gene-focused query → Results page needed
-2. Calls `route_to_target_page` OR `navigate_to_resultsview` directly
-3. Parameters: `targetPage="results"`, `studyKeywords=["TCGA", "lung", "adenocarcinoma"]`, `genes=["TP53"]`
-
-**Server Processing**:
-1. Searches studies matching keywords → finds "luad_tcga"
-2. Validates gene "TP53" ✓
-3. Builds results URL with OncoPrint parameters
-4. Returns: `https://www.cbioportal.org/results/oncoprint?...`
-
-### Example 2: Patient View
-
-**User Query**: "Take me to patient TCGA-05-4384 in study luad_tcga"
-
-**AI Processing**:
-1. Recognizes: Specific patient → Patient page needed
-2. Calls `route_to_target_page` OR `navigate_to_patientview` directly
-3. Parameters: `targetPage="patient"`, `studyId="luad_tcga"`, `patientId="TCGA-05-4384"`
-
-**Server Processing**:
-1. Validates study "luad_tcga" exists ✓
-2. Builds patient URL
-3. Returns: `https://www.cbioportal.org/patient?studyId=luad_tcga&caseId=TCGA-05-4384`
-
-### Example 3: Study Overview
-
-**User Query**: "Show me the TCGA breast cancer study overview"
-
-**AI Processing**:
-1. Recognizes: Study-level overview → Study page needed
-2. Calls `route_to_target_page` OR `navigate_to_studyview` directly
-3. Parameters: `targetPage="study"`, `studyKeywords=["TCGA", "breast"]`
-
-**Server Processing**:
-1. Searches studies → finds "brca_tcga"
-2. Builds study URL
-3. Returns: `https://www.cbioportal.org/study?id=brca_tcga`
 
 ## Architecture
 
-### Communication Flow
+### Communication Flows
 
+**Option 1: MCP Protocol (Claude Desktop)**
 ```
-AI Assistant (Claude)
-    ↓ MCP Protocol
-MCP Server (this project)
-    ↓ HTTP API
-cBioPortal Public API
+Claude Desktop
+    ↓ MCP Protocol (stdio)
+Navigator MCP Server
+    ↓ cBioPortal HTTP API
+cBioPortal
 ```
 
-### Transport Modes
+**Option 2: Chat Completions API (LibreChat)**
+```
+LibreChat UI
+    ↓ HTTP POST
+Navigator Chat Completions API (/v1/chat/completions)
+    ↓ AI SDK → Anthropic/Google/OpenAI API
+AI Provider (Claude/Gemini/GPT)
+    ↓ Tool calls → MCP tools
+Navigator MCP Tools
+    ↓ cBioPortal HTTP API
+cBioPortal
+```
 
-- **stdio**: For local clients like Claude Desktop (direct stdin/stdout communication)
-- **Streamable HTTP**: For remote/web-based clients like LibreChat (HTTP POST with optional SSE)
+### Dual Mode Support
 
-The server automatically selects the transport mode based on the `MCP_TRANSPORT` environment variable:
-- `MCP_TRANSPORT=stdio` (default): Uses stdio transport
-- `MCP_TRANSPORT=http`: Uses Streamable HTTP transport
+Navigator runs in one of two transport modes based on the `MCP_TRANSPORT` environment variable:
+
+**stdio mode** (default):
+- Used by Claude Desktop and other local MCP clients
+- Direct process communication via stdin/stdout
+- Command: `MCP_TRANSPORT=stdio npm start`
+
+**HTTP mode**:
+- Used by LibreChat and web-based clients
+- Provides both MCP endpoint (`/mcp`) and Chat Completions endpoint (`/v1/chat/completions`)
+- Streamable HTTP with SSE support
+- Command: `MCP_TRANSPORT=http PORT=8002 npm start`
 
 ## Development
 
@@ -242,25 +300,6 @@ The server automatically selects the transport mode based on the `MCP_TRANSPORT`
 | `npm run watch` | Auto-rebuild on file changes |
 | `npm run dev` | Run with tsx (no build needed) |
 | `npm start` | Run compiled version (requires build first) |
-
-## License
-
-AGPL-3.0-or-later
-
-## Contributing
-
-Contributions welcome! Please ensure:
-- TypeScript code compiles without errors
-- Changes are tested with both Claude Desktop and LibreChat
-- Documentation is updated accordingly
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| **Claude Desktop not connecting** | • Use absolute path in config<br>• Run `npm run build` to create dist/index.js<br>• Check logs: `~/Library/Logs/Claude/` (macOS) |
-| **Docker container not starting** | • Check logs: `docker-compose logs cbioportal-navigator`<br>• Rebuild: `docker-compose up --build` |
-| **HTTP endpoint 404** | • Verify container running: `docker ps`<br>• Test health: `curl http://localhost:8002/health`<br>• Check firewall on port 8002 |
 
 ## Resources
 
