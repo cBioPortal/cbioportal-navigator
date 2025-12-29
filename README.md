@@ -38,26 +38,29 @@ cbioportal-navigator/
 │   │       ├── types.ts              # Tool response types
 │   │       ├── responses.ts          # Response builders
 │   │       └── validators.ts         # Input validators
-│   ├── schemas/                      # Type definitions & Zod schema generation
-│   │   ├── README.md                 # Schema generation guide
-│   │   ├── types/                    # TypeScript type definitions
-│   │   │   ├── StudyViewFilter.d.ts  # StudyViewFilter types from cBioPortal API
-│   │   │   └── PlotsConfig.d.ts      # Plots configuration types
-│   │   └── generated/                # Auto-generated Zod schemas (ts-to-zod)
-│   │       ├── StudyViewFilterSchemas.ts
-│   │       └── PlotsConfigSchemas.ts
-│   ├── resolution/                   # Entity resolvers
-│   │   ├── studyResolver.ts          # Study search and validation
-│   │   ├── geneResolver.ts           # Gene validation
-│   │   └── profileResolver.ts        # Molecular profile lookup
-│   ├── urlBuilders/                  # URL construction logic
-│   │   ├── config.ts                 # Base URL configuration
-│   │   ├── core.ts                   # Core URL utilities
-│   │   ├── study.ts                  # StudyView URL builder
-│   │   ├── patient.ts                # PatientView URL builder
-│   │   └── results.ts                # ResultsView URL builder
-│   └── api/                          # cBioPortal API client
-│       └── client.ts                 # HTTP client wrapper
+│   ├── pages/                        # Page-specific tools and schemas
+│   │   ├── studyViewPage/
+│   │   │   ├── tool.ts               # StudyView MCP tool
+│   │   │   ├── schemas.ts            # Plots URL parameter schemas (manual)
+│   │   │   ├── urlBuilder.ts         # URL construction
+│   │   │   └── tabValidator.ts       # Tab availability validation
+│   │   ├── resultsViewPage/          # ResultsView page navigation
+│   │   └── patientViewPage/          # PatientView page navigation
+│   ├── shared/                       # Shared utilities and schemas
+│   │   ├── schemas/
+│   │   │   └── cbioportal.ts         # Auto-generated API type schemas (ts-to-zod)
+│   │   ├── resolvers/                # Entity resolvers
+│   │   │   ├── studyResolver.ts      # Study search and validation
+│   │   │   ├── geneResolver.ts       # Gene validation
+│   │   │   └── profileResolver.ts    # Molecular profile lookup
+│   │   ├── utils/                    # Shared utilities
+│   │   │   ├── urlBuilder.ts         # Core URL utilities
+│   │   │   ├── responses.ts          # Response builders
+│   │   │   └── types.ts              # Common types
+│   │   └── api/
+│   │       └── client.ts             # cBioPortal API client
+│   └── router.ts                     # Main routing tool
+├── DEVELOPMENT.md                    # Development status and schema documentation
 ├── Dockerfile                        # Multi-stage Docker build
 ├── docker-compose.example.yml        # Docker Compose template
 ├── librechat.example.yaml            # LibreChat MCP configuration
@@ -271,7 +274,7 @@ npm run generate:schemas
 npm run build
 ```
 
-**For detailed schema development guide**, see [`src/schemas/README.md`](src/shared/schemas/README.md)
+**For schema architecture and type sources**, see [`DEVELOPMENT.md`](DEVELOPMENT.md)
 
 ### Available Scripts
 
