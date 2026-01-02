@@ -28,7 +28,7 @@
 import {
     buildCBioPortalPageUrl,
     QueryParams,
-} from '../../shared/utils/urlBuilder.js';
+} from '../shared/utils/urlBuilder.js';
 
 export interface PatientUrlOptions {
     studyId: string;

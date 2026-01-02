@@ -15,6 +15,11 @@
  * - `navigate_to_patientview`: Patient detail page navigation
  * - `navigate_to_resultsview`: Results/OncoPrint page navigation
  *
+ * Registered resources:
+ * - `cbioportal://study/{studyId}/filters/clinical-attributes`: Clinical attributes metadata
+ * - `cbioportal://study/{studyId}/filters/case-lists`: Case lists metadata
+ * - `cbioportal://study/{studyId}/filters/molecular-profiles`: Molecular profiles metadata
+ *
  * Architecture:
  * The server is stateless and can be instantiated per-request (HTTP mode) or
  * as a long-lived instance (stdio mode). Each tool registration includes its
@@ -24,22 +29,11 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { resolveAndRouteTool, handleResolveAndRoute } from './router.js';
-import {
-    navigateToStudyViewTool,
-    handleNavigateToStudyView,
-} from './pages/studyViewPage/tool.js';
-import {
-    navigateToPatientViewTool,
-    handleNavigateToPatientView,
-} from './pages/patientViewPage/tool.js';
-import {
-    navigateToResultsViewTool,
-    handleNavigateToResultsView,
-} from './pages/resultsViewPage/tool.js';
+import { registerTools } from './mcp/toolRegistry.js';
+import { registerResources } from './mcp/resourceRegistry.js';
 
 /**
- * Create and configure MCP server with all tools registered
+ * Create and configure MCP server with all tools and resources registered
  */
 export function createMcpServer(): McpServer {
     const server = new McpServer({
@@ -47,47 +41,11 @@ export function createMcpServer(): McpServer {
         version: '1.0.0',
     });
 
-    // Register the main router tool
-    server.registerTool(
-        resolveAndRouteTool.name,
-        {
-            title: resolveAndRouteTool.title,
-            description: resolveAndRouteTool.description,
-            inputSchema: resolveAndRouteTool.inputSchema,
-        },
-        handleResolveAndRoute
-    );
+    // Register all tools
+    registerTools(server);
 
-    // Register specialized navigation tools
-    server.registerTool(
-        navigateToStudyViewTool.name,
-        {
-            title: navigateToStudyViewTool.title,
-            description: navigateToStudyViewTool.description,
-            inputSchema: navigateToStudyViewTool.inputSchema,
-        },
-        handleNavigateToStudyView
-    );
-
-    server.registerTool(
-        navigateToPatientViewTool.name,
-        {
-            title: navigateToPatientViewTool.title,
-            description: navigateToPatientViewTool.description,
-            inputSchema: navigateToPatientViewTool.inputSchema,
-        },
-        handleNavigateToPatientView
-    );
-
-    server.registerTool(
-        navigateToResultsViewTool.name,
-        {
-            title: navigateToResultsViewTool.title,
-            description: navigateToResultsViewTool.description,
-            inputSchema: navigateToResultsViewTool.inputSchema,
-        },
-        handleNavigateToResultsView
-    );
+    // Register all resources
+    registerResources(server);
 
     return server;
 }

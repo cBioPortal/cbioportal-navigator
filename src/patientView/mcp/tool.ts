@@ -27,7 +27,7 @@
 
 import { z } from 'zod';
 import { studyResolver } from '../../shared/resolvers/studyResolver.js';
-import { buildPatientUrl } from './urlBuilder.js';
+import { buildPatientUrl } from '../urlBuilder.js';
 import {
     createSuccessResponse,
     createErrorResponse,

@@ -8,7 +8,7 @@
  *
  * @remarks
  * Key exports:
- * - `CbioportalApiClient`: Wrapper class around CBioPortalAPI
+ * - `CbioportalApiClient`: Wrapper class around CBioPortalAPI and CBioPortalAPIInternal
  * - `apiClient`: Singleton instance configured with environment-based base URL
  *
  * API methods:
@@ -21,6 +21,7 @@
  * - `getPatient(studyId, patientId)`: Get specific patient details
  * - `getSamplesForPatient(studyId, patientId)`: Get samples for a patient
  * - `getRawApi()`: Access underlying CBioPortalAPI for advanced operations
+ * - `getInternalApi()`: Access underlying CBioPortalAPIInternal for StudyView endpoints
  *
  * Configuration:
  * The base URL is determined by (in priority order):
@@ -31,10 +32,11 @@
  * @packageDocumentation
  */
 
-import { CBioPortalAPI } from 'cbioportal-ts-api-client';
+import { CBioPortalAPI, CBioPortalAPIInternal } from 'cbioportal-ts-api-client';
 
 export class CbioportalApiClient {
     private api: CBioPortalAPI;
+    private internalApi: CBioPortalAPIInternal;
 
     constructor(baseUrl?: string) {
         const apiBaseUrl =
@@ -42,6 +44,7 @@ export class CbioportalApiClient {
             process.env.CBIOPORTAL_API_URL ||
             'https://www.cbioportal.org';
         this.api = new CBioPortalAPI(apiBaseUrl);
+        this.internalApi = new CBioPortalAPIInternal(apiBaseUrl);
     }
 
     /**
@@ -111,6 +114,14 @@ export class CbioportalApiClient {
      */
     getRawApi(): CBioPortalAPI {
         return this.api;
+    }
+
+    /**
+     * Get the underlying CBioPortalAPIInternal instance for internal/StudyView endpoints
+     * Use this for StudyView-specific methods like fetchClinicalDataCountsUsingPOST
+     */
+    getInternalApi(): CBioPortalAPIInternal {
+        return this.internalApi;
     }
 }
 

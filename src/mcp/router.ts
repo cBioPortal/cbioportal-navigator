@@ -29,13 +29,13 @@
  */
 
 import { z } from 'zod';
-import { studyResolver } from './shared/resolvers/studyResolver.js';
+import { studyResolver } from '../shared/resolvers/studyResolver.js';
 import {
     createSuccessResponse,
     createAmbiguityResponse,
     createErrorResponse,
-} from './shared/utils/responses.js';
-import type { ToolResponse } from './shared/utils/types.js';
+} from '../shared/utils/responses.js';
+import type { ToolResponse } from '../shared/utils/types.js';
 
 /**
  * Tool definition for MCP registration

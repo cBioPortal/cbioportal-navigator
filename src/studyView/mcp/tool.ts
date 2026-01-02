@@ -29,18 +29,18 @@
 
 import { z } from 'zod';
 import { studyResolver } from '../../shared/resolvers/studyResolver.js';
-import { buildStudyUrl } from './urlBuilder.js';
-import { validateTabAvailability } from './tabValidator.js';
+import { buildStudyUrl } from '../urlBuilder.js';
+import { validateTabAvailability } from '../tabValidator.js';
 import {
     createSuccessResponse,
     createErrorResponse,
 } from '../../shared/utils/responses.js';
 import type { ToolResponse } from '../../shared/utils/types.js';
-import { studyViewFilterSchema } from '../../shared/schemas/cbioportal.js';
 import {
+    studyViewFilterSchema,
     plotsSelectionParamSchema,
     plotsColoringParamSchema,
-} from './schemas.js';
+} from '../schemas/index.js';
 
 /**
  * Tool definition for MCP registration

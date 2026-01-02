@@ -31,7 +31,7 @@ import { z } from 'zod';
 import { studyResolver } from '../../shared/resolvers/studyResolver.js';
 import { geneResolver } from '../../shared/resolvers/geneResolver.js';
 import { profileResolver } from '../../shared/resolvers/profileResolver.js';
-import { buildResultsUrl } from './urlBuilder.js';
+import { buildResultsUrl } from '../urlBuilder.js';
 import {
     createSuccessResponse,
     createErrorResponse,

@@ -260,21 +260,11 @@ AGPL-3.0-or-later
 
 ## Development
 
-### Schema Generation
+### Schema Architecture
 
-This project uses [ts-to-zod](https://github.com/fabien0102/ts-to-zod) to automatically generate Zod validation schemas from TypeScript type definitions, providing strict type safety for MCP tool inputs.
+Schemas are manually maintained in domain-specific directories (e.g., `src/studyView/schemas/`). This approach provides precise validation rules and avoids issues with incorrect auto-generated types.
 
-**Quick Reference:**
-
-```bash
-# Regenerate all schemas
-npm run generate:schemas
-
-# Build project
-npm run build
-```
-
-**For schema architecture and type sources**, see [`DEVELOPMENT.md`](DEVELOPMENT.md)
+**For detailed schema architecture and maintenance workflows**, see [`DEVELOPMENT.md`](DEVELOPMENT.md)
 
 ### Available Scripts
 
@@ -284,7 +274,6 @@ npm run build
 | `npm run watch` | Auto-rebuild on file changes |
 | `npm run dev` | Run with tsx (no build needed) |
 | `npm start` | Run compiled version (requires build first) |
-| `npm run generate:schemas` | Regenerate all Zod schemas from type definitions |
 
 ## Contributing
 
@@ -292,7 +281,7 @@ Contributions welcome! Please ensure:
 - TypeScript code compiles without errors
 - Changes are tested with both Claude Desktop and LibreChat
 - Documentation is updated accordingly
-- If modifying schemas, run `npm run generate:schemas` before committing
+- Schema changes are properly validated and tested with API calls
 
 ## Troubleshooting
 
