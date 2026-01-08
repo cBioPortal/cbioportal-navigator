@@ -1,33 +1,24 @@
 # Development Status
 
-## Project Goal
+## Current Status (2026-01-09)
 
-Build an MCP server that helps AI assistants navigate to cBioPortal pages by providing properly structured URL parameters and filter metadata.
+**Latest Updates:**
+- Fixed AI SDK 6.0 tool integration (parameters → inputSchema)
+- Added tool call visibility in responses (OpenAI-compatible)
+- LibreChat integration configured and ready for testing
 
-## Current Status
+## Project Overview
 
-### Completed Features
+MCP server that helps AI assistants navigate to cBioPortal pages by providing properly structured URL parameters and filter metadata.
 
-**Pages:**
-- **StudyView** - Full support (filters, plots, tabs)
-- **ResultsView** - Basic navigation
-- **PatientView** - Basic navigation
+**Supported Pages:**
+- StudyView (full support: filters, plots, tabs)
+- ResultsView (basic navigation)
+- PatientView (basic navigation)
 
-**Infrastructure:**
-- Domain-driven architecture (`src/{studyView,patientView,resultsView}/`)
-- Unified API client (`src/shared/api/client.ts`)
-- MCP Resources for filter metadata (Phase 1)
-- Manual schema maintenance (`src/studyView/schemas/`)
-
-### Not Implemented (Low Priority)
-
-**StudyView Parameters:**
-- `sharedGroups`, `sharedCustomData`, `geneset_list`, `generic_assay_groups`
-
-**MCP Resources (Phase 2):**
-- Detailed clinical data values per attribute
-- Generic assay profiles
-- Gene-specific genomic data values
+**Dual Mode Support:**
+- MCP protocol (stdio/HTTP) for Claude Desktop and other MCP clients
+- OpenAI-compatible Chat Completions API for LibreChat and similar platforms
 
 ## Architecture
 
@@ -35,134 +26,201 @@ Build an MCP server that helps AI assistants navigate to cBioPortal pages by pro
 
 ```
 src/
-├── mcp/                       # MCP infrastructure
-│   ├── router.ts             # Main routing (resolve_and_route)
-│   ├── toolRegistry.ts       # Tool registration
-│   └── resourceRegistry.ts   # Resource registration
+├── chat/                     # Chat Completions API (OpenAI-compatible)
+│   ├── handler.ts           # Request handler (streaming & non-streaming)
+│   ├── tools/converter.ts   # MCP tools → AI SDK converter
+│   ├── providers/factory.ts # Multi-provider support (Anthropic/Google/OpenAI)
+│   └── config/              # System prompt, defaults
 │
-├── studyView/                # StudyView domain
-│   ├── mcp/
-│   │   ├── tool.ts          # navigate_to_studyview
-│   │   └── resources/       # clinical-attributes, case-lists, molecular-profiles
-│   ├── schemas/             # filters.ts, urlParams.ts (manually maintained)
-│   ├── urlBuilder.ts
-│   └── tabValidator.ts
+├── mcp/                      # MCP infrastructure
+│   ├── router.ts            # resolve_and_route tool
+│   ├── toolRegistry.ts      # Tool registration
+│   └── resourceRegistry.ts  # Resource registration
 │
-├── patientView/              # PatientView domain
-├── resultsView/              # ResultsView domain
+├── studyView/               # StudyView domain
+│   ├── mcp/tool.ts          # navigate_to_studyview
+│   ├── schemas/             # Manually maintained Zod schemas
+│   └── urlBuilder.ts
 │
-└── shared/                   # Shared infrastructure
-    ├── api/
-    │   ├── client.ts        # CbioportalApiClient (unified API wrapper)
-    │   └── studyViewData.ts # StudyViewDataClient (filter metadata)
-    ├── resolvers/           # studyResolver, geneResolver, profileResolver
-    └── utils/               # config, types, responses, validators
+├── patientView/             # PatientView domain
+├── resultsView/             # ResultsView domain
+│
+└── shared/                  # Shared infrastructure
+    ├── api/client.ts        # cBioPortal API wrapper
+    └── resolvers/           # Study/gene/profile resolvers
 ```
 
 **Design Principles:**
-- Domain-driven: Each page type is self-contained
-- Centralized infrastructure: MCP routing and registration
-- Reusable components: Shared resolvers and API clients
+- Domain-driven architecture (each page type is self-contained)
+- 100% MCP tool reuse (no code duplication for Chat API)
+- Server-side tool execution (zero configuration for clients)
+
+## Chat Completions API
+
+### Overview
+
+OpenAI-compatible endpoint (`/v1/chat/completions`) with automatic server-side tool execution.
+
+**Key Features:**
+- Multi-provider support (Anthropic, Google, OpenAI)
+- Auto-detection from model name
+- Streaming and non-streaming responses
+- Tool call transparency (includes `tool_calls` in responses)
+
+### Implementation
+
+**Tool Conversion** (`src/chat/tools/converter.ts`):
+```typescript
+tool({
+    title: mcpTool.title,
+    description: mcpTool.description,
+    inputSchema: zodObject,  // AI SDK 6.0 API
+    execute: async (args) => {
+        const result = await mcpTool.handler(args);  // Reuse MCP handler
+        return extractTextContent(result);
+    }
+})
+```
+
+**Request Handler** (`src/chat/handler.ts`):
+- Uses AI SDK's `generateText()` / `streamText()`
+- Automatic multi-turn tool execution (max 10 steps)
+- Returns OpenAI-compatible responses with tool call visibility
+
+**Provider Factory** (`src/chat/providers/factory.ts`):
+- Auto-detects provider from model name (claude-* / gemini-* / gpt-*)
+- API key resolution: request body > headers > environment
+
+### Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/v1/chat/completions` | POST | Chat completions with tool calling |
+| `/v1/models` | GET | List available models |
+| `/health` | GET | Health check |
+| `/mcp` | POST | MCP protocol endpoint |
+
+### Model Aliases (Auto-updating)
+
+Using stable aliases to avoid manual version updates:
+- `claude-sonnet-4-5` (auto-updates to latest Sonnet)
+- `claude-opus-4-5` (auto-updates to latest Opus)
+- `gemini-2.0-flash` (auto-updates to latest Flash)
+- `gpt-4o` (OpenAI's recommended model)
+
+## Testing
+
+### Local Testing
+
+```bash
+# Build
+npm run build
+
+# Start server
+MCP_TRANSPORT=http PORT=8002 npm run dev
+
+# Test chat completions
+curl -X POST http://localhost:8002/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ANTHROPIC_API_KEY" \
+  -d '{
+    "model": "claude-sonnet-4-5",
+    "messages": [{"role": "user", "content": "Show me TCGA lung cancer"}]
+  }'
+```
+
+### LibreChat Integration Testing
+
+The Navigator service is integrated into LibreChat via Docker Compose. To test:
+
+**Configuration files:**
+- `/Users/fuzy/codebase/LibreChat/librechat.yaml` - Navigator endpoint config
+- `/Users/fuzy/codebase/LibreChat/docker-compose.override.yml` - Service integration
+
+**Test workflow:**
+1. Build Navigator Docker image:
+   ```bash
+   cd /Users/fuzy/codebase/cbioportal-navigator
+   docker build -t cbioportal-navigator:latest .
+   ```
+
+2. Start LibreChat with Navigator:
+   ```bash
+   cd /Users/fuzy/codebase/LibreChat
+   docker-compose up -d
+   ```
+
+3. Access LibreChat UI and test Navigator integration:
+   - URL: http://localhost:3080
+   - Select Navigator endpoint from dropdown
+   - Test queries like "Show me TCGA breast cancer study"
+
+4. Check logs:
+   ```bash
+   docker-compose logs -f navigator
+   ```
+
+**Expected behavior:**
+- Navigator appears as available endpoint in LibreChat
+- Tool calls execute automatically on server
+- Final response includes cBioPortal URLs
+
+## Advanced Features (Optional)
+
+### Tool Approval
+
+Require user confirmation before executing tools:
+
+```typescript
+tool({
+    needsApproval: true,  // or (input) => boolean
+    ...
+})
+```
+
+Use cases: sensitive operations, audit trails
+
+### Strict Mode
+
+Enable provider-native strict schema validation:
+
+```typescript
+tool({
+    strict: true,
+    ...
+})
+```
+
+Supported: OpenAI, Anthropic (not Google Gemini)
+
+Benefits: exact schema matching, fewer hallucinated parameters
 
 ## Schema Management
 
-### Approach: Manual Maintenance
-
-**Decision (2026-01):** Switched from ts-to-zod auto-generation to manual schemas.
-
-**Reasons:**
-- Source types in `cbioportal-ts-api-client` have known issues (e.g., `DataFilterValue` required fields should be optional XOR)
-- Low usage rate: only ~20 of 121 generated schemas used
-- API is stable; manual precision is more valuable
-
-### Schema Files
-
 Location: `src/studyView/schemas/`
 
-| File | Content | Reference |
-|------|---------|-----------|
-| `filters.ts` | `StudyViewFilter` and nested types (288 lines) | Backend Java: `cbioportal/.../web/parameter/`<br>Frontend: `StudyViewPageStore.ts` |
-| `urlParams.ts` | Plots configuration schemas | Frontend: `StudyViewURLWrapper.ts` |
+**Approach:** Manual maintenance (switched from auto-generation)
 
-### Maintenance Notes
+**Reasons:**
+- Source types have known issues (optional/required XOR constraints)
+- Low usage rate (~20 of 121 generated schemas used)
+- API is stable, manual precision preferred
 
-- **URL params**: All are strings (even numeric IDs like entrez gene IDs)
-- **Validation**: Test with actual API calls when updating `filters.ts`
-- **Documentation**: Document corrections (e.g., DataFilterValue XOR constraints)
+**Files:**
+- `filters.ts` - StudyViewFilter and nested types
+- `urlParams.ts` - Plots configuration
 
-## MCP Resources (Phase 1)
+**Maintenance:** Test with actual API calls when updating
 
-MCP Resources provide AI with filter metadata, preventing guesswork when constructing `filterJson`.
+## Development Workflow
 
-### Implemented Resources
+- **Schema updates:** Edit `src/studyView/schemas/filters.ts` and test
+- **New tools:** Add to domain `mcp/tool.ts`, register in `toolRegistry.ts`
+- **Chat API changes:** Update `src/chat/handler.ts`, rebuild, test
 
-Location: `src/studyView/mcp/resources/`
+## Known Limitations
 
-| URI Pattern | Returns | Implementation |
-|-------------|---------|----------------|
-| `cbioportal://study/{studyId}/filters/clinical-attributes` | Clinical attribute IDs, names, types | `clinicalAttributes.ts` |
-| `cbioportal://study/{studyId}/filters/case-lists` | Sample lists/cohorts | `caseLists.ts` |
-| `cbioportal://study/{studyId}/filters/molecular-profiles` | Molecular data types | `molecularProfiles.ts` |
-
-### Implementation References
-
-All resources follow `cbioportal-frontend/src/pages/studyView/StudyViewPageStore.ts` patterns:
-
-| Feature | Frontend Lines | Our Implementation |
-|---------|---------------|-------------------|
-| Clinical Attributes | 6137-6167 | `studyViewData.ts:getClinicalAttributes()` |
-| Clinical Data Values | 4973-5033 | `studyViewData.ts:getClinicalDataValues()` |
-| Case Lists | 11831-11837 | `studyViewData.ts:getCaseLists()` |
-| Molecular Profiles | 5619-5633 | `studyViewData.ts:getMolecularProfiles()` |
-
-### Design Notes
-
-- **Study-specific only**: AI must resolve studyId first
-- **Values without counts**: Keep responses concise
-- **POST APIs**: Support multiple studyIds (follows frontend pattern)
-- **Unified client**: Both public and internal APIs via `src/shared/api/client.ts`
-
-## API Clients
-
-### CbioportalApiClient
-
-Location: `src/shared/api/client.ts`
-
-Wraps both `CBioPortalAPI` and `CBioPortalAPIInternal` from `cbioportal-ts-api-client`.
-
-**Methods:**
-- `getAllStudies()`, `getStudy()`, `getGene()`, `getMolecularProfiles()`, `getCaseLists()`
-- `getPatientsInStudy()`, `getPatient()`, `getSamplesForPatient()`
-- `getRawApi()`, `getInternalApi()` (direct access)
-
-**Singleton:** `apiClient`
-
-### StudyViewDataClient
-
-Location: `src/shared/api/studyViewData.ts`
-
-Specialized client for StudyView filter metadata.
-
-**Methods:**
-- `getClinicalAttributes(studyIds)` - Deduplicated attributes
-- `getClinicalDataValues(studyId, attributeId)` - Possible values
-- `getCaseLists(studyId)` - Case lists with SUMMARY projection
-- `getMolecularProfiles(studyIds)` - Molecular profiles
-
-**Singleton:** `studyViewDataClient`
-
-**Design:** Uses `apiClient.getInternalApi()` for StudyView-specific endpoints.
-
-## Next Steps
-
-### Potential Improvements
-
-- **Caching**: Resource metadata could be cached to reduce API calls
-- **Phase 2 Resources**: Detailed clinical data values, generic assay profiles
-- **Extended Pages**: More parameters for ResultsView/PatientView if needed
-
-### Development Workflow
-
-- **Schema updates**: Edit `src/studyView/schemas/filters.ts` and test with API calls
-- **New resources**: Add to `src/studyView/mcp/resources/` and register in `resourceRegistry.ts`
-- **New tools**: Add to domain `mcp/tool.ts` and register in `toolRegistry.ts`
+**Not Implemented:**
+- StudyView parameters: sharedGroups, sharedCustomData, geneset_list
+- MCP Resources Phase 2: detailed clinical data values per attribute
+- Conversation history management in Chat API

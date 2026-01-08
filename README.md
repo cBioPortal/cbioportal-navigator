@@ -97,7 +97,7 @@ cbioportal-navigator/
 
    **Important**: Use absolute path (not relative like `~/` or `./`)
 
-3. **Restart Claude Desktop** → Look for 🔌 icon
+3. **Restart Claude Desktop** → Look for MCP connection icon
 
 #### Development Mode
 
@@ -113,9 +113,89 @@ For HTTP mode development:
 MCP_TRANSPORT=http PORT=8002 npm run dev
 ```
 
-### Option 2: Server Deployment with LibreChat
+### Option 2: Chat Completions API (OpenAI-Compatible)
 
-**Quick Start** (4 steps):
+The server provides an OpenAI-compatible chat completions endpoint at `/v1/chat/completions` that includes built-in system prompts and cBioPortal tools. Perfect for LibreChat and other OpenAI-compatible clients.
+
+**Quick Start** (local testing):
+
+1. **Start the server**:
+   ```bash
+   # Install and build
+   npm install && npm run build
+
+   # Start in HTTP mode
+   MCP_TRANSPORT=http PORT=8002 npm start
+   ```
+
+2. **Test the endpoint**:
+   ```bash
+   # Non-streaming request
+   curl -X POST http://localhost:8002/v1/chat/completions \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer YOUR_API_KEY" \
+     -d '{
+       "model": "claude-3-5-sonnet-20241022",
+       "messages": [{"role": "user", "content": "Show me TCGA breast cancer study"}]
+     }'
+
+   # Streaming request
+   curl -X POST http://localhost:8002/v1/chat/completions \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer YOUR_API_KEY" \
+     -d '{
+       "model": "claude-3-5-sonnet-20241022",
+       "messages": [{"role": "user", "content": "Show me TCGA breast cancer study"}],
+       "stream": true
+     }'
+
+   # Available models
+   curl http://localhost:8002/v1/models
+   ```
+
+**Supported Models**:
+- `claude-3-5-sonnet-20241022` (Anthropic)
+- `gemini-2.0-flash-exp` (Google)
+- `gpt-4-turbo-preview` (OpenAI)
+
+**API Key Configuration** (priority order):
+1. Request body: `"api_key": "your-key"`
+2. Headers: `Authorization: Bearer your-key` or `X-API-Key: your-key`
+3. Environment variables: `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `OPENAI_API_KEY`
+
+**Key Features**:
+- Built-in system prompt (cBioPortal navigation assistant)
+- Automatic tool execution (resolve_and_route, navigate_to_studyview, etc.)
+- Multi-provider support (Anthropic, Google, OpenAI)
+- Streaming and non-streaming responses
+- OpenAI-compatible format
+
+### Option 3: LibreChat Integration
+
+**Method A: Chat Completions Endpoint (Recommended)**
+
+1. **Start the server** (see Option 2 above)
+
+2. **Configure LibreChat** (`librechat.yaml`):
+   ```yaml
+   endpoints:
+     custom:
+       - name: "cBioPortal Navigator"
+         apiKey: "user_provided"
+         baseURL: "http://localhost:8002/v1"
+         models:
+           default: ["claude-3-5-sonnet-20241022", "gemini-2.0-flash-exp", "gpt-4-turbo-preview"]
+   ```
+
+3. **Usage in LibreChat**:
+   - Select "cBioPortal Navigator" endpoint
+   - Enter your Anthropic/Google/OpenAI API key
+   - Ask queries like "Show me TCGA lung cancer mutations in EGFR"
+   - The system automatically calls cBioPortal tools and returns URLs
+
+**Method B: MCP Server (Advanced)**
+
+For users who prefer the MCP protocol:
 
 1. **Setup config files**:
    ```bash
@@ -124,9 +204,8 @@ MCP_TRANSPORT=http PORT=8002 npm run dev
    ```
 
 2. **Configure docker-compose.yml**:
-
-   Choose one image source:
    ```yaml
+   # Choose one image source
    # Option A: Use pre-built image
    image: ghcr.io/YOUR_USERNAME/cbioportal-navigator:latest
 
@@ -136,31 +215,24 @@ MCP_TRANSPORT=http PORT=8002 npm run dev
      dockerfile: Dockerfile
    ```
 
-   Add your API keys:
+3. **LibreChat MCP Configuration** (`librechat.yaml`):
    ```yaml
-   librechat:
-     environment:
-       - ANTHROPIC_API_KEY=your_key_here
-       - OPENAI_API_KEY=your_key_here
+   mcpServers:
+     cbioportal-navigator:
+       type: streamable-http
+       url: "http://cbioportal-navigator:8002/mcp"
    ```
 
-3. **Start services**:
+4. **Start services**:
    ```bash
    docker-compose up -d
    ```
 
-4. **Verify**:
+5. **Verify**:
    - LibreChat UI: http://localhost:3080
    - Health check: http://localhost:8002/health
+   - Chat Completions: http://localhost:8002/v1/chat/completions
    - View logs: `docker-compose logs -f cbioportal-navigator`
-
-**LibreChat MCP Configuration** (`librechat.yaml`):
-```yaml
-mcpServers:
-  cbioportal-navigator:
-    type: streamable-http
-    url: "http://cbioportal-navigator:8002/mcp"
-```
 
 **Optional - Environment Variables**:
 ```yaml
@@ -175,6 +247,11 @@ cbioportal-navigator:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `CBIOPORTAL_BASE_URL` | Base URL of cBioPortal instance | `https://www.cbioportal.org` |
+| `MCP_TRANSPORT` | Transport mode (`stdio` or `http`) | `stdio` |
+| `PORT` | HTTP server port (HTTP mode only) | `8002` |
+| `ANTHROPIC_API_KEY` | Anthropic API key (for Claude models) | - |
+| `GOOGLE_API_KEY` | Google API key (for Gemini models) | - |
+| `OPENAI_API_KEY` | OpenAI API key (for GPT models) | - |
 | `NODE_ENV` | Environment mode | `production` (in Docker) |
 
 ## Tool Usage Flow
@@ -192,7 +269,7 @@ When connected to an AI assistant (e.g., Claude):
 
 **Server Processing**:
 1. Searches studies matching keywords → finds "luad_tcga"
-2. Validates gene "TP53" ✓
+2. Validates gene "TP53"
 3. Builds results URL with OncoPrint parameters
 4. Returns: `https://www.cbioportal.org/results/oncoprint?...`
 
@@ -206,7 +283,7 @@ When connected to an AI assistant (e.g., Claude):
 3. Parameters: `targetPage="patient"`, `studyId="luad_tcga"`, `patientId="TCGA-05-4384"`
 
 **Server Processing**:
-1. Validates study "luad_tcga" exists ✓
+1. Validates study "luad_tcga" exists
 2. Builds patient URL
 3. Returns: `https://www.cbioportal.org/patient?studyId=luad_tcga&caseId=TCGA-05-4384`
 

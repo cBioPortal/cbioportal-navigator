@@ -32,6 +32,7 @@ import express from 'express';
 
 import { setConfig } from './shared/utils/config.js';
 import { createMcpServer } from './server.js';
+import { handleChatCompletion } from './chat/handler.js';
 
 /**
  * Start server in stdio mode (for Claude Desktop)
@@ -118,10 +119,53 @@ async function startHttp() {
         }
     });
 
+    // Chat Completions API (OpenAI-compatible)
+    app.post('/v1/chat/completions', async (req, res) => {
+        await handleChatCompletion(req, res);
+    });
+
+    // Models endpoint (for LibreChat model discovery)
+    // Using model aliases for automatic updates to latest versions
+    app.get('/v1/models', (req, res) => {
+        res.json({
+            object: 'list',
+            data: [
+                {
+                    id: 'claude-sonnet-4-5',
+                    object: 'model',
+                    created: Date.now(),
+                    owned_by: 'anthropic',
+                },
+                {
+                    id: 'claude-opus-4-5',
+                    object: 'model',
+                    created: Date.now(),
+                    owned_by: 'anthropic',
+                },
+                {
+                    id: 'gemini-2.0-flash',
+                    object: 'model',
+                    created: Date.now(),
+                    owned_by: 'google',
+                },
+                {
+                    id: 'gpt-4o',
+                    object: 'model',
+                    created: Date.now(),
+                    owned_by: 'openai',
+                },
+            ],
+        });
+    });
+
     const port = parseInt(process.env.PORT || '8002');
     app.listen(port, () => {
         console.log(`cBioPortal Navigator HTTP server running`);
         console.log(`MCP endpoint: http://localhost:${port}/mcp`);
+        console.log(
+            `Chat Completions: http://localhost:${port}/v1/chat/completions`
+        );
+        console.log(`Models: http://localhost:${port}/v1/models`);
         console.log(`Health check: http://localhost:${port}/health`);
         console.log(
             `Base URL: ${process.env.CBIOPORTAL_BASE_URL || 'https://www.cbioportal.org'}`
