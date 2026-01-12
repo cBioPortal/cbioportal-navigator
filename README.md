@@ -99,147 +99,94 @@ cbioportal-navigator/
 
 3. **Restart Claude Desktop** → Look for MCP connection icon
 
-#### Development Mode
+### Option 2: LibreChat Integration (Docker)
 
-For development with auto-reload (stdio mode):
+Navigator integrates with LibreChat via Docker Compose, supporting multiple AI providers (Claude, Gemini, GPT) with a single endpoint configuration.
 
-```bash
-npm run dev
-```
+**Quick Start**:
 
-For HTTP mode development:
-
-```bash
-MCP_TRANSPORT=http PORT=8002 npm run dev
-```
-
-### Option 2: Chat Completions API (OpenAI-Compatible)
-
-The server provides an OpenAI-compatible chat completions endpoint at `/v1/chat/completions` that includes built-in system prompts and cBioPortal tools. Perfect for LibreChat and other OpenAI-compatible clients.
-
-**Quick Start** (local testing):
-
-1. **Start the server**:
+1. **Configure API keys in LibreChat's `.env` file**:
    ```bash
-   # Install and build
-   npm install && npm run build
-
-   # Start in HTTP mode
-   MCP_TRANSPORT=http PORT=8002 npm start
+   # Edit /path/to/LibreChat/.env
+   ANTHROPIC_API_KEY=sk-ant-...
+   GOOGLE_KEY=AIzaSy...
+   OPENAI_API_KEY=sk-proj-...
    ```
 
-2. **Test the endpoint**:
+2. **Setup configuration files**:
    ```bash
-   # Non-streaming request
-   curl -X POST http://localhost:8002/v1/chat/completions \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer YOUR_API_KEY" \
-     -d '{
-       "model": "claude-3-5-sonnet-20241022",
-       "messages": [{"role": "user", "content": "Show me TCGA breast cancer study"}]
-     }'
-
-   # Streaming request
-   curl -X POST http://localhost:8002/v1/chat/completions \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer YOUR_API_KEY" \
-     -d '{
-       "model": "claude-3-5-sonnet-20241022",
-       "messages": [{"role": "user", "content": "Show me TCGA breast cancer study"}],
-       "stream": true
-     }'
-
-   # Available models
-   curl http://localhost:8002/v1/models
-   ```
-
-**Supported Models**:
-- `claude-3-5-sonnet-20241022` (Anthropic)
-- `gemini-2.0-flash-exp` (Google)
-- `gpt-4-turbo-preview` (OpenAI)
-
-**API Key Configuration** (priority order):
-1. Request body: `"api_key": "your-key"`
-2. Headers: `Authorization: Bearer your-key` or `X-API-Key: your-key`
-3. Environment variables: `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `OPENAI_API_KEY`
-
-**Key Features**:
-- Built-in system prompt (cBioPortal navigation assistant)
-- Automatic tool execution (resolve_and_route, navigate_to_studyview, etc.)
-- Multi-provider support (Anthropic, Google, OpenAI)
-- Streaming and non-streaming responses
-- OpenAI-compatible format
-
-### Option 3: LibreChat Integration
-
-**Method A: Chat Completions Endpoint (Recommended)**
-
-1. **Start the server** (see Option 2 above)
-
-2. **Configure LibreChat** (`librechat.yaml`):
-   ```yaml
-   endpoints:
-     custom:
-       - name: "cBioPortal Navigator"
-         apiKey: "user_provided"
-         baseURL: "http://localhost:8002/v1"
-         models:
-           default: ["claude-3-5-sonnet-20241022", "gemini-2.0-flash-exp", "gpt-4-turbo-preview"]
-   ```
-
-3. **Usage in LibreChat**:
-   - Select "cBioPortal Navigator" endpoint
-   - Enter your Anthropic/Google/OpenAI API key
-   - Ask queries like "Show me TCGA lung cancer mutations in EGFR"
-   - The system automatically calls cBioPortal tools and returns URLs
-
-**Method B: MCP Server (Advanced)**
-
-For users who prefer the MCP protocol:
-
-1. **Setup config files**:
-   ```bash
-   cp docker-compose.example.yml docker-compose.yml
+   cp docker-compose.example.yml docker-compose.override.yml
    cp librechat.example.yaml librechat.yaml
    ```
 
-2. **Configure docker-compose.yml**:
+3. **Edit `docker-compose.override.yml`**:
    ```yaml
-   # Choose one image source
-   # Option A: Use pre-built image
-   image: ghcr.io/YOUR_USERNAME/cbioportal-navigator:latest
-
-   # Option B: Build locally
-   build:
-     context: .
-     dockerfile: Dockerfile
-   ```
-
-3. **LibreChat MCP Configuration** (`librechat.yaml`):
-   ```yaml
-   mcpServers:
+   services:
      cbioportal-navigator:
-       type: streamable-http
-       url: "http://cbioportal-navigator:8002/mcp"
+       # Use pre-built GitHub image (or build locally)
+       image: ghcr.io/YOUR_USERNAME/cbioportal-navigator:latest
+       container_name: cbioportal-navigator
+       ports:
+         - "8002:8002"
+       environment:
+         - MCP_TRANSPORT=http
+         - PORT=8002
+         # API keys shared from LibreChat .env
+         - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+         - GOOGLE_API_KEY=${GOOGLE_KEY}
+         - OPENAI_API_KEY=${OPENAI_API_KEY}
+       restart: unless-stopped
+       networks:
+         - default
+
+     api:
+       volumes:
+         - ./librechat.yaml:/app/librechat.yaml:ro
    ```
 
-4. **Start services**:
+4. **Edit `librechat.yaml`**:
+   ```yaml
+   endpoints:
+     custom:
+       - name: 'cBioPortal Navigator'
+         apiKey: 'dummy'  # Navigator uses env vars, not this value
+         baseURL: 'http://cbioportal-navigator:8002/v1'
+         models:
+           default:
+             - 'claude-sonnet-4-5'
+             - 'claude-opus-4-5'
+             - 'gemini-2.0-flash'
+             - 'gpt-4o'
+           fetch: true
+         modelDisplayLabel: 'cBioPortal Navigator'
+   ```
+
+5. **Start services** (from LibreChat directory):
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
-5. **Verify**:
-   - LibreChat UI: http://localhost:3080
-   - Health check: http://localhost:8002/health
-   - Chat Completions: http://localhost:8002/v1/chat/completions
-   - View logs: `docker-compose logs -f cbioportal-navigator`
+6. **Usage**:
+   - Open LibreChat: http://localhost:3080
+   - Select "cBioPortal Navigator" from the endpoint dropdown
+   - Choose any model (all use correct API keys automatically)
+   - Ask: "Show me TCGA lung cancer mutations in EGFR"
 
-**Optional - Environment Variables**:
-```yaml
-# In docker-compose.yml
-cbioportal-navigator:
-  environment:
-    - CBIOPORTAL_BASE_URL=https://www.cbioportal.org  # Change if using custom instance
+**How it works**:
+- Navigator detects provider from model name (claude-* → Anthropic, gemini-* → Google, gpt-* → OpenAI)
+- Uses corresponding environment variable for each provider
+- Single endpoint supports all models without per-model configuration
+
+**Troubleshooting**:
+```bash
+# View Navigator logs
+docker compose logs -f cbioportal-navigator
+
+# Test health endpoint
+curl http://localhost:8002/health
+
+# Check available models
+curl http://localhost:8002/v1/models
 ```
 
 ## Environment Variables
@@ -254,73 +201,47 @@ cbioportal-navigator:
 | `OPENAI_API_KEY` | OpenAI API key (for GPT models) | - |
 | `NODE_ENV` | Environment mode | `production` (in Docker) |
 
-## Tool Usage Flow
-
-When connected to an AI assistant (e.g., Claude):
-
-### Example 1: Gene Mutation Analysis
-
-**User Query**: "Show me TP53 mutations in TCGA lung adenocarcinoma"
-
-**AI Processing**:
-1. Recognizes: Gene-focused query → Results page needed
-2. Calls `route_to_target_page` OR `navigate_to_resultsview` directly
-3. Parameters: `targetPage="results"`, `studyKeywords=["TCGA", "lung", "adenocarcinoma"]`, `genes=["TP53"]`
-
-**Server Processing**:
-1. Searches studies matching keywords → finds "luad_tcga"
-2. Validates gene "TP53"
-3. Builds results URL with OncoPrint parameters
-4. Returns: `https://www.cbioportal.org/results/oncoprint?...`
-
-### Example 2: Patient View
-
-**User Query**: "Take me to patient TCGA-05-4384 in study luad_tcga"
-
-**AI Processing**:
-1. Recognizes: Specific patient → Patient page needed
-2. Calls `route_to_target_page` OR `navigate_to_patientview` directly
-3. Parameters: `targetPage="patient"`, `studyId="luad_tcga"`, `patientId="TCGA-05-4384"`
-
-**Server Processing**:
-1. Validates study "luad_tcga" exists
-2. Builds patient URL
-3. Returns: `https://www.cbioportal.org/patient?studyId=luad_tcga&caseId=TCGA-05-4384`
-
-### Example 3: Study Overview
-
-**User Query**: "Show me the TCGA breast cancer study overview"
-
-**AI Processing**:
-1. Recognizes: Study-level overview → Study page needed
-2. Calls `route_to_target_page` OR `navigate_to_studyview` directly
-3. Parameters: `targetPage="study"`, `studyKeywords=["TCGA", "breast"]`
-
-**Server Processing**:
-1. Searches studies → finds "brca_tcga"
-2. Builds study URL
-3. Returns: `https://www.cbioportal.org/study?id=brca_tcga`
 
 ## Architecture
 
-### Communication Flow
+### Communication Flows
 
+**Option 1: MCP Protocol (Claude Desktop)**
 ```
-AI Assistant (Claude)
-    ↓ MCP Protocol
-MCP Server (this project)
-    ↓ HTTP API
-cBioPortal Public API
+Claude Desktop
+    ↓ MCP Protocol (stdio)
+Navigator MCP Server
+    ↓ cBioPortal HTTP API
+cBioPortal
 ```
 
-### Transport Modes
+**Option 2: Chat Completions API (LibreChat)**
+```
+LibreChat UI
+    ↓ HTTP POST
+Navigator Chat Completions API (/v1/chat/completions)
+    ↓ AI SDK → Anthropic/Google/OpenAI API
+AI Provider (Claude/Gemini/GPT)
+    ↓ Tool calls → MCP tools
+Navigator MCP Tools
+    ↓ cBioPortal HTTP API
+cBioPortal
+```
 
-- **stdio**: For local clients like Claude Desktop (direct stdin/stdout communication)
-- **Streamable HTTP**: For remote/web-based clients like LibreChat (HTTP POST with optional SSE)
+### Dual Mode Support
 
-The server automatically selects the transport mode based on the `MCP_TRANSPORT` environment variable:
-- `MCP_TRANSPORT=stdio` (default): Uses stdio transport
-- `MCP_TRANSPORT=http`: Uses Streamable HTTP transport
+Navigator runs in one of two transport modes based on the `MCP_TRANSPORT` environment variable:
+
+**stdio mode** (default):
+- Used by Claude Desktop and other local MCP clients
+- Direct process communication via stdin/stdout
+- Command: `MCP_TRANSPORT=stdio npm start`
+
+**HTTP mode**:
+- Used by LibreChat and web-based clients
+- Provides both MCP endpoint (`/mcp`) and Chat Completions endpoint (`/v1/chat/completions`)
+- Streamable HTTP with SSE support
+- Command: `MCP_TRANSPORT=http PORT=8002 npm start`
 
 ## Development
 
@@ -330,43 +251,6 @@ The server automatically selects the transport mode based on the `MCP_TRANSPORT`
 | `npm run watch` | Auto-rebuild on file changes |
 | `npm run dev` | Run with tsx (no build needed) |
 | `npm start` | Run compiled version (requires build first) |
-
-## License
-
-AGPL-3.0-or-later
-
-## Development
-
-### Schema Architecture
-
-Schemas are manually maintained in domain-specific directories (e.g., `src/studyView/schemas/`). This approach provides precise validation rules and avoids issues with incorrect auto-generated types.
-
-**For detailed schema architecture and maintenance workflows**, see [`DEVELOPMENT.md`](DEVELOPMENT.md)
-
-### Available Scripts
-
-| Command | Description |
-|---------|-------------|
-| `npm run build` | Compile TypeScript to dist/ |
-| `npm run watch` | Auto-rebuild on file changes |
-| `npm run dev` | Run with tsx (no build needed) |
-| `npm start` | Run compiled version (requires build first) |
-
-## Contributing
-
-Contributions welcome! Please ensure:
-- TypeScript code compiles without errors
-- Changes are tested with both Claude Desktop and LibreChat
-- Documentation is updated accordingly
-- Schema changes are properly validated and tested with API calls
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| **Claude Desktop not connecting** | • Use absolute path in config<br>• Run `npm run build` to create dist/index.js<br>• Check logs: `~/Library/Logs/Claude/` (macOS) |
-| **Docker container not starting** | • Check logs: `docker-compose logs cbioportal-navigator`<br>• Rebuild: `docker-compose up --build` |
-| **HTTP endpoint 404** | • Verify container running: `docker ps`<br>• Test health: `curl http://localhost:8002/health`<br>• Check firewall on port 8002 |
 
 ## Resources
 
