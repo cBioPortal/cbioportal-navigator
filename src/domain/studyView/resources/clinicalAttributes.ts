@@ -10,7 +10,7 @@
  * @packageDocumentation
  */
 
-import { studyViewDataClient } from '../../../shared/api/studyViewData.js';
+import { studyViewDataClient } from '../../../infrastructure/api/studyViewData.js';
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface Variables {

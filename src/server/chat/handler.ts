@@ -9,7 +9,7 @@ import type { Request, Response } from 'express';
 import { ZodError } from 'zod';
 import { chatCompletionRequestSchema } from './schemas.js';
 import { createProvider } from './providers/factory.js';
-import { getAllTools } from './tools/converter.js';
+import { getMCPTools } from './mcp-client/toolsLoader.js';
 import { DEFAULT_SYSTEM_PROMPT, CONFIG } from './config/defaults.js';
 import { ChatCompletionError, createErrorResponse } from './utils/errors.js';
 
@@ -27,8 +27,8 @@ export async function handleChatCompletion(req: Request, res: Response) {
             req.headers as Record<string, string>
         );
 
-        // 3. Get converted tools
-        const tools = getAllTools();
+        // 3. Get tools from MCP server
+        const tools = await getMCPTools();
 
         // 4. Prepare messages (inject system prompt if not present)
         const messages = [...requestData.messages]; // Clone to avoid mutation
@@ -194,23 +194,62 @@ async function handleStreaming(
             }),
         });
 
-        // Stream chunks in OpenAI format
-        for await (const chunk of streamResult.textStream) {
-            const sseChunk = {
-                id: `chatcmpl-${Date.now()}`,
-                object: 'chat.completion.chunk',
-                created: Math.floor(Date.now() / 1000),
-                model: model.modelId,
-                choices: [
-                    {
-                        index: 0,
-                        delta: { content: chunk },
-                        finish_reason: null,
-                    },
-                ],
-            };
+        // Use fullStream to get both text and tool call events
+        for await (const delta of streamResult.fullStream) {
+            if (delta.type === 'text-delta') {
+                // Text content
+                const sseChunk = {
+                    id: `chatcmpl-${Date.now()}`,
+                    object: 'chat.completion.chunk',
+                    created: Math.floor(Date.now() / 1000),
+                    model: model.modelId,
+                    choices: [
+                        {
+                            index: 0,
+                            delta: { content: delta.text },
+                            finish_reason: null,
+                        },
+                    ],
+                };
+                res.write(`data: ${JSON.stringify(sseChunk)}\n\n`);
+            }
 
-            res.write(`data: ${JSON.stringify(sseChunk)}\n\n`);
+            if (delta.type === 'tool-call') {
+                // Tool call with complete arguments
+                const toolCallChunk = {
+                    id: `chatcmpl-${Date.now()}`,
+                    object: 'chat.completion.chunk',
+                    created: Math.floor(Date.now() / 1000),
+                    model: model.modelId,
+                    choices: [
+                        {
+                            index: 0,
+                            delta: {
+                                tool_calls: [
+                                    {
+                                        index: 0,
+                                        id: delta.toolCallId,
+                                        type: 'function' as const,
+                                        function: {
+                                            name: delta.toolName,
+                                            arguments: JSON.stringify(
+                                                delta.input
+                                            ),
+                                        },
+                                    },
+                                ],
+                            },
+                            finish_reason: null,
+                        },
+                    ],
+                };
+                res.write(`data: ${JSON.stringify(toolCallChunk)}\n\n`);
+            }
+
+            if (delta.type === 'tool-result') {
+                // Tool execution completed (optional: log)
+                console.log(`[Tool] ${delta.toolName} completed`);
+            }
         }
 
         // Get final result to obtain finishReason

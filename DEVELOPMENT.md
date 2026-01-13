@@ -1,14 +1,21 @@
 # Development Status
 
-## Current Status (2026-01-12)
+## Current Status (2026-01-13)
 
 **Latest Updates:**
+- **Migrated to MCP client architecture** - Chat Completions now uses `@ai-sdk/mcp` to connect to own MCP server
+- **Improved streaming support** - Tool calls now visible in streaming responses (using `fullStream`)
+- Removed manual tool converter - tools automatically synced from MCP server
+- MCP client connection overhead: ~50ms per request
+- All 4 tools loaded successfully: resolve_and_route, navigate_to_studyview, navigate_to_patientview, navigate_to_resultsview
+
+**Previous Updates (2026-01-12):**
 - **LibreChat integration fully working** - Chat Completions API tested and verified
 - Fixed API key priority handling for multi-provider support
 - Modified `src/chat/config/auth.ts` to skip headers and use environment variables
 - All 4 models working: claude-sonnet-4-5, claude-opus-4-5, gemini-2.0-flash, gpt-4o
 
-**Recent Changes (2026-01-09):**
+**Earlier Changes (2026-01-09):**
 - Fixed AI SDK 6.0 tool integration (parameters → inputSchema)
 - Added tool call visibility in responses (OpenAI-compatible)
 
@@ -31,35 +38,64 @@ MCP server that helps AI assistants navigate to cBioPortal pages by providing pr
 
 ```
 src/
-├── chat/                     # Chat Completions API (OpenAI-compatible)
-│   ├── handler.ts           # Request handler (streaming & non-streaming)
-│   ├── tools/converter.ts   # MCP tools → AI SDK converter
-│   ├── providers/factory.ts # Multi-provider support (Anthropic/Google/OpenAI)
-│   └── config/
-│       └── auth.ts          # API key resolution logic
+├── server/                   # Server layer (user-facing)
+│   ├── index.ts             # Application entry point
+│   ├── mcp/                 # MCP server infrastructure
+│   │   ├── server.ts        # MCP server creation and setup
+│   │   ├── toolRegistry.ts  # Tool registration
+│   │   └── resourceRegistry.ts # Resource registration
+│   └── chat/                # Chat Completions API (OpenAI-compatible)
+│       ├── handler.ts       # Request handler (streaming & non-streaming)
+│       ├── mcp-client/      # MCP client integration
+│       │   ├── client.ts    # MCP client configuration and creation
+│       │   └── toolsLoader.ts # Tools loading from MCP server
+│       ├── providers/       # Multi-provider support (Anthropic/Google/OpenAI)
+│       ├── config/          # API key resolution logic
+│       ├── schemas.ts       # Request/response schemas
+│       └── utils/           # Error handling utilities
 │
-├── mcp/                      # MCP infrastructure
-│   ├── router.ts            # resolve_and_route tool
-│   ├── toolRegistry.ts      # Tool registration
-│   └── resourceRegistry.ts  # Resource registration
+├── domain/                  # Domain layer (business logic)
+│   ├── shared/              # Shared types and utilities for all domain tools
+│   │   ├── types.ts         # MCP tool parameter and response types
+│   │   ├── responses.ts     # Response builders for MCP tools
+│   │   └── validators.ts    # Parameter validation utilities
+│   ├── router/              # Main routing tool
+│   │   └── tool.ts          # resolve_and_route tool
+│   ├── studyView/           # StudyView domain
+│   │   ├── tool.ts          # navigate_to_studyview
+│   │   ├── urlBuilder.ts    # URL construction logic
+│   │   ├── tabValidator.ts  # Tab availability validation
+│   │   ├── schemas/         # Manually maintained Zod schemas
+│   │   └── resources/       # MCP resources (clinical attributes, case lists, etc.)
+│   ├── patientView/         # PatientView domain
+│   │   ├── tool.ts          # navigate_to_patientview
+│   │   └── urlBuilder.ts    # URL construction logic
+│   └── resultsView/         # ResultsView domain
+│       ├── tool.ts          # navigate_to_resultsview
+│       └── urlBuilder.ts    # URL construction logic
 │
-├── studyView/               # StudyView domain
-│   ├── mcp/tool.ts          # navigate_to_studyview
-│   ├── schemas/             # Manually maintained Zod schemas
-│   └── urlBuilder.ts
-│
-├── patientView/             # PatientView domain
-├── resultsView/             # ResultsView domain
-│
-└── shared/                  # Shared infrastructure
-    ├── api/client.ts        # cBioPortal API wrapper
-    └── resolvers/           # Study/gene/profile resolvers
+└── infrastructure/          # Infrastructure layer (API-facing)
+    ├── api/                 # cBioPortal API clients
+    │   ├── client.ts        # Main API client
+    │   └── studyViewData.ts # StudyView-specific API calls
+    ├── resolvers/           # Entity resolvers
+    │   ├── studyResolver.ts # Study search and validation
+    │   ├── geneResolver.ts  # Gene validation
+    │   └── profileResolver.ts # Molecular profile lookup
+    └── utils/               # Core infrastructure utilities
+        ├── config.ts        # Configuration management (baseUrl, protocol)
+        └── urlBuilder.ts    # Core URL construction utilities
 ```
 
 **Design Principles:**
-- Domain-driven architecture (each page type is self-contained)
-- 100% MCP tool reuse (no code duplication for Chat API)
-- Server-side tool execution (zero configuration for clients)
+- **Three-layer architecture**: Server (user-facing) → Domain (business logic) → Infrastructure (API-facing)
+- **Domain-driven organization**: Each cBioPortal page type (studyView, patientView, resultsView) is self-contained with tool + logic + schemas
+- **MCP server as single source of truth**: Chat API uses MCP client to load tools from MCP server
+- **Server-side tool execution**: Zero configuration for clients (tools auto-synced via MCP)
+- **Clear separation of concerns**:
+  - Server layer handles protocols and API endpoints
+  - Domain layer contains pure business logic (cBioPortal-specific)
+  - Infrastructure layer provides cross-cutting utilities and external API access
 
 ## Chat Completions API
 
@@ -84,15 +120,24 @@ OpenAI-compatible endpoint (`/v1/chat/completions`) with automatic server-side t
 
 ### Implementation Details
 
-**Tool Conversion** (`src/chat/tools/converter.ts`):
-- Converts MCP tools to AI SDK format using `tool()` function
-- Uses `inputSchema` (AI SDK 6.0 API) for parameter validation
-- Reuses MCP handlers via `execute()` callback
+**MCP Client Integration** (`src/chat/mcp/`):
+- Uses `@ai-sdk/mcp` package to connect to own MCP server (`http://localhost:8002/mcp`)
+- `client.ts`: MCP client configuration and connection management
+- `toolsLoader.ts`: Loads tools from MCP server via `client.tools()`
+- Automatic tool synchronization (no manual conversion needed)
+- Connection overhead: ~50ms per request (44ms connection + 7ms tools loading)
 
 **Request Handler** (`src/chat/handler.ts`):
 - Uses AI SDK's `generateText()` / `streamText()`
 - Automatic multi-turn tool execution (max 10 steps)
 - Returns OpenAI-compatible responses
+- **Streaming improvements**: Uses `fullStream` instead of `textStream` to include tool call deltas
+
+**Streaming Support**:
+- Text deltas: Incremental text content streaming
+- Tool calls: Full tool invocation details in streaming responses
+- Tool results: Logged to console for debugging
+- OpenAI-compatible format for LibreChat and other clients
 
 **Provider Factory** (`src/chat/providers/factory.ts`):
 - Auto-detects provider from model name pattern matching
@@ -150,6 +195,90 @@ export function resolveApiKey(provider: Provider, bodyKey?: string, headers?: Re
 - Automatic provider selection based on model name
 - No need for multiple endpoint configurations
 
+## MCP Client Architecture
+
+### Overview
+
+The Chat Completions API now uses an **internal MCP client** to connect to its own MCP server, creating a clean separation between:
+- **MCP Server** (`/mcp` endpoint): Source of truth for tools and resources
+- **MCP Client** (`src/chat/mcp/`): Lightweight connection manager
+- **Chat Completions Handler**: Orchestrates LLM requests with auto-loaded tools
+
+### Design Rationale
+
+**Why MCP Client?**
+1. **Single source of truth**: MCP server defines tools once, both Claude Desktop and Chat API use them
+2. **Automatic synchronization**: New tools in MCP server → instantly available in Chat API
+3. **Cleaner architecture**: No manual tool conversion code to maintain
+4. **Resource access**: Enables future use of MCP resources (clinical attributes, case lists, etc.)
+
+### Connection Flow
+
+```
+Chat Completions Request
+    ↓
+Handler creates MCP client
+    ↓
+Connect to http://localhost:8002/mcp (HTTP transport)
+    ↓
+Load tools via client.tools()
+    ↓
+Pass tools to generateText() / streamText()
+    ↓
+Close MCP client
+    ↓
+Return response
+```
+
+### Performance Characteristics
+
+| Metric | Value | Impact |
+|--------|-------|--------|
+| Connection time | ~44ms | Per request |
+| Tools loading | ~7ms | Per request |
+| **Total overhead** | **~50ms** | Acceptable |
+| Tools cached | No | Short-lived client |
+| Connection reused | No | Stateless design |
+
+### Environment Configuration
+
+```bash
+# MCP Server URL (optional, auto-detected)
+MCP_SERVER_URL=http://localhost:8002/mcp
+
+# Docker environment flag (auto-set in containers)
+DOCKER_ENV=false
+```
+
+### Error Handling
+
+If MCP client connection fails:
+- Chat Completions request returns 500 error
+- Error logged with `[MCP Client]` prefix
+- No fallback (by design - fail fast)
+
+**Common errors:**
+- `ECONNREFUSED`: MCP server not running (ensure HTTP mode enabled)
+- `Timeout`: MCP server slow to respond (check server logs)
+- `Protocol mismatch`: MCP SDK version incompatibility (verify @ai-sdk/mcp version)
+
+### Future Enhancements
+
+1. **MCP Resources Integration**:
+   - Add `client.listResources()` / `client.readResource()` calls
+   - Inject resource data into system messages as context
+   - Example: Auto-load clinical attributes when study is mentioned
+
+2. **Connection Pooling** (if needed):
+   - Reuse MCP client across requests
+   - Implement TTL-based connection management
+   - Only add if performance analysis shows significant benefit
+
+3. **Resource Caching**:
+   - Cache frequently accessed resources (e.g., TCGA study metadata)
+   - Reduce repeated API calls to cBioPortal
+   - TTL-based invalidation
+
 ## Testing
 
 ### Local Development Testing
@@ -205,19 +334,30 @@ Test with actual API calls when updating schemas.
 ## Development Workflow
 
 **Schema updates:**
-- Edit `src/studyView/schemas/filters.ts`
+- Edit `src/domain/studyView/schemas/filters.ts`
 - Test with actual cBioPortal API calls
 - Verify URL generation works correctly
 
 **New tools:**
-- Add to domain `mcp/tool.ts`
-- Register in `src/mcp/toolRegistry.ts`
-- Add corresponding Chat API converter if needed
+- Add tool definition to `src/domain/<page>/tool.ts`
+- Register in `src/server/mcp/toolRegistry.ts`
+- **No Chat API changes needed** - tools automatically available via MCP client
+
+**New domains:**
+- Create `src/domain/<newPage>/` directory
+- Add `tool.ts` (MCP tool definition + handler)
+- Add business logic files (urlBuilder.ts, etc.)
+- Register tool in `src/server/mcp/toolRegistry.ts`
 
 **Chat API changes:**
-- Update `src/chat/handler.ts` or related files
+- Update `src/server/chat/handler.ts` or related files
 - Run `npm run build`
 - Test with both streaming and non-streaming requests
+
+**Infrastructure changes:**
+- Add shared utilities to `src/infrastructure/utils/`
+- Add API clients to `src/infrastructure/api/`
+- Add resolvers to `src/infrastructure/resolvers/`
 
 **Build commands:**
 - `npm run build` - Compile TypeScript to dist/
@@ -228,11 +368,13 @@ Test with actual API calls when updating schemas.
 
 **Not Implemented:**
 - StudyView URL parameters: sharedGroups, sharedCustomData, geneset_list
-- MCP Resources Phase 2: detailed clinical data values per attribute
+- **MCP Resources usage in Chat API**: Available via `client.listResources()` / `client.readResource()` but not yet integrated
 - Conversation history management in Chat API
 - Tool approval (`needsApproval` parameter)
 - Strict mode schema validation (`strict` parameter)
+- MCP client connection pooling (short-lived connections per request)
 
 **Platform-specific:**
 - Tool approval and strict mode are AI SDK features not currently utilized
 - May be useful for future audit trails or stricter validation requirements
+- MCP Resources can be accessed but need manual injection into messages (not auto-integrated like tools)

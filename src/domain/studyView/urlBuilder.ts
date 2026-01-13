@@ -30,7 +30,7 @@ import {
     buildCBioPortalPageUrl,
     QueryParams,
     BuildUrlParams,
-} from '../shared/utils/urlBuilder.js';
+} from '../../infrastructure/utils/urlBuilder.js';
 
 export interface StudyUrlOptions {
     studyIds: string | string[];

@@ -29,8 +29,8 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { registerTools } from './mcp/toolRegistry.js';
-import { registerResources } from './mcp/resourceRegistry.js';
+import { registerTools } from './toolRegistry.js';
+import { registerResources } from './resourceRegistry.js';
 
 /**
  * Create and configure MCP server with all tools and resources registered

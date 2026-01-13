@@ -1,15 +1,16 @@
 /**
- * MCP Resource for StudyView Case Lists metadata.
+ * MCP Resource for StudyView Molecular Profiles metadata.
  *
- * Provides a list of all case lists (sample lists) available in a study.
- * Case lists are pre-defined groups of samples used for filtering in StudyViewFilter.
+ * Provides a list of all molecular profiles available in a study.
+ * Molecular profiles represent different types of molecular data (mutations, CNA, expression, etc.)
+ * and can be used in genomicProfiles and other filter fields of StudyViewFilter.
  *
- * URI Template: cbioportal://study/{studyId}/filters/case-lists
+ * URI Template: cbioportal://study/{studyId}/filters/molecular-profiles
  *
  * @packageDocumentation
  */
 
-import { studyViewDataClient } from '../../../shared/api/studyViewData.js';
+import { studyViewDataClient } from '../../../infrastructure/api/studyViewData.js';
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface Variables {
@@ -18,18 +19,18 @@ interface Variables {
 }
 
 /**
- * Resource configuration for case lists.
+ * Resource configuration for molecular profiles.
  */
-export const caseListsResource = {
-    name: 'study-case-lists',
-    uriTemplate: 'cbioportal://study/{studyId}/filters/case-lists',
+export const molecularProfilesResource = {
+    name: 'study-molecular-profiles',
+    uriTemplate: 'cbioportal://study/{studyId}/filters/molecular-profiles',
     metadata: {
-        title: 'Case Lists for Study',
+        title: 'Molecular Profiles for Study',
         description:
-            'List of all case lists (sample lists) available in a study. ' +
-            'Case lists are pre-defined groups of samples that can be used ' +
-            'in the caseLists field of StudyViewFilter. Each list includes ' +
-            'its ID, name, description, and category.',
+            'List of all molecular profiles available in a study. ' +
+            'Molecular profiles represent different types of molecular data ' +
+            '(mutations, copy number alterations, mRNA expression, etc.). ' +
+            'Profile IDs can be used in genomicProfiles and other filter fields.',
         mimeType: 'application/json',
     },
     handler: async (
@@ -43,18 +44,21 @@ export const caseListsResource = {
                 throw new Error('studyId is required in URI template');
             }
 
-            // Fetch case lists for the study
-            const caseLists = await studyViewDataClient.getCaseLists(studyId);
+            // Fetch molecular profiles for the study
+            const profiles = await studyViewDataClient.getMolecularProfiles([
+                studyId,
+            ]);
 
             // Transform to resource format
             const resourceData = {
                 studyId,
-                caseLists: caseLists.map((list) => ({
-                    sampleListId: list.sampleListId,
-                    name: list.name,
-                    description: list.description,
-                    category: list.category,
-                    sampleCount: list.sampleCount,
+                profiles: profiles.map((profile) => ({
+                    molecularProfileId: profile.molecularProfileId,
+                    name: profile.name,
+                    description: profile.description,
+                    molecularAlterationType: profile.molecularAlterationType,
+                    datatype: profile.datatype,
+                    showProfileInAnalysisTab: profile.showProfileInAnalysisTab,
                 })),
             };
 

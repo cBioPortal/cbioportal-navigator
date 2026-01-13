@@ -30,8 +30,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express from 'express';
 
-import { setConfig } from './shared/utils/config.js';
-import { createMcpServer } from './server.js';
+import { setConfig } from '../infrastructure/utils/config.js';
+import { createMcpServer } from './mcp/server.js';
 import { handleChatCompletion } from './chat/handler.js';
 
 /**

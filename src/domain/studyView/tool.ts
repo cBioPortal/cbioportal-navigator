@@ -28,19 +28,19 @@
  */
 
 import { z } from 'zod';
-import { studyResolver } from '../../shared/resolvers/studyResolver.js';
-import { buildStudyUrl } from '../urlBuilder.js';
-import { validateTabAvailability } from '../tabValidator.js';
+import { studyResolver } from '../../infrastructure/resolvers/studyResolver.js';
+import { buildStudyUrl } from './urlBuilder.js';
+import { validateTabAvailability } from './tabValidator.js';
 import {
     createSuccessResponse,
     createErrorResponse,
-} from '../../shared/utils/responses.js';
-import type { ToolResponse } from '../../shared/utils/types.js';
+} from '../shared/responses.js';
+import type { ToolResponse } from '../shared/types.js';
 import {
     studyViewFilterSchema,
     plotsSelectionParamSchema,
     plotsColoringParamSchema,
-} from '../schemas/index.js';
+} from './schemas/index.js';
 
 /**
  * Tool definition for MCP registration

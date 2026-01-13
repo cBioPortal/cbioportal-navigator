@@ -1,16 +1,15 @@
 /**
- * MCP Resource for StudyView Molecular Profiles metadata.
+ * MCP Resource for StudyView Case Lists metadata.
  *
- * Provides a list of all molecular profiles available in a study.
- * Molecular profiles represent different types of molecular data (mutations, CNA, expression, etc.)
- * and can be used in genomicProfiles and other filter fields of StudyViewFilter.
+ * Provides a list of all case lists (sample lists) available in a study.
+ * Case lists are pre-defined groups of samples used for filtering in StudyViewFilter.
  *
- * URI Template: cbioportal://study/{studyId}/filters/molecular-profiles
+ * URI Template: cbioportal://study/{studyId}/filters/case-lists
  *
  * @packageDocumentation
  */
 
-import { studyViewDataClient } from '../../../shared/api/studyViewData.js';
+import { studyViewDataClient } from '../../../infrastructure/api/studyViewData.js';
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface Variables {
@@ -19,18 +18,18 @@ interface Variables {
 }
 
 /**
- * Resource configuration for molecular profiles.
+ * Resource configuration for case lists.
  */
-export const molecularProfilesResource = {
-    name: 'study-molecular-profiles',
-    uriTemplate: 'cbioportal://study/{studyId}/filters/molecular-profiles',
+export const caseListsResource = {
+    name: 'study-case-lists',
+    uriTemplate: 'cbioportal://study/{studyId}/filters/case-lists',
     metadata: {
-        title: 'Molecular Profiles for Study',
+        title: 'Case Lists for Study',
         description:
-            'List of all molecular profiles available in a study. ' +
-            'Molecular profiles represent different types of molecular data ' +
-            '(mutations, copy number alterations, mRNA expression, etc.). ' +
-            'Profile IDs can be used in genomicProfiles and other filter fields.',
+            'List of all case lists (sample lists) available in a study. ' +
+            'Case lists are pre-defined groups of samples that can be used ' +
+            'in the caseLists field of StudyViewFilter. Each list includes ' +
+            'its ID, name, description, and category.',
         mimeType: 'application/json',
     },
     handler: async (
@@ -44,21 +43,18 @@ export const molecularProfilesResource = {
                 throw new Error('studyId is required in URI template');
             }
 
-            // Fetch molecular profiles for the study
-            const profiles = await studyViewDataClient.getMolecularProfiles([
-                studyId,
-            ]);
+            // Fetch case lists for the study
+            const caseLists = await studyViewDataClient.getCaseLists(studyId);
 
             // Transform to resource format
             const resourceData = {
                 studyId,
-                profiles: profiles.map((profile) => ({
-                    molecularProfileId: profile.molecularProfileId,
-                    name: profile.name,
-                    description: profile.description,
-                    molecularAlterationType: profile.molecularAlterationType,
-                    datatype: profile.datatype,
-                    showProfileInAnalysisTab: profile.showProfileInAnalysisTab,
+                caseLists: caseLists.map((list) => ({
+                    sampleListId: list.sampleListId,
+                    name: list.name,
+                    description: list.description,
+                    category: list.category,
+                    sampleCount: list.sampleCount,
                 })),
             };
 

@@ -8,19 +8,22 @@
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { resolveAndRouteTool, handleResolveAndRoute } from './router.js';
+import {
+    resolveAndRouteTool,
+    handleResolveAndRoute,
+} from '../../domain/router/tool.js';
 import {
     navigateToStudyViewTool,
     handleNavigateToStudyView,
-} from '../studyView/mcp/tool.js';
+} from '../../domain/studyView/tool.js';
 import {
     navigateToPatientViewTool,
     handleNavigateToPatientView,
-} from '../patientView/mcp/tool.js';
+} from '../../domain/patientView/tool.js';
 import {
     navigateToResultsViewTool,
     handleNavigateToResultsView,
-} from '../resultsView/mcp/tool.js';
+} from '../../domain/resultsView/tool.js';
 
 /**
  * Register all MCP tools with the server.

@@ -8,9 +8,9 @@
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { clinicalAttributesResource } from '../studyView/mcp/resources/clinicalAttributes.js';
-import { caseListsResource } from '../studyView/mcp/resources/caseLists.js';
-import { molecularProfilesResource } from '../studyView/mcp/resources/molecularProfiles.js';
+import { clinicalAttributesResource } from '../../domain/studyView/resources/clinicalAttributes.js';
+import { caseListsResource } from '../../domain/studyView/resources/caseLists.js';
+import { molecularProfilesResource } from '../../domain/studyView/resources/molecularProfiles.js';
 
 /**
  * Register all MCP resources with the server.

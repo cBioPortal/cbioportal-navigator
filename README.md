@@ -27,40 +27,48 @@ cBioPortal Navigator bridges the gap between natural language cancer genomics qu
 ```
 cbioportal-navigator/
 ├── src/
-│   ├── index.ts                      # Entry point (stdio/HTTP mode selection)
-│   ├── server.ts                     # MCP server creation and tool registration
-│   ├── tools/
-│   │   ├── routeToTargetPage.ts      # Main router tool (routes to specialized tools)
-│   │   ├── navigateToStudyView.ts    # StudyView page navigation
-│   │   ├── navigateToPatientView.ts  # PatientView page navigation
-│   │   ├── navigateToResultsView.ts  # ResultsView page navigation
-│   │   └── common/                   # Shared tool utilities
-│   │       ├── types.ts              # Tool response types
-│   │       ├── responses.ts          # Response builders
-│   │       └── validators.ts         # Input validators
-│   ├── pages/                        # Page-specific tools and schemas
-│   │   ├── studyViewPage/
-│   │   │   ├── tool.ts               # StudyView MCP tool
-│   │   │   ├── schemas.ts            # Plots URL parameter schemas (manual)
-│   │   │   ├── urlBuilder.ts         # URL construction
-│   │   │   └── tabValidator.ts       # Tab availability validation
-│   │   ├── resultsViewPage/          # ResultsView page navigation
-│   │   └── patientViewPage/          # PatientView page navigation
-│   ├── shared/                       # Shared utilities and schemas
-│   │   ├── schemas/
-│   │   │   └── cbioportal.ts         # Auto-generated API type schemas (ts-to-zod)
-│   │   ├── resolvers/                # Entity resolvers
-│   │   │   ├── studyResolver.ts      # Study search and validation
-│   │   │   ├── geneResolver.ts       # Gene validation
-│   │   │   └── profileResolver.ts    # Molecular profile lookup
-│   │   ├── utils/                    # Shared utilities
-│   │   │   ├── urlBuilder.ts         # Core URL utilities
-│   │   │   ├── responses.ts          # Response builders
-│   │   │   └── types.ts              # Common types
-│   │   └── api/
-│   │       └── client.ts             # cBioPortal API client
-│   └── router.ts                     # Main routing tool
-├── DEVELOPMENT.md                    # Development status and schema documentation
+│   ├── server/                       # Server layer (user-facing)
+│   │   ├── index.ts                  # Application entry point
+│   │   ├── mcp/                      # MCP server infrastructure
+│   │   │   ├── server.ts             # MCP server creation and setup
+│   │   │   ├── toolRegistry.ts       # Tool registration
+│   │   │   └── resourceRegistry.ts   # Resource registration
+│   │   └── chat/                     # Chat Completions API
+│   │       ├── handler.ts            # Request handler (streaming & non-streaming)
+│   │       ├── mcp-client/           # MCP client integration
+│   │       ├── providers/            # Multi-provider support
+│   │       └── config/               # API key resolution logic
+│   ├── domain/                       # Domain layer (business logic)
+│   │   ├── shared/                   # Shared types and utilities for all domain tools
+│   │   │   ├── types.ts              # MCP tool parameter and response types
+│   │   │   ├── responses.ts          # Response builders for MCP tools
+│   │   │   └── validators.ts         # Parameter validation utilities
+│   │   ├── router/                   # Main routing tool
+│   │   │   └── tool.ts               # resolve_and_route tool
+│   │   ├── studyView/                # StudyView domain
+│   │   │   ├── tool.ts               # navigate_to_studyview
+│   │   │   ├── urlBuilder.ts         # URL construction logic
+│   │   │   ├── tabValidator.ts       # Tab availability validation
+│   │   │   ├── schemas/              # Manually maintained Zod schemas
+│   │   │   └── resources/            # MCP resources
+│   │   ├── patientView/              # PatientView domain
+│   │   │   ├── tool.ts               # navigate_to_patientview
+│   │   │   └── urlBuilder.ts         # URL construction logic
+│   │   └── resultsView/              # ResultsView domain
+│   │       ├── tool.ts               # navigate_to_resultsview
+│   │       └── urlBuilder.ts         # URL construction logic
+│   └── infrastructure/               # Infrastructure layer (API-facing)
+│       ├── api/                      # cBioPortal API clients
+│       │   ├── client.ts             # Main API client
+│       │   └── studyViewData.ts      # StudyView-specific API calls
+│       ├── resolvers/                # Entity resolvers
+│       │   ├── studyResolver.ts      # Study search and validation
+│       │   ├── geneResolver.ts       # Gene validation
+│       │   └── profileResolver.ts    # Molecular profile lookup
+│       └── utils/                    # Core infrastructure utilities
+│           ├── config.ts             # Configuration management (baseUrl, protocol)
+│           └── urlBuilder.ts         # Core URL construction utilities
+├── DEVELOPMENT.md                    # Development status and architecture docs
 ├── Dockerfile                        # Multi-stage Docker build
 ├── docker-compose.example.yml        # Docker Compose template
 ├── librechat.example.yaml            # LibreChat MCP configuration
