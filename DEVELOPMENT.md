@@ -1,8 +1,17 @@
 # Development Status
 
-## Current Status (2026-01-13)
+## Current Status (2026-01-15)
 
 **Latest Updates:**
+- **Added structured logging system** - Comprehensive request/response/tool logging in Chat Completions API
+  - Request tracking with unique IDs
+  - Full message content logging (user input, AI responses)
+  - Tool call and result logging with JSON formatting
+  - Token usage statistics
+  - Performance metrics (duration, timing)
+  - See `src/server/chat/utils/logger.ts`
+
+**Previous Updates (2026-01-13):**
 - **Migrated to MCP client architecture** - Chat Completions now uses `@ai-sdk/mcp` to connect to own MCP server
 - **Improved streaming support** - Tool calls now visible in streaming responses (using `fullStream`)
 - Removed manual tool converter - tools automatically synced from MCP server
@@ -363,6 +372,209 @@ Test with actual API calls when updating schemas.
 - `npm run build` - Compile TypeScript to dist/
 - `npm run watch` - Auto-rebuild on file changes
 - `npm run dev` - Run with tsx (no build needed)
+
+## Planned Enhancements
+
+### Router-Provided Filter Metadata (High Priority)
+
+**Problem:**
+When users request filters (e.g., "show lung cancer with high tumor grade"), the AI needs to know:
+- What clinical attributes are available for filtering (e.g., `TUMOR_GRADE`, `AGE`, `SEX`)
+- What values/options each attribute can have (e.g., SEX: ["Male", "Female"])
+- What molecular profiles exist for gene filtering
+- Valid case lists for sample selection
+
+Currently, this information is only available through MCP resources, which require manual injection into context.
+
+**Solution:**
+Two-tier approach to optimize token usage while providing filter metadata when needed:
+
+1. **Router returns lightweight metadata** - ID lists and small datasets
+2. **New dedicated tool for clinical attributes details** - On-demand retrieval of datatype and options
+
+**Design Rationale:**
+
+Token consumption analysis:
+- Full clinical attributes with options: ~1,500 tokens (30-50 attributes × 8 options avg)
+- Molecular profiles: ~200 tokens (5-15 profiles)
+- Case lists: ~100 tokens (5-10 lists)
+
+**Issue:** Most queries don't need filters, so including full clinical attribute details in every router call wastes tokens.
+
+**Solution:** Split data by size and usage pattern:
+- **Lightweight data** (case lists, molecular profiles): Return directly in router (~300 tokens)
+- **Heavy data** (clinical attributes with options): Return only IDs in router, provide dedicated tool for details
+
+**Implementation Plan:**
+
+1. **Modify `src/domain/router/tool.ts`:**
+   ```typescript
+   // Current return format
+   {
+     studyId: "luad_tcga",
+     targetPage: "studyview"
+   }
+
+   // New return format with lightweight metadata
+   {
+     studyId: "luad_tcga",
+     targetPage: "studyview",
+     metadata: {
+       // Only IDs for clinical attributes (AI knows what's available)
+       clinicalAttributeIds: ["AGE", "SEX", "TUMOR_GRADE", "TUMOR_STAGE", ...],
+
+       // Full info for small datasets (no options needed)
+       caseLists: [
+         {
+           sampleListId: "luad_tcga_all",
+           name: "All Tumors",
+           description: "All tumor samples",
+           category: "all_cases_in_study",
+           sampleCount: 566
+         },
+         // ... 5-10 case lists
+       ],
+
+       molecularProfiles: [
+         {
+           molecularProfileId: "luad_tcga_mutations",
+           name: "Mutations",
+           molecularAlterationType: "MUTATION_EXTENDED",
+           datatype: "MAF"
+         },
+         {
+           molecularProfileId: "luad_tcga_gistic",
+           name: "Copy Number Alterations",
+           molecularAlterationType: "COPY_NUMBER_ALTERATION",
+           datatype: "DISCRETE"
+         },
+         // ... 5-15 molecular profiles
+       ]
+     }
+   }
+   ```
+
+   **Token cost:** ~300-400 tokens (vs ~2,000 with full clinical attributes)
+
+2. **Create new tool `src/domain/studyView/tools/getClinicalAttributeOptions.ts`:**
+   ```typescript
+   // Tool: get_clinical_attribute_options
+   // Purpose: Get detailed info (datatype + options) for specific clinical attributes
+
+   // Input
+   {
+     studyId: "luad_tcga",
+     attributeIds: ["SEX", "TUMOR_STAGE"]  // AI only requests what it needs
+   }
+
+   // Output
+   {
+     attributes: [
+       {
+         attributeId: "SEX",
+         datatype: "STRING",
+         options: ["Male", "Female"]
+       },
+       {
+         attributeId: "TUMOR_STAGE",
+         datatype: "STRING",
+         options: ["Stage I", "Stage IA", "Stage IB", "Stage II", ...]
+       }
+     ]
+   }
+   ```
+
+   **Implementation details:**
+   - Use `studyViewDataClient.getClinicalAttributes([studyId])` with SUMMARY projection
+   - Filter to requested attributeIds
+   - Use `studyViewDataClient` batch method to fetch options for all requested attributes in **one API call**:
+     ```typescript
+     fetchClinicalDataCountsUsingPOST({
+       attributes: attributeIds.map(id => ({ attributeId: id, values: [] })),
+       studyViewFilter: { studyIds: [studyId] }
+     })
+     ```
+   - **Optimization:** Only fetch options for STRING/BOOLEAN types (NUMBER types don't need predefined options)
+   - Return combined data: `{ attributeId, datatype, options }`
+
+3. **Workflow Examples:**
+
+   **Simple query (no filters needed):**
+   ```
+   User: "Show me TCGA lung cancer study"
+     ↓
+   AI calls: resolve_and_route({ targetPage: 'study', studyKeywords: ['TCGA', 'lung'] })
+     ↓
+   Router returns: studyId + lightweight metadata (~300 tokens)
+     ↓
+   AI calls: navigate_to_studyview({ studyIds: ["luad_tcga"] })
+     ↓
+   Done! (No extra tool call needed)
+   ```
+
+   **Query with filters:**
+   ```
+   User: "Show me TCGA lung cancer patients with high tumor grade"
+     ↓
+   AI calls: resolve_and_route({ targetPage: 'study', studyKeywords: ['TCGA', 'lung'] })
+     ↓
+   Router returns: {
+     studyId: "luad_tcga",
+     metadata: {
+       clinicalAttributeIds: ["AGE", "SEX", "TUMOR_GRADE", ...],  // AI sees TUMOR_GRADE exists
+       ...
+     }
+   }
+     ↓
+   AI calls: get_clinical_attribute_options({
+     studyId: "luad_tcga",
+     attributeIds: ["TUMOR_GRADE"]  // Only request what's needed
+   })
+     ↓
+   Returns: {
+     attributes: [{
+       attributeId: "TUMOR_GRADE",
+       datatype: "STRING",
+       options: ["G1", "G2", "G3", "G4", "GX"]
+     }]
+   }
+     ↓
+   AI knows: high grade = G3, G4
+     ↓
+   AI calls: navigate_to_studyview({
+     studyIds: ["luad_tcga"],
+     filterJson: {
+       clinicalDataFilters: [{
+         attributeId: "TUMOR_GRADE",
+         values: [{ value: "G3" }, { value: "G4" }]
+       }]
+     }
+   })
+   ```
+
+**Benefits:**
+- **Token efficiency:** Router only adds ~300 tokens (vs ~2,000 with full clinical attributes)
+- **On-demand details:** AI only fetches clinical attribute options when constructing filters
+- **Accurate filtering:** AI gets exact options (e.g., "Male"/"Female" not guessed as "M"/"F")
+- **Fast simple queries:** No overhead for queries without filters
+- **Batch efficiency:** Single API call to fetch options for multiple attributes
+
+**Performance Considerations:**
+- Router overhead: ~200-300ms (clinical attribute IDs + case lists + molecular profiles)
+- New tool overhead: ~150-250ms (options for requested attributes only)
+- Total for filter queries: ~400-500ms (acceptable)
+- Simple queries (no filters): ~200-300ms (no extra tool call)
+
+**Files to Create/Modify:**
+- `src/domain/router/tool.ts` - Add lightweight metadata fetching
+- `src/domain/studyView/tools/getClinicalAttributeOptions.ts` - New tool for detailed attribute info
+- `src/infrastructure/api/studyViewData.ts` - Add batch options fetching method (if not exists)
+- `src/server/mcp/toolRegistry.ts` - Register new tool
+
+**MCP Resources Status:**
+- Resources (`clinicalAttributes`, `caseLists`, `molecularProfiles`) remain registered for potential future use
+- This enhancement makes them **redundant for the Chat API use case**
+- Resources are still useful for MCP clients with UI (e.g., Claude Desktop with @ mention system)
 
 ## Known Limitations
 

@@ -12,25 +12,62 @@ import { createProvider } from './providers/factory.js';
 import { getMCPTools } from './mcp-client/toolsLoader.js';
 import { DEFAULT_SYSTEM_PROMPT, CONFIG } from './config/defaults.js';
 import { ChatCompletionError, createErrorResponse } from './utils/errors.js';
+import { RequestLogger, generateRequestId } from './utils/logger.js';
+import type { Provider } from './providers/types.js';
+
+/**
+ * Detect provider from model name
+ */
+function detectProvider(model: string, requestProvider?: Provider): Provider {
+    if (requestProvider) {
+        return requestProvider;
+    }
+
+    // Pattern matching
+    if (/^claude-/.test(model)) return 'anthropic';
+    if (/^gemini-/.test(model)) return 'google';
+    if (/^gpt-/.test(model)) return 'openai';
+
+    // Default to openai for unknown models
+    return 'openai';
+}
 
 /**
  * Main handler for chat completion requests
  */
 export async function handleChatCompletion(req: Request, res: Response) {
+    const requestId = generateRequestId();
+    const logger = new RequestLogger(requestId);
+
     try {
         // 1. Validate request
         const requestData = chatCompletionRequestSchema.parse(req.body);
 
-        // 2. Create provider instance
+        // 2. Detect provider
+        const provider = detectProvider(
+            requestData.model,
+            requestData.provider
+        );
+
+        // 3. Create provider instance
         const model = createProvider(
             requestData,
             req.headers as Record<string, string>
         );
 
-        // 3. Get tools from MCP server
-        const tools = await getMCPTools();
+        // 4. Log request
+        logger.logRequest({
+            model: requestData.model,
+            provider,
+            messages: requestData.messages,
+            stream: requestData.stream ?? false,
+        });
 
-        // 4. Prepare messages (inject system prompt if not present)
+        // 4. Get tools from MCP server
+        const tools = await getMCPTools();
+        logger.logToolsLoaded(tools);
+
+        // 5. Prepare messages (inject system prompt if not present)
         const messages = [...requestData.messages]; // Clone to avoid mutation
         if (!messages.some((m) => m.role === 'system')) {
             messages.unshift({
@@ -39,13 +76,14 @@ export async function handleChatCompletion(req: Request, res: Response) {
             });
         }
 
-        // 5. Execute (streaming or non-streaming)
+        // 6. Execute (streaming or non-streaming)
         if (requestData.stream) {
             return await handleStreaming(res, {
                 model,
                 messages,
                 tools,
                 requestData,
+                logger,
             });
         } else {
             return await handleNonStreaming(res, {
@@ -53,10 +91,14 @@ export async function handleChatCompletion(req: Request, res: Response) {
                 messages,
                 tools,
                 requestData,
+                logger,
             });
         }
     } catch (error) {
         console.error('Chat completion error:', error);
+        logger.logComplete({
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
 
         if (error instanceof ZodError) {
             return res
@@ -86,9 +128,10 @@ async function handleNonStreaming(
         messages: any[];
         tools: Record<string, any>;
         requestData: any;
+        logger: RequestLogger;
     }
 ) {
-    const { model, messages, tools, requestData } = params;
+    const { model, messages, tools, requestData, logger } = params;
 
     try {
         // AI SDK automatically handles multi-turn tool calling
@@ -108,6 +151,30 @@ async function handleNonStreaming(
                     : [requestData.stop],
             }),
         });
+
+        // Log tool calls and results
+        if (result.steps) {
+            for (const step of result.steps) {
+                if (step.toolCalls) {
+                    for (const tc of step.toolCalls) {
+                        logger.logToolCall({
+                            toolName: tc.toolName,
+                            toolCallId: tc.toolCallId,
+                            input: tc.input,
+                        });
+                    }
+                }
+                if (step.toolResults) {
+                    for (const tr of step.toolResults) {
+                        logger.logToolResult({
+                            toolName: tr.toolName,
+                            toolCallId: tr.toolCallId,
+                            result: tr.output,
+                        });
+                    }
+                }
+            }
+        }
 
         // Convert to OpenAI format with tool call visibility
         const response = {
@@ -148,6 +215,22 @@ async function handleNonStreaming(
             },
         };
 
+        // Log AI response
+        const toolCallsCount = result.steps?.reduce(
+            (count, step) => count + (step.toolCalls?.length || 0),
+            0
+        );
+        logger.logResponse({
+            content: result.text,
+            finishReason: result.finishReason || 'stop',
+            toolCallsCount,
+        });
+
+        // Log completion with usage stats
+        logger.logComplete({
+            usage: response.usage,
+        });
+
         return res.json(response);
     } catch (error) {
         console.error('Text generation error:', error);
@@ -167,9 +250,10 @@ async function handleStreaming(
         messages: any[];
         tools: Record<string, any>;
         requestData: any;
+        logger: RequestLogger;
     }
 ) {
-    const { model, messages, tools, requestData } = params;
+    const { model, messages, tools, requestData, logger } = params;
 
     try {
         // Set SSE headers
@@ -194,9 +278,16 @@ async function handleStreaming(
             }),
         });
 
+        // Track accumulated text for logging
+        let accumulatedText = '';
+        let toolCallsCount = 0;
+
         // Use fullStream to get both text and tool call events
         for await (const delta of streamResult.fullStream) {
             if (delta.type === 'text-delta') {
+                // Accumulate text for logging
+                accumulatedText += delta.text;
+
                 // Text content
                 const sseChunk = {
                     id: `chatcmpl-${Date.now()}`,
@@ -215,6 +306,16 @@ async function handleStreaming(
             }
 
             if (delta.type === 'tool-call') {
+                // Count tool calls
+                toolCallsCount++;
+
+                // Log tool call
+                logger.logToolCall({
+                    toolName: delta.toolName,
+                    toolCallId: delta.toolCallId,
+                    input: delta.input,
+                });
+
                 // Tool call with complete arguments
                 const toolCallChunk = {
                     id: `chatcmpl-${Date.now()}`,
@@ -247,13 +348,38 @@ async function handleStreaming(
             }
 
             if (delta.type === 'tool-result') {
-                // Tool execution completed (optional: log)
-                console.log(`[Tool] ${delta.toolName} completed`);
+                // Log tool result
+                logger.logToolResult({
+                    toolName: delta.toolName,
+                    toolCallId: delta.toolCallId,
+                    result: delta.output,
+                });
             }
         }
 
-        // Get final result to obtain finishReason
+        // Get final result to obtain finishReason and usage
         const finalResult = await streamResult;
+        const finishReason = (await finalResult.finishReason) || 'stop';
+        const usageData = await finalResult.usage;
+
+        // Log AI response
+        logger.logResponse({
+            content: accumulatedText,
+            finishReason,
+            toolCallsCount: toolCallsCount > 0 ? toolCallsCount : undefined,
+        });
+
+        // Log completion with usage stats
+        const usage = usageData
+            ? {
+                  prompt_tokens: usageData.inputTokens || 0,
+                  completion_tokens: usageData.outputTokens || 0,
+                  total_tokens:
+                      (usageData.inputTokens || 0) +
+                      (usageData.outputTokens || 0),
+              }
+            : undefined;
+        logger.logComplete({ usage });
 
         // Send final chunk with finish_reason
         const finalChunk = {
@@ -265,7 +391,7 @@ async function handleStreaming(
                 {
                     index: 0,
                     delta: {},
-                    finish_reason: finalResult.finishReason || 'stop',
+                    finish_reason: finishReason,
                 },
             ],
         };
@@ -276,6 +402,10 @@ async function handleStreaming(
         res.end();
     } catch (error) {
         console.error('Streaming error:', error);
+        logger.logComplete({
+            error: error instanceof Error ? error.message : 'Streaming failed',
+        });
+
         if (!res.headersSent) {
             throw new ChatCompletionError(
                 error instanceof Error ? error.message : 'Streaming failed'
