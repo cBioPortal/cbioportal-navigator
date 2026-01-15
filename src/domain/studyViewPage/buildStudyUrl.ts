@@ -30,7 +30,7 @@ import {
     buildCBioPortalPageUrl,
     QueryParams,
     BuildUrlParams,
-} from '../../infrastructure/utils/urlBuilder.js';
+} from '../../infrastructure/utils/cbioportalUrlBuilder.js';
 
 export interface StudyUrlOptions {
     studyIds: string | string[];

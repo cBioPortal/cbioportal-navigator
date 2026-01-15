@@ -110,27 +110,22 @@ export interface ResultsViewParams extends StudyIdentificationParams {
 }
 
 /**
- * Success response format
+ * Navigation response format (for navigation tools that return URLs)
  */
-export interface SuccessResponse {
+export interface NavigationResponse {
     success: true;
+    message: string;
     url: string;
-    metadata: Record<string, any>;
+    data: Record<string, any>;
 }
 
 /**
- * Ambiguity response format (when multiple options need user selection)
+ * Data response format (for data tools like router, get attribute values)
  */
-export interface AmbiguityResponse {
-    success: false;
-    needsSelection: true;
+export interface DataResponse {
+    success: true;
     message: string;
-    options: Array<{
-        studyId: string;
-        name: string;
-        description?: string;
-        sampleCount?: number;
-    }>;
+    data: Record<string, any>;
 }
 
 /**
@@ -145,4 +140,10 @@ export interface ErrorResponse {
 /**
  * Union type for all tool responses
  */
-export type ToolResponse = SuccessResponse | AmbiguityResponse | ErrorResponse;
+export type ToolResponse = NavigationResponse | DataResponse | ErrorResponse;
+
+/**
+ * Legacy type alias for backward compatibility
+ * @deprecated Use NavigationResponse instead
+ */
+export type SuccessResponse = NavigationResponse;

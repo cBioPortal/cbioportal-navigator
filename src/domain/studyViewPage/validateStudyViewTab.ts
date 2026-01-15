@@ -25,7 +25,7 @@
  * @packageDocumentation
  */
 
-import { apiClient } from '../../infrastructure/api/client.js';
+import { apiClient } from '../../infrastructure/api/cbioportalClient.js';
 
 export interface TabValidationResult {
     available: boolean;

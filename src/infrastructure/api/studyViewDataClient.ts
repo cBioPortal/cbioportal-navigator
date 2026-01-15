@@ -10,7 +10,7 @@
  * @packageDocumentation
  */
 
-import { apiClient } from './client.js';
+import { apiClient } from './cbioportalClient.js';
 import _ from 'lodash';
 import type {
     ClinicalAttribute,
@@ -75,6 +75,46 @@ export class StudyViewDataClient {
             (item) => item.attributeId === attributeId
         );
         return countItem?.counts.map((c) => c.value) || [];
+    }
+
+    /**
+     * Get possible values for multiple clinical attributes in batch (single API call).
+     *
+     * Optimized version that fetches values for multiple attributes in a single request.
+     * Uses the same API endpoint as getClinicalDataValues but with multiple attributes.
+     *
+     * @param studyId - Study identifier
+     * @param attributeIds - Array of clinical attribute IDs
+     * @returns Map of attributeId → array of unique string values
+     */
+    async getClinicalDataValuesBatch(
+        studyId: string,
+        attributeIds: string[]
+    ): Promise<Map<string, string[]>> {
+        // Return empty map if no attributes requested
+        if (attributeIds.length === 0) {
+            return new Map();
+        }
+
+        // Construct batch request
+        const result = await this.internalApi.fetchClinicalDataCountsUsingPOST({
+            clinicalDataCountFilter: {
+                attributes: attributeIds.map((id) => ({
+                    attributeId: id,
+                    values: [],
+                })),
+                studyViewFilter: { studyIds: [studyId] } as StudyViewFilter,
+            },
+        });
+
+        // Transform result array into Map<attributeId, values[]>
+        const valuesMap = new Map<string, string[]>();
+        for (const item of result) {
+            const values = item.counts.map((c) => c.value);
+            valuesMap.set(item.attributeId, values);
+        }
+
+        return valuesMap;
     }
 
     /**

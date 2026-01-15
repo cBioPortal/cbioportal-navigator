@@ -25,42 +25,37 @@
  */
 
 import type {
-    SuccessResponse,
-    AmbiguityResponse,
+    NavigationResponse,
+    DataResponse,
     ErrorResponse,
 } from './types.js';
 
 /**
- * Create a success response
+ * Create a navigation response (for tools that return URLs)
  */
-export function createSuccessResponse(
+export function createNavigationResponse(
     url: string,
-    metadata: Record<string, any>
-): SuccessResponse {
+    data?: Record<string, any>
+): NavigationResponse {
     return {
         success: true,
+        message: `Navigating to ${url}`,
         url,
-        metadata,
+        data: data || {},
     };
 }
 
 /**
- * Create an ambiguity response (multiple matches found)
+ * Create a data response (for tools that return data without URLs)
  */
-export function createAmbiguityResponse(
+export function createDataResponse(
     message: string,
-    options: Array<{
-        studyId: string;
-        name: string;
-        description?: string;
-        sampleCount?: number;
-    }>
-): AmbiguityResponse {
+    data: Record<string, any>
+): DataResponse {
     return {
-        success: false,
-        needsSelection: true,
+        success: true,
         message,
-        options,
+        data,
     };
 }
 
@@ -76,4 +71,15 @@ export function createErrorResponse(
         error,
         details,
     };
+}
+
+/**
+ * Legacy function for backward compatibility
+ * @deprecated Use createNavigationResponse instead
+ */
+export function createSuccessResponse(
+    url: string,
+    metadata: Record<string, any>
+): NavigationResponse {
+    return createNavigationResponse(url, metadata);
 }

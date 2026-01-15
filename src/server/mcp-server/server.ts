@@ -10,15 +10,11 @@
  * - `createMcpServer()`: Factory function that returns a configured McpServer instance
  *
  * Registered tools:
- * - `resolve_and_route`: Main router that delegates to specialized tools
+ * - `resolve_and_route`: Main router that delegates to specialized tools (includes filter metadata)
  * - `navigate_to_studyview`: Study overview page navigation
  * - `navigate_to_patientview`: Patient detail page navigation
  * - `navigate_to_resultsview`: Results/OncoPrint page navigation
- *
- * Registered resources:
- * - `cbioportal://study/{studyId}/filters/clinical-attributes`: Clinical attributes metadata
- * - `cbioportal://study/{studyId}/filters/case-lists`: Case lists metadata
- * - `cbioportal://study/{studyId}/filters/molecular-profiles`: Molecular profiles metadata
+ * - `get_clinical_attribute_values`: Get clinical attribute values for filtering (on-demand)
  *
  * Architecture:
  * The server is stateless and can be instantiated per-request (HTTP mode) or
@@ -30,7 +26,6 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerTools } from './toolRegistry.js';
-import { registerResources } from './resourceRegistry.js';
 
 /**
  * Create and configure MCP server with all tools and resources registered
@@ -44,8 +39,8 @@ export function createMcpServer(): McpServer {
     // Register all tools
     registerTools(server);
 
-    // Register all resources
-    registerResources(server);
+    // Resources removed - replaced by router metadata + get_clinical_attribute_values tool
+    // This provides better UX for Chat Completions API (lightweight, on-demand fetching)
 
     return server;
 }

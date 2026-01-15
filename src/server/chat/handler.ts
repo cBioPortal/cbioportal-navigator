@@ -9,7 +9,7 @@ import type { Request, Response } from 'express';
 import { ZodError } from 'zod';
 import { chatCompletionRequestSchema } from './schemas.js';
 import { createProvider } from './providers/factory.js';
-import { getMCPTools } from './mcp-client/toolsLoader.js';
+import { getMCPTools, resetMCPClient } from './mcp-client/toolsLoader.js';
 import { DEFAULT_SYSTEM_PROMPT, CONFIG } from './config/defaults.js';
 import { ChatCompletionError, createErrorResponse } from './utils/errors.js';
 import { RequestLogger, generateRequestId } from './utils/logger.js';
@@ -99,6 +99,11 @@ export async function handleChatCompletion(req: Request, res: Response) {
         logger.logComplete({
             error: error instanceof Error ? error.message : 'Unknown error',
         });
+
+        // If MCP client error, reset for next request
+        if (error instanceof Error && error.message.includes('closed client')) {
+            resetMCPClient();
+        }
 
         if (error instanceof ZodError) {
             return res
@@ -353,6 +358,14 @@ async function handleStreaming(
                     toolName: delta.toolName,
                     toolCallId: delta.toolCallId,
                     result: delta.output,
+                });
+            }
+
+            if (delta.type === 'tool-error') {
+                console.error('[Tool Error]', {
+                    toolName: delta.toolName,
+                    toolCallId: delta.toolCallId,
+                    error: delta.error,
                 });
             }
         }

@@ -30,9 +30,9 @@
 
 import { z } from 'zod';
 import { studyResolver } from '../../infrastructure/resolvers/studyResolver.js';
+import { studyViewDataClient } from '../../infrastructure/api/studyViewDataClient.js';
 import {
-    createSuccessResponse,
-    createAmbiguityResponse,
+    createDataResponse,
     createErrorResponse,
 } from '../shared/responses.js';
 import type { ToolResponse } from '../shared/types.js';
@@ -172,7 +172,8 @@ WORKFLOW EXAMPLE:
      status: 'success',
      recommendedTool: 'navigate_to_resultsview',
      resolvedStudyIds: ['luad_tcga', 'lusc_tcga'],
-     message: 'Found 2 studies. Use navigate_to_resultsview with these studyIds.'
+     message: 'Found 2 studies. Use navigate_to_resultsview with these studyIds.',
+     metadata: { ... }
    }
 4. AI calls: navigate_to_resultsview(studyIds=['luad_tcga', 'lusc_tcga'], genes=['TP53'])
 
@@ -180,6 +181,31 @@ PARAMETERS:
 - targetPage: Which page type (study/patient/results)
 - studyKeywords: Array of keywords to search for studies (e.g., ["TCGA", "lung"]) OR
 - studyIds: Array of direct study IDs to validate (e.g., ["luad_tcga", "brca_tcga"])
+
+
+═══════════════════════════════════════════════════════════════════════════════
+METADATA RETURNED
+═══════════════════════════════════════════════════════════════════════════════
+
+The router provides lightweight filter metadata to help construct filters:
+
+1. clinicalAttributeIds: Array of clinical attribute IDs available for filtering
+   Example: ["AGE", "SEX", "TUMOR_GRADE", "TUMOR_STAGE", "OS_MONTHS"]
+   → Use get_clinical_attribute_values tool to get datatype + valid values
+
+2. caseLists: Complete case list information (5-10 lists, small dataset)
+   Example: [{ sampleListId: "study_all", name: "All Tumors", sampleCount: 566 }]
+   → Directly usable in filterJson.caseLists field
+
+3. molecularProfiles: Complete molecular profile information (5-15 profiles)
+   Example: [{ molecularProfileId: "study_mutations", name: "Mutations", ... }]
+   → Directly usable in filterJson genomicProfiles field
+
+For filter construction with clinical attributes:
+1. Check clinicalAttributeIds to see what's available
+2. Call get_clinical_attribute_values to get datatype and exact values
+3. Use exact values in filterJson.clinicalDataFilters
+
 
 For detailed information about parameters for each page type, please refer to
 the documentation of the specific navigation tools after receiving the recommendation.`,
@@ -293,20 +319,8 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
             });
         }
 
-        if (matches.length > 1) {
-            // Return options for user to choose
-            return createAmbiguityResponse(
-                'Multiple studies found. Please specify which one(s) to use by calling this tool again with studyIds parameter:',
-                matches.map((s) => ({
-                    studyId: s.studyId,
-                    name: s.name,
-                    description: s.description,
-                    sampleCount: s.allSampleCount,
-                }))
-            );
-        }
-
-        resolvedStudyIds = [matches[0].studyId];
+        // Return all matched studies (AI will decide if it can auto-select)
+        resolvedStudyIds = matches.map((s) => s.studyId);
     } else {
         return createErrorResponse(
             'Either studyKeywords or studyIds must be provided'
@@ -322,22 +336,65 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
 
     const recommendedTool = toolMapping[targetPage];
 
-    // 3. Get study details for metadata
+    // 3. Get study details
     const studyDetails = await Promise.all(
         resolvedStudyIds.map((id) => studyResolver.getById(id))
     );
 
-    // 4. Return success response with recommendation
-    return createSuccessResponse(
-        `Found ${resolvedStudyIds.length} study(ies). Please use the ${recommendedTool} tool with the resolved studyIds.`,
-        {
-            recommendedTool,
-            resolvedStudyIds,
-            studies: studyDetails.map((s) => ({
-                studyId: s.studyId,
-                name: s.name,
-                sampleCount: s.allSampleCount,
-            })),
-        }
+    // 4. Fetch metadata for each study independently
+    const studiesWithMetadata = await Promise.all(
+        resolvedStudyIds.map(async (studyId) => {
+            const study = studyDetails.find((s) => s.studyId === studyId)!;
+
+            const [clinicalAttributes, caseLists, molecularProfiles] =
+                await Promise.all([
+                    studyViewDataClient.getClinicalAttributes([studyId]),
+                    studyViewDataClient.getCaseLists(studyId),
+                    studyViewDataClient.getMolecularProfiles([studyId]),
+                ]);
+
+            return {
+                studyId: study.studyId,
+                name: study.name,
+                sampleCount: study.allSampleCount,
+                metadata: {
+                    clinicalAttributeIds: clinicalAttributes.map(
+                        (attr) => attr.clinicalAttributeId
+                    ),
+                    caseLists: caseLists.map((list) => ({
+                        sampleListId: list.sampleListId,
+                        name: list.name,
+                        description: list.description,
+                        category: list.category,
+                        sampleCount: list.sampleCount,
+                    })),
+                    molecularProfiles: molecularProfiles.map((profile) => ({
+                        molecularProfileId: profile.molecularProfileId,
+                        name: profile.name,
+                        description: profile.description,
+                        molecularAlterationType:
+                            profile.molecularAlterationType,
+                        datatype: profile.datatype,
+                    })),
+                },
+            };
+        })
     );
+
+    // 5. Build response based on number of studies
+    const needsStudySelection = resolvedStudyIds.length > 1;
+
+    let message: string;
+    if (needsStudySelection) {
+        message = `Found ${resolvedStudyIds.length} matching studies. Review the user's original query to determine if it clearly matches one study. If yes, use that study's metadata to call ${recommendedTool}. If ambiguous, ask the user to choose.`;
+    } else {
+        message = `Found 1 study. Use ${recommendedTool} with the provided study metadata.`;
+    }
+
+    return createDataResponse(message, {
+        recommendedTool,
+        needsStudySelection,
+        resolvedStudyIds,
+        studies: studiesWithMetadata,
+    });
 }

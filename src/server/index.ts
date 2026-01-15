@@ -31,8 +31,9 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import express from 'express';
 
 import { setConfig } from '../infrastructure/utils/config.js';
-import { createMcpServer } from './mcp/server.js';
+import { createMcpServer } from './mcp-server/server.js';
 import { handleChatCompletion } from './chat/handler.js';
+import { closeMCPClient } from './chat/mcp-client/toolsLoader.js';
 
 /**
  * Start server in stdio mode (for Claude Desktop)
@@ -137,19 +138,13 @@ async function startHttp() {
                     owned_by: 'anthropic',
                 },
                 {
-                    id: 'claude-opus-4-5',
-                    object: 'model',
-                    created: Date.now(),
-                    owned_by: 'anthropic',
-                },
-                {
-                    id: 'gemini-2.0-flash',
+                    id: 'gemini-3-flash',
                     object: 'model',
                     created: Date.now(),
                     owned_by: 'google',
                 },
                 {
-                    id: 'gpt-4o',
+                    id: 'gpt-5.2',
                     object: 'model',
                     created: Date.now(),
                     owned_by: 'openai',
@@ -159,7 +154,7 @@ async function startHttp() {
     });
 
     const port = parseInt(process.env.PORT || '8002');
-    app.listen(port, () => {
+    const server = app.listen(port, () => {
         console.log(`cBioPortal Navigator HTTP server running`);
         console.log(`MCP endpoint: http://localhost:${port}/mcp`);
         console.log(
@@ -170,6 +165,25 @@ async function startHttp() {
         console.log(
             `Base URL: ${process.env.CBIOPORTAL_BASE_URL || 'https://www.cbioportal.org'}`
         );
+    });
+
+    // Graceful shutdown handlers
+    process.on('SIGTERM', async () => {
+        console.log('SIGTERM received, closing server...');
+        server.close(() => {
+            console.log('HTTP server closed');
+        });
+        await closeMCPClient();
+        process.exit(0);
+    });
+
+    process.on('SIGINT', async () => {
+        console.log('SIGINT received, closing server...');
+        server.close(() => {
+            console.log('HTTP server closed');
+        });
+        await closeMCPClient();
+        process.exit(0);
     });
 }
 

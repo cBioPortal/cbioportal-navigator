@@ -8,7 +8,7 @@
  *
  * @remarks
  * Key exports:
- * - `navigateToStudyViewTool`: Tool definition with schema and documentation
+ * - `navigateToStudyViewPageTool`: Tool definition with schema and documentation
  * - `handleNavigateToStudyView()`: MCP tool handler
  * - `navigateToStudyView()`: Core navigation logic
  *
@@ -29,10 +29,10 @@
 
 import { z } from 'zod';
 import { studyResolver } from '../../infrastructure/resolvers/studyResolver.js';
-import { buildStudyUrl } from './urlBuilder.js';
-import { validateTabAvailability } from './tabValidator.js';
+import { buildStudyUrl } from './buildStudyUrl.js';
+import { validateTabAvailability } from './validateStudyViewTab.js';
 import {
-    createSuccessResponse,
+    createNavigationResponse,
     createErrorResponse,
 } from '../shared/responses.js';
 import type { ToolResponse } from '../shared/types.js';
@@ -45,8 +45,8 @@ import {
 /**
  * Tool definition for MCP registration
  */
-export const navigateToStudyViewTool = {
-    name: 'navigate_to_studyview',
+export const navigateToStudyViewPageTool = {
+    name: 'navigate_to_studyview_page',
     title: 'Navigate to StudyView Page',
     description: `Navigate to cBioPortal StudyView page - research cohort overview and analysis.
 
@@ -217,35 +217,37 @@ Tab validation examples:
 };
 
 // Infer type from Zod schema
-type NavigateToStudyViewInput = {
-    studyIds: z.infer<typeof navigateToStudyViewTool.inputSchema.studyIds>;
-    tab?: z.infer<typeof navigateToStudyViewTool.inputSchema.tab>;
-    filterJson?: z.infer<typeof navigateToStudyViewTool.inputSchema.filterJson>;
+type NavigateToStudyViewPageInput = {
+    studyIds: z.infer<typeof navigateToStudyViewPageTool.inputSchema.studyIds>;
+    tab?: z.infer<typeof navigateToStudyViewPageTool.inputSchema.tab>;
+    filterJson?: z.infer<
+        typeof navigateToStudyViewPageTool.inputSchema.filterJson
+    >;
     filterAttributeId?: z.infer<
-        typeof navigateToStudyViewTool.inputSchema.filterAttributeId
+        typeof navigateToStudyViewPageTool.inputSchema.filterAttributeId
     >;
     filterValues?: z.infer<
-        typeof navigateToStudyViewTool.inputSchema.filterValues
+        typeof navigateToStudyViewPageTool.inputSchema.filterValues
     >;
     plotsHorzSelection?: z.infer<
-        typeof navigateToStudyViewTool.inputSchema.plotsHorzSelection
+        typeof navigateToStudyViewPageTool.inputSchema.plotsHorzSelection
     >;
     plotsVertSelection?: z.infer<
-        typeof navigateToStudyViewTool.inputSchema.plotsVertSelection
+        typeof navigateToStudyViewPageTool.inputSchema.plotsVertSelection
     >;
     plotsColoringSelection?: z.infer<
-        typeof navigateToStudyViewTool.inputSchema.plotsColoringSelection
+        typeof navigateToStudyViewPageTool.inputSchema.plotsColoringSelection
     >;
 };
 
 /**
  * Tool handler for MCP
  */
-export async function handleNavigateToStudyView(
-    input: NavigateToStudyViewInput
+export async function handleNavigateToStudyViewPage(
+    input: NavigateToStudyViewPageInput
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
     try {
-        const result = await navigateToStudyView(input);
+        const result = await navigateToStudyViewPage(input);
         return {
             content: [
                 {
@@ -273,8 +275,8 @@ export async function handleNavigateToStudyView(
 /**
  * Main navigation logic for StudyView
  */
-async function navigateToStudyView(
-    params: NavigateToStudyViewInput
+async function navigateToStudyViewPage(
+    params: NavigateToStudyViewPageInput
 ): Promise<ToolResponse> {
     const { studyIds } = params;
 
@@ -326,7 +328,7 @@ async function navigateToStudyView(
         studyIds.map((id) => studyResolver.getById(id))
     );
 
-    return createSuccessResponse(url, {
+    return createNavigationResponse(url, {
         studyIds,
         studies: studyDetails.map((s) => ({
             studyId: s.studyId,

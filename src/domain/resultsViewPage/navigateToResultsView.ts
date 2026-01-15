@@ -8,7 +8,7 @@
  *
  * @remarks
  * Key exports:
- * - `navigateToResultsViewTool`: Tool definition with schema and documentation
+ * - `navigateToResultsViewPageTool`: Tool definition with schema and documentation
  * - `handleNavigateToResultsView()`: MCP tool handler
  * - `navigateToResultsView()`: Core navigation logic
  *
@@ -31,9 +31,9 @@ import { z } from 'zod';
 import { studyResolver } from '../../infrastructure/resolvers/studyResolver.js';
 import { geneResolver } from '../../infrastructure/resolvers/geneResolver.js';
 import { profileResolver } from '../../infrastructure/resolvers/profileResolver.js';
-import { buildResultsUrl } from './urlBuilder.js';
+import { buildResultsUrl } from './buildResultsUrl.js';
 import {
-    createSuccessResponse,
+    createNavigationResponse,
     createErrorResponse,
 } from '../shared/responses.js';
 import type { ToolResponse } from '../shared/types.js';
@@ -41,8 +41,8 @@ import type { ToolResponse } from '../shared/types.js';
 /**
  * Tool definition for MCP registration
  */
-export const navigateToResultsViewTool = {
-    name: 'navigate_to_resultsview',
+export const navigateToResultsViewPageTool = {
+    name: 'navigate_to_resultsview_page',
     title: 'Navigate to ResultsView page',
     description: `Navigate to cBioPortal ResultsView page - gene alteration analysis across samples.
 
@@ -129,27 +129,31 @@ TYPICAL USE CASES:
 };
 
 // Infer type from Zod schema
-type NavigateToResultsViewInput = {
-    studyIds: z.infer<typeof navigateToResultsViewTool.inputSchema.studyIds>;
-    genes: z.infer<typeof navigateToResultsViewTool.inputSchema.genes>;
-    caseSetId?: z.infer<typeof navigateToResultsViewTool.inputSchema.caseSetId>;
-    tab?: z.infer<typeof navigateToResultsViewTool.inputSchema.tab>;
+type NavigateToResultsViewPageInput = {
+    studyIds: z.infer<
+        typeof navigateToResultsViewPageTool.inputSchema.studyIds
+    >;
+    genes: z.infer<typeof navigateToResultsViewPageTool.inputSchema.genes>;
+    caseSetId?: z.infer<
+        typeof navigateToResultsViewPageTool.inputSchema.caseSetId
+    >;
+    tab?: z.infer<typeof navigateToResultsViewPageTool.inputSchema.tab>;
     zScoreThreshold?: z.infer<
-        typeof navigateToResultsViewTool.inputSchema.zScoreThreshold
+        typeof navigateToResultsViewPageTool.inputSchema.zScoreThreshold
     >;
     rppaScoreThreshold?: z.infer<
-        typeof navigateToResultsViewTool.inputSchema.rppaScoreThreshold
+        typeof navigateToResultsViewPageTool.inputSchema.rppaScoreThreshold
     >;
 };
 
 /**
  * Tool handler for MCP
  */
-export async function handleNavigateToResultsView(
-    input: NavigateToResultsViewInput
+export async function handleNavigateToResultsViewPage(
+    input: NavigateToResultsViewPageInput
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
     try {
-        const result = await navigateToResultsView(input);
+        const result = await navigateToResultsViewPage(input);
         return {
             content: [
                 {
@@ -177,8 +181,8 @@ export async function handleNavigateToResultsView(
 /**
  * Main navigation logic for ResultsView
  */
-async function navigateToResultsView(
-    params: NavigateToResultsViewInput
+async function navigateToResultsViewPage(
+    params: NavigateToResultsViewPageInput
 ): Promise<ToolResponse> {
     const { studyIds } = params;
 
@@ -240,7 +244,7 @@ async function navigateToResultsView(
         studyIds.map((id) => profileResolver.getForStudy(id, 'mutation'))
     );
 
-    return createSuccessResponse(url, {
+    return createNavigationResponse(url, {
         studyIds,
         studies: studyDetails.map((s) => ({
             studyId: s.studyId,

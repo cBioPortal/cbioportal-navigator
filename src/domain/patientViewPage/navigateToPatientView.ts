@@ -8,7 +8,7 @@
  *
  * @remarks
  * Key exports:
- * - `navigateToPatientViewTool`: Tool definition with schema and documentation
+ * - `navigateToPatientViewPageTool`: Tool definition with schema and documentation
  * - `handleNavigateToPatientView()`: MCP tool handler
  * - `navigateToPatientView()`: Core navigation logic
  *
@@ -27,9 +27,9 @@
 
 import { z } from 'zod';
 import { studyResolver } from '../../infrastructure/resolvers/studyResolver.js';
-import { buildPatientUrl } from './urlBuilder.js';
+import { buildPatientUrl } from './buildPatientUrl.js';
 import {
-    createSuccessResponse,
+    createNavigationResponse,
     createErrorResponse,
 } from '../shared/responses.js';
 import type { ToolResponse } from '../shared/types.js';
@@ -37,8 +37,8 @@ import type { ToolResponse } from '../shared/types.js';
 /**
  * Tool definition for MCP registration
  */
-export const navigateToPatientViewTool = {
-    name: 'navigate_to_patientview',
+export const navigateToPatientViewPageTool = {
+    name: 'navigate_to_patientview_page',
     title: 'Navigate to PatientView Page',
     description: `Navigate to cBioPortal PatientView page - detailed individual patient/sample information.
 
@@ -110,22 +110,28 @@ PARAMETERS:
 };
 
 // Infer type from Zod schema
-type NavigateToPatientViewInput = {
-    studyIds: z.infer<typeof navigateToPatientViewTool.inputSchema.studyIds>;
-    patientId?: z.infer<typeof navigateToPatientViewTool.inputSchema.patientId>;
-    sampleId?: z.infer<typeof navigateToPatientViewTool.inputSchema.sampleId>;
-    tab?: z.infer<typeof navigateToPatientViewTool.inputSchema.tab>;
-    navIds?: z.infer<typeof navigateToPatientViewTool.inputSchema.navIds>;
+type NavigateToPatientViewPageInput = {
+    studyIds: z.infer<
+        typeof navigateToPatientViewPageTool.inputSchema.studyIds
+    >;
+    patientId?: z.infer<
+        typeof navigateToPatientViewPageTool.inputSchema.patientId
+    >;
+    sampleId?: z.infer<
+        typeof navigateToPatientViewPageTool.inputSchema.sampleId
+    >;
+    tab?: z.infer<typeof navigateToPatientViewPageTool.inputSchema.tab>;
+    navIds?: z.infer<typeof navigateToPatientViewPageTool.inputSchema.navIds>;
 };
 
 /**
  * Tool handler for MCP
  */
-export async function handleNavigateToPatientView(
-    input: NavigateToPatientViewInput
+export async function handleNavigateToPatientViewPage(
+    input: NavigateToPatientViewPageInput
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
     try {
-        const result = await navigateToPatientView(input);
+        const result = await navigateToPatientViewPage(input);
         return {
             content: [
                 {
@@ -153,8 +159,8 @@ export async function handleNavigateToPatientView(
 /**
  * Main navigation logic for PatientView
  */
-async function navigateToPatientView(
-    params: NavigateToPatientViewInput
+async function navigateToPatientViewPage(
+    params: NavigateToPatientViewPageInput
 ): Promise<ToolResponse> {
     const { studyIds } = params;
 
@@ -196,12 +202,10 @@ async function navigateToPatientView(
         })
         .join('\n\n');
 
-    const message =
-        studyIds.length === 1
-            ? patientUrls[0].url
-            : `Generated ${studyIds.length} PatientView URLs:\n\n${urlDescriptions}`;
+    // Use first URL as primary navigation URL
+    const primaryUrl = patientUrls[0].url;
 
-    return createSuccessResponse(message, {
+    return createNavigationResponse(primaryUrl, {
         patientUrls: patientUrls.map((item, index) => ({
             studyId: item.studyId,
             studyName: studyDetails[index].name,
@@ -210,5 +214,6 @@ async function navigateToPatientView(
         patientId: params.patientId,
         sampleId: params.sampleId,
         tab: params.tab,
+        hasMultipleUrls: studyIds.length > 1,
     });
 }
