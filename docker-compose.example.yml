@@ -1,37 +1,37 @@
-# Docker Compose Override for cBioPortal Navigator Integration
-# This file extends the main docker-compose.yml to add the Navigator service
+# Docker Compose Example for cBioPortal Navigator MCP Server
 #
-# Usage:
-#   1. Copy to LibreChat directory: cp docker-compose.example.yml /path/to/LibreChat/docker-compose.override.yml
-#   2. Check Navigator image tag matches your desired branch (see comment below)
-#   3. Ensure LibreChat .env has: ANTHROPIC_API_KEY, GOOGLE_KEY, OPENAI_API_KEY
-#   4. Run: docker compose up -d
+# This file demonstrates how to add cBioPortal Navigator as an additional MCP server
+# alongside the existing mcp-clickhouse server in cbioportal-mcp-qa.
+#
+# Usage with cbioportal-mcp-qa:
+#   1. Add the cbioportal-navigator service to cbioportal-mcp-qa's docker-compose.yml
+#   2. Configure your MCP agent to connect to both servers, OR
+#   3. Run separate agents for each MCP server
+#
+# Two deployment patterns:
+#   A) Single agent connecting to both MCP servers (requires multi-server support)
+#   B) Separate agents for Navigator and ClickHouse (shown below)
 
 services:
-  # Add cBioPortal Navigator service to LibreChat's network
+  # cBioPortal Navigator as MCP Server (for URL navigation)
   cbioportal-navigator:
     # Use pre-built GitHub image
-    # IMPORTANT: Check available branches/tags at:
+    # Check available tags at:
     # https://github.com/fuzhaoyuan/cbioportal-navigator/pkgs/container/cbioportal-navigator
-    image: ghcr.io/fuzhaoyuan/cbioportal-navigator:master-studyview-url-shortened-chat-completions
+    image: ghcr.io/fuzhaoyuan/cbioportal-navigator:latest
 
     # Or build from local source:
     # build:
-    #   context: ../cbioportal-navigator
+    #   context: .
     #   dockerfile: Dockerfile
 
     container_name: cbioportal-navigator
     ports:
-      - "8002:8002"  # Expose for debugging/testing
+      - "8001:8002"  # Use port 8001 to avoid conflict with mcp-clickhouse (8000)
     environment:
       - MCP_TRANSPORT=http
       - PORT=8002
       - CBIOPORTAL_BASE_URL=https://www.cbioportal.org
-      # Pass API keys from LibreChat .env to Navigator
-      # Navigator will use these for AI provider authentication
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - GOOGLE_API_KEY=${GOOGLE_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8002/health"]
@@ -39,10 +39,46 @@ services:
       timeout: 10s
       retries: 5
       start_period: 20s
-    networks:
-      - default
 
-  # Update LibreChat service to mount the config file
-  api:
-    volumes:
-      - ./librechat.yaml:/app/librechat.yaml:ro
+  # Example: Existing mcp-clickhouse from PR #16 (for reference)
+  # This should already exist in cbioportal-mcp-qa's docker-compose.yml
+  # mcp-clickhouse:
+  #   image: cbioportal/mcp:latest
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     - CLICKHOUSE_HOST=...
+  #     - CLICKHOUSE_MCP_SERVER_TRANSPORT=http
+  #     - CLICKHOUSE_MCP_BIND_HOST=0.0.0.0
+  #     - CLICKHOUSE_MCP_BIND_PORT=8000
+
+  # Example: MCP Agent for Navigator (dedicated agent for URL navigation)
+  # Uncomment to deploy a dedicated agent for Navigator
+  # navigator-agent:
+  #   image: ghcr.io/jim-bo/mcp-agent-base:sha-a3209c6
+  #   ports:
+  #     - "8081:5000"  # Different port from clickhouse agent
+  #   depends_on:
+  #     cbioportal-navigator:
+  #       condition: service_healthy
+  #   environment:
+  #     - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+  #     - DEFAULT_MODEL=anthropic:claude-sonnet-4-5-20250929
+  #     - MCP_SERVER_URL=http://cbioportal-navigator:8002/mcp
+  #     - TEMPERATURE=0.0
+  #   volumes:
+  #     - ./cbioportal-navigator-prompt.txt:/app/system_prompt.txt:ro
+
+  # Example: Existing ClickHouse agent from PR #16 (for reference)
+  # mcp-agent:
+  #   image: ghcr.io/jim-bo/mcp-agent-base:sha-a3209c6
+  #   ports:
+  #     - "8080:5000"
+  #   depends_on:
+  #     mcp-clickhouse:
+  #       condition: service_started
+  #   environment:
+  #     - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+  #     - DEFAULT_MODEL=anthropic:claude-sonnet-4-5-20250929
+  #     - MCP_SERVER_URL=http://mcp-clickhouse:8000/mcp
+  #     - TEMPERATURE=0.0

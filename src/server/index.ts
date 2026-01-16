@@ -32,8 +32,6 @@ import express from 'express';
 
 import { setConfig } from '../infrastructure/utils/config.js';
 import { createMcpServer } from './mcp-server/server.js';
-import { handleChatCompletion } from './chat/handler.js';
-import { closeMCPClient } from './chat/mcp-client/toolsLoader.js';
 
 /**
  * Start server in stdio mode (for Claude Desktop)
@@ -63,7 +61,7 @@ async function startStdio() {
 }
 
 /**
- * Start server in HTTP mode (for LibreChat and other remote clients)
+ * Start server in HTTP mode (for mcp-agent and other remote clients)
  */
 async function startHttp() {
     // Configure base URL from environment
@@ -120,47 +118,10 @@ async function startHttp() {
         }
     });
 
-    // Chat Completions API (OpenAI-compatible)
-    app.post('/v1/chat/completions', async (req, res) => {
-        await handleChatCompletion(req, res);
-    });
-
-    // Models endpoint (for LibreChat model discovery)
-    // Using model aliases for automatic updates to latest versions
-    app.get('/v1/models', (req, res) => {
-        res.json({
-            object: 'list',
-            data: [
-                {
-                    id: 'claude-sonnet-4-5',
-                    object: 'model',
-                    created: Date.now(),
-                    owned_by: 'anthropic',
-                },
-                {
-                    id: 'gemini-3-flash',
-                    object: 'model',
-                    created: Date.now(),
-                    owned_by: 'google',
-                },
-                {
-                    id: 'gpt-5.2',
-                    object: 'model',
-                    created: Date.now(),
-                    owned_by: 'openai',
-                },
-            ],
-        });
-    });
-
     const port = parseInt(process.env.PORT || '8002');
     const server = app.listen(port, () => {
-        console.log(`cBioPortal Navigator HTTP server running`);
+        console.log(`cBioPortal Navigator MCP server running`);
         console.log(`MCP endpoint: http://localhost:${port}/mcp`);
-        console.log(
-            `Chat Completions: http://localhost:${port}/v1/chat/completions`
-        );
-        console.log(`Models: http://localhost:${port}/v1/models`);
         console.log(`Health check: http://localhost:${port}/health`);
         console.log(
             `Base URL: ${process.env.CBIOPORTAL_BASE_URL || 'https://www.cbioportal.org'}`
@@ -172,18 +133,16 @@ async function startHttp() {
         console.log('SIGTERM received, closing server...');
         server.close(() => {
             console.log('HTTP server closed');
+            process.exit(0);
         });
-        await closeMCPClient();
-        process.exit(0);
     });
 
     process.on('SIGINT', async () => {
         console.log('SIGINT received, closing server...');
         server.close(() => {
             console.log('HTTP server closed');
+            process.exit(0);
         });
-        await closeMCPClient();
-        process.exit(0);
     });
 }
 

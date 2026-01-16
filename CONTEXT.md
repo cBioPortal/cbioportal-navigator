@@ -3,8 +3,7 @@
 ## Current Status
 
 MCP server for AI-assisted cBioPortal navigation with dual mode support:
-- MCP protocol (stdio/HTTP) for Claude Desktop and other MCP clients
-- OpenAI-compatible Chat Completions API for LibreChat and similar platforms
+- MCP protocol (stdio/HTTP) for Claude Desktop and remote MCP agents
 
 **Latest update:** Column-store integration for performance optimization (2026-01-16)
 - Implemented transparent URL rewriting to route API calls to column-store endpoints
@@ -18,10 +17,10 @@ MCP server for AI-assisted cBioPortal navigation with dual mode support:
 - Router returns all matched studies with individual metadata for AI to auto-select
 - Files: `types.ts`, `responses.ts`, `router/tool.ts`, all navigation tools
 
-**Previous update:** Global singleton MCP client implementation (2026-01-15)
-- Fixed "closed client" errors by persisting MCP client for server lifetime
-- Performance: First request ~50ms overhead, subsequent requests ~0ms
-- Files: `toolsLoader.ts`, `handler.ts`, `index.ts`
+**Previous update:** Code cleanup (2026-01-16)
+- Removed Chat Completions API and AI SDK dependencies
+- Simplified to pure MCP server for integration with external agents
+- Files: removed `src/server/chat/`, updated `index.ts`, `package.json`
 
 **Supported Pages:**
 - StudyView (full support: filters, plots, tabs)
@@ -36,29 +35,20 @@ MCP server for AI-assisted cBioPortal navigation with dual mode support:
 src/
 ├── server/                   # Server layer (user-facing)
 │   ├── index.ts             # Application entry point
-│   ├── mcp/                 # MCP server infrastructure
-│   │   ├── server.ts        # MCP server creation and setup
-│   │   └── toolRegistry.ts  # Tool registration
-│   └── chat/                # Chat Completions API (OpenAI-compatible)
-│       ├── handler.ts       # Request handler (streaming & non-streaming)
-│       ├── mcp-client/      # MCP client integration
-│       │   ├── client.ts    # MCP client configuration
-│       │   └── toolsLoader.ts # Tools loading from MCP server (global singleton)
-│       ├── providers/       # Multi-provider support (Anthropic/Google/OpenAI)
-│       ├── config/          # API key resolution logic
-│       └── schemas.ts       # Request/response schemas
+│   └── mcp-server/          # MCP server infrastructure
+│       ├── server.ts        # MCP server creation and setup
+│       └── toolRegistry.ts  # Tool registration
 │
 ├── domain/                  # Domain layer (business logic)
 │   ├── shared/              # Shared types and utilities
 │   ├── router/              # Main routing tool (resolve_and_route)
-│   ├── studyView/           # StudyView domain
-│   │   ├── tool.ts          # navigate_to_studyview
-│   │   ├── urlBuilder.ts    # URL construction logic
-│   │   ├── schemas/         # Manually maintained Zod schemas
-│   │   └── tools/           # Additional tools
-│   │       └── getClinicalAttributeValues.ts
-│   ├── patientView/         # PatientView domain
-│   └── resultsView/         # ResultsView domain
+│   ├── studyViewPage/       # StudyView domain
+│   │   ├── navigateToStudyView.ts        # navigate_to_studyview tool
+│   │   ├── getClinicalAttributeValues.ts # get_clinical_attribute_values tool
+│   │   ├── buildStudyUrl.ts              # URL construction logic
+│   │   └── schemas/                      # Manually maintained Zod schemas
+│   ├── patientViewPage/     # PatientView domain
+│   └── resultsViewPage/     # ResultsView domain
 │
 └── infrastructure/          # Infrastructure layer (API-facing)
     ├── api/                 # cBioPortal API clients
@@ -69,44 +59,11 @@ src/
 **Design Principles:**
 - Server (user-facing) → Domain (business logic) → Infrastructure (API-facing)
 - Domain-driven: Each page type is self-contained
-- MCP server as single source of truth for tools
-- Server-side tool execution (zero client configuration)
+- Pure MCP server for integration with external agents
 
 ## Key Design Decisions
 
-### 1. MCP Server as Single Source of Truth
-
-**Problem:** Chat Completions API needed tool definitions. Should we duplicate tool definitions or reuse MCP server's tools?
-
-**Solution:** Chat API uses internal MCP client to connect to own MCP server (`http://localhost:8002/mcp`).
-
-**Why:**
-- Tools defined once in MCP server, used by both Claude Desktop and Chat API
-- Automatic synchronization: new tools instantly available
-- No manual tool conversion code to maintain
-- Enables future use of MCP resources
-
-**Implementation:**
-- Global singleton MCP client in `toolsLoader.ts`
-- Lazy initialization on first request (~50ms)
-- Cached tools for subsequent requests (~0ms)
-- Automatic error recovery via `resetMCPClient()`
-
-### 2. API Key Resolution for Multi-Provider Support
-
-**Problem:** Navigator supports multiple AI providers (Anthropic, Google, OpenAI), but LibreChat's custom endpoint only allows single `apiKey` field in Authorization header.
-
-**Solution:** Skip Authorization headers entirely, use environment variables exclusively.
-
-**Why:**
-- Single endpoint configuration supports all providers
-- Auto-detect provider from model name (e.g., `claude-sonnet-4-5` → Anthropic)
-- Select appropriate env var: `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, or `OPENAI_API_KEY`
-- More secure (keys in env, not passed through requests)
-
-**Implementation:** `src/chat/config/auth.ts` ignores Authorization header, uses `ENV_VAR_MAPPING[provider]`.
-
-### 3. Two-Tier Filter Metadata
+### 1. Two-Tier Filter Metadata
 
 **Problem:** When users request filters (e.g., "show lung cancer with high tumor grade"), AI needs:
 - Available clinical attributes (e.g., `TUMOR_GRADE`, `AGE`, `SEX`)
@@ -130,7 +87,7 @@ Full clinical attributes with options = ~1,500 tokens. Most queries don't need f
 - New tool `get_clinical_attribute_values` provides datatype and options on demand
 - Single batch API call for multiple attributes
 
-### 4. Manual Schema Maintenance
+### 2. Manual Schema Maintenance
 
 **Location:** `src/domain/studyView/schemas/`
 
@@ -142,7 +99,7 @@ Full clinical attributes with options = ~1,500 tokens. Most queries don't need f
 - cBioPortal API is stable, manual precision preferred over automation
 - Easier to maintain small subset of actually-used schemas
 
-### 5. Response Type System
+### 3. Response Type System
 
 **Problem:** Different tools serve different purposes - navigation tools return URLs, data tools return structured information. Using a single `SuccessResponse` type was ambiguous and led to inconsistent response structures.
 
@@ -173,7 +130,7 @@ Full clinical attributes with options = ~1,500 tokens. Most queries don't need f
 - Type definitions in `src/domain/shared/types.ts`
 - Helper functions in `src/domain/shared/responses.ts`
 
-### 6. Multi-Study Intelligent Selection
+### 4. Multi-Study Intelligent Selection
 
 **Problem:** When router matched multiple studies (e.g., "lung cancer" → LUAD, LUSC, SCLC), the old design returned an ambiguity error forcing explicit user selection. This added friction and prevented AI from using context to auto-select.
 
@@ -206,7 +163,7 @@ User: "show me lung adenocarcinoma with high tumor grade"
 - Multi-study: ~1500-2500 tokens (3-5 studies × metadata)
 - Acceptable cost for improved UX
 
-### 7. Column-Store Integration
+### 5. Column-Store Integration
 
 **Problem:** Standard cBioPortal API endpoints had performance issues and data quality bugs:
 - `allSampleCount` incorrectly returned `1` for all studies (broke relevance sorting)
@@ -231,25 +188,6 @@ User: "show me lung adenocarcinoma with high tumor grade"
 - Secondary: Sample count (statistical significance)
 - Example: "TCGA lung adenocarcinoma" → `luad_tcga` (3 matches, 1166 samples) not `nsclc_mskimpact_2022` (1 match, 1800 samples)
 
-### 8. Chat Completions API Architecture
-
-**Key Features:**
-- Multi-provider support (Anthropic, Google, OpenAI)
-- Auto-detection from model name pattern
-- Streaming and non-streaming responses
-- Server-side tool execution (tools auto-synced via MCP client)
-
-**Model Aliases:** Using stable aliases to avoid manual version updates
-- `claude-sonnet-4-5`
-- `gemini-3-flash`
-- `gpt-5.2`
-
-**Available Endpoints:**
-- `/v1/chat/completions` - Chat completions with tool calling
-- `/v1/models` - List available models
-- `/health` - Health check
-- `/mcp` - MCP protocol endpoint
-
 ## Known Limitations
 
 **Not Implemented:**
@@ -257,23 +195,17 @@ User: "show me lung adenocarcinoma with high tumor grade"
 - Tool approval (`needsApproval` parameter)
 - Strict mode schema validation (`strict` parameter)
 
-**Platform-specific:**
-- LibreChat custom endpoints do not display tool calls in UI (LibreChat limitation)
-  - Tools execute successfully but users only see final results
-  - Tool execution progress logged server-side only
-
 ## Development Workflow
 
 **New tools:**
-- Add tool definition to `src/domain/<page>/tool.ts`
-- Register in `src/server/mcp/toolRegistry.ts`
-- No Chat API changes needed (tools automatically available via MCP client)
+- Add tool definition to `src/domain/<page>/<toolName>.ts`
+- Register in `src/server/mcp-server/toolRegistry.ts`
 
 **New domains:**
 - Create `src/domain/<newPage>/` directory
-- Add `tool.ts` (MCP tool definition + handler)
-- Add business logic files (urlBuilder.ts, etc.)
-- Register tool in `src/server/mcp/toolRegistry.ts`
+- Add tool files (MCP tool definitions + handlers)
+- Add business logic files (buildUrl.ts, etc.)
+- Register tools in `src/server/mcp-server/toolRegistry.ts`
 
 **Schema updates:**
 - Edit `src/domain/studyView/schemas/filters.ts`
