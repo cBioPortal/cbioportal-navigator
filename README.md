@@ -131,7 +131,8 @@ Navigator integrates with LibreChat via Docker Compose, supporting multiple AI p
    ```yaml
    services:
      cbioportal-navigator:
-       # Use pre-built GitHub image (or build locally)
+       # Use pre-built GitHub image
+       # Or build locally: docker build -t cbioportal-navigator:latest .
        image: ghcr.io/YOUR_USERNAME/cbioportal-navigator:latest
        container_name: cbioportal-navigator
        ports:
@@ -171,6 +172,7 @@ Navigator integrates with LibreChat via Docker Compose, supporting multiple AI p
 
 5. **Start services** (from LibreChat directory):
    ```bash
+   # If currently running, docker compose down
    docker compose up -d
    ```
 

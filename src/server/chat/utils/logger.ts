@@ -67,7 +67,13 @@ export class RequestLogger {
         );
         console.log(`ID: ${params.toolCallId}`);
         console.log('Input:');
-        console.log(JSON.stringify(params.input, null, 2));
+        const inputStr = JSON.stringify(params.input, null, 2);
+        // Truncate long inputs
+        const truncated =
+            inputStr.length > 2000
+                ? inputStr.substring(0, 2000) + '\n... (truncated)'
+                : inputStr;
+        console.log(truncated);
     }
 
     /**
@@ -87,14 +93,31 @@ export class RequestLogger {
             console.log(`Duration: ${params.durationMs.toFixed(2)}ms`);
         }
         console.log('Result:');
-        const resultStr =
-            typeof params.result === 'string'
-                ? params.result
-                : JSON.stringify(params.result, null, 2);
+
+        // Smart formatting for MCP response format
+        let resultStr: string;
+        if (params.result?.content?.[0]?.text) {
+            // MCP format detected: extract and parse the JSON text
+            const text = params.result.content[0].text;
+            try {
+                const parsed = JSON.parse(text);
+                resultStr = JSON.stringify(parsed, null, 2); // Format parsed object
+            } catch {
+                // Not valid JSON, display as-is
+                resultStr = text;
+            }
+        } else {
+            // Other formats
+            resultStr =
+                typeof params.result === 'string'
+                    ? params.result
+                    : JSON.stringify(params.result, null, 2);
+        }
+
         // Truncate long results
         const truncated =
-            resultStr.length > 1000
-                ? resultStr.substring(0, 1000) + '... (truncated)'
+            resultStr.length > 10000
+                ? resultStr.substring(0, 10000) + '\n... (truncated)'
                 : resultStr;
         console.log(truncated);
         console.log('─'.repeat(80));
@@ -135,8 +158,8 @@ export class RequestLogger {
         console.log('Content:');
         // Truncate long responses
         const truncated =
-            params.content.length > 1000
-                ? params.content.substring(0, 1000) + '... (truncated)'
+            params.content.length > 5000
+                ? params.content.substring(0, 5000) + '\n... (truncated)'
                 : params.content;
         console.log(truncated);
         console.log('─'.repeat(80));

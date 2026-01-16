@@ -29,16 +29,18 @@ export class StudyViewDataClient {
      *
      * Follows the pattern from cbioportal-frontend StudyViewPageStore.ts (lines 6137-6167)
      * - Uses POST method to support multiple studyIds
+     * - Uses SUMMARY projection to get datatype and description fields
      * - Deduplicates based on combination of patientAttribute and clinicalAttributeId
      *
      * @param studyIds - Array of study identifiers
-     * @returns Deduplicated list of clinical attributes
+     * @returns Deduplicated list of clinical attributes with summary-level information
      */
     async getClinicalAttributes(
         studyIds: string[]
     ): Promise<ClinicalAttribute[]> {
         const attributes = await this.api.fetchClinicalAttributesUsingPOST({
             studyIds: studyIds,
+            projection: 'SUMMARY',
         });
 
         // Deduplicate based on combination key (same logic as frontend)
@@ -121,15 +123,15 @@ export class StudyViewDataClient {
      * Get all sample lists (case lists) for a study.
      *
      * Follows the pattern from cbioportal-frontend StudyViewPageStore.ts (lines 11831-11837)
-     * - Uses SUMMARY projection to reduce response size
+     * - Uses ID projection to minimize response size (returns only IDs)
      *
      * @param studyId - Study identifier
-     * @returns Array of sample lists with summary information
+     * @returns Array of sample lists with ID-level information only
      */
     async getCaseLists(studyId: string): Promise<SampleList[]> {
         return await this.api.getAllSampleListsInStudyUsingGET({
             studyId,
-            projection: 'SUMMARY',
+            projection: 'ID',
         });
     }
 
@@ -138,9 +140,10 @@ export class StudyViewDataClient {
      *
      * Follows the pattern from cbioportal-frontend StudyViewPageStore.ts (lines 5619-5633)
      * - Uses POST method to support multiple studyIds
+     * - Uses ID projection to minimize response size (returns only IDs)
      *
      * @param studyIds - Array of study identifiers
-     * @returns Array of molecular profiles
+     * @returns Array of molecular profiles with ID-level information only
      */
     async getMolecularProfiles(
         studyIds: string[]
@@ -149,6 +152,7 @@ export class StudyViewDataClient {
             molecularProfileFilter: {
                 studyIds: studyIds,
             } as MolecularProfileFilter, // Type assertion needed due to API client type definition
+            projection: 'ID',
         });
     }
 }

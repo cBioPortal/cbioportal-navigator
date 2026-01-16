@@ -252,7 +252,7 @@ export async function handleResolveAndRoute(
             content: [
                 {
                     type: 'text' as const,
-                    text: JSON.stringify(result, null, 2),
+                    text: JSON.stringify(result),
                 },
             ],
         };
@@ -265,7 +265,7 @@ export async function handleResolveAndRoute(
             content: [
                 {
                     type: 'text' as const,
-                    text: JSON.stringify(errorResponse, null, 2),
+                    text: JSON.stringify(errorResponse),
                 },
             ],
         };
@@ -319,8 +319,43 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
             });
         }
 
-        // Return all matched studies (AI will decide if it can auto-select)
-        resolvedStudyIds = matches.map((s) => s.studyId);
+        // Sort by relevance: keyword match count (primary), sample count (secondary)
+        const sortedMatches = matches
+            .map((study) => {
+                // Count how many keywords match this study
+                const searchText = [
+                    study.studyId,
+                    study.name,
+                    study.description,
+                    study.cancerType,
+                ]
+                    .filter(Boolean)
+                    .join(' ')
+                    .toLowerCase();
+
+                const matchCount = studyKeywords.filter((kw) =>
+                    searchText.includes(kw.toLowerCase())
+                ).length;
+
+                return { study, matchCount };
+            })
+            .sort((a, b) => {
+                // Primary: keyword match count (descending)
+                if (a.matchCount !== b.matchCount) {
+                    return b.matchCount - a.matchCount;
+                }
+                // Secondary: sample count (descending) - for studies with equal relevance
+                const aCount = a.study.allSampleCount || 0;
+                const bCount = b.study.allSampleCount || 0;
+                return bCount - aCount;
+            })
+            .map((item) => item.study);
+
+        // Limit to top 5 most relevant studies
+        const topMatches = sortedMatches.slice(0, 5);
+
+        // Return top 5 matched studies
+        resolvedStudyIds = topMatches.map((s) => s.studyId);
     } else {
         return createErrorResponse(
             'Either studyKeywords or studyIds must be provided'
@@ -346,12 +381,12 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
         resolvedStudyIds.map(async (studyId) => {
             const study = studyDetails.find((s) => s.studyId === studyId)!;
 
-            const [clinicalAttributes, caseLists, molecularProfiles] =
-                await Promise.all([
-                    studyViewDataClient.getClinicalAttributes([studyId]),
-                    studyViewDataClient.getCaseLists(studyId),
-                    studyViewDataClient.getMolecularProfiles([studyId]),
-                ]);
+            const [clinicalAttributes] = await Promise.all([
+                studyViewDataClient.getClinicalAttributes([studyId]),
+                // TODO: Re-enable caseLists and molecularProfiles in future
+                // studyViewDataClient.getCaseLists(studyId),
+                // studyViewDataClient.getMolecularProfiles([studyId]),
+            ]);
 
             return {
                 studyId: study.studyId,
@@ -361,21 +396,22 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
                     clinicalAttributeIds: clinicalAttributes.map(
                         (attr) => attr.clinicalAttributeId
                     ),
-                    caseLists: caseLists.map((list) => ({
-                        sampleListId: list.sampleListId,
-                        name: list.name,
-                        description: list.description,
-                        category: list.category,
-                        sampleCount: list.sampleCount,
-                    })),
-                    molecularProfiles: molecularProfiles.map((profile) => ({
-                        molecularProfileId: profile.molecularProfileId,
-                        name: profile.name,
-                        description: profile.description,
-                        molecularAlterationType:
-                            profile.molecularAlterationType,
-                        datatype: profile.datatype,
-                    })),
+                    // TODO: Re-enable caseLists and molecularProfiles in future
+                    // caseLists: caseLists.map((list) => ({
+                    //     sampleListId: list.sampleListId,
+                    //     name: list.name,
+                    //     description: list.description,
+                    //     category: list.category,
+                    //     sampleCount: list.sampleCount,
+                    // })),
+                    // molecularProfiles: molecularProfiles.map((profile) => ({
+                    //     molecularProfileId: profile.molecularProfileId,
+                    //     name: profile.name,
+                    //     description: profile.description,
+                    //     molecularAlterationType:
+                    //         profile.molecularAlterationType,
+                    //     datatype: profile.datatype,
+                    // })),
                 },
             };
         })

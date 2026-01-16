@@ -45,10 +45,10 @@ Array of attribute details:
 - displayName: Human-readable name
 - description: Attribute description
 - datatype: "STRING", "NUMBER", or "BOOLEAN"
-- values: Array of valid values (only for STRING/BOOLEAN types)
+- values: Array of valid values for all types
   - STRING types: Array of categorical values (e.g., ["Male", "Female"])
   - BOOLEAN types: Array of boolean values (e.g., ["true", "false"])
-  - NUMBER types: Empty array (use ranges instead)
+  - NUMBER types: Array of actual numeric values found in the data
 
 WORKFLOW EXAMPLE:
 1. Router returns: clinicalAttributeIds: ["AGE", "SEX", "TUMOR_GRADE", ...]
@@ -62,7 +62,7 @@ WORKFLOW EXAMPLE:
 
 PERFORMANCE:
 - Uses batch API call to fetch values for multiple attributes at once
-- Only fetches values for STRING/BOOLEAN types (NUMBER types don't need predefined values)
+- Fetches values for all attribute types when queried by ID
 - Typical response time: 150-250ms for 3-5 attributes`,
     inputSchema: {
         studyId: z.string().describe('Study identifier (e.g., "luad_tcga")'),
@@ -95,7 +95,7 @@ export async function handleGetClinicalAttributeValues(
             content: [
                 {
                     type: 'text' as const,
-                    text: JSON.stringify(result, null, 2),
+                    text: JSON.stringify(result),
                 },
             ],
         };
@@ -108,7 +108,7 @@ export async function handleGetClinicalAttributeValues(
             content: [
                 {
                     type: 'text' as const,
-                    text: JSON.stringify(errorResponse, null, 2),
+                    text: JSON.stringify(errorResponse),
                 },
             ],
         };
@@ -153,19 +153,13 @@ async function getClinicalAttributeValues(
         );
     }
 
-    // 2. Separate attributes by datatype
-    // Only STRING and BOOLEAN types need values fetched
-    const attributesNeedingValues = requestedAttributes.filter(
-        (attr) => attr.datatype === 'STRING' || attr.datatype === 'BOOLEAN'
-    );
-
-    // 3. Batch fetch values for STRING/BOOLEAN attributes
+    // 2. Batch fetch values for all requested attributes
     let valuesMap: Map<string, string[]> = new Map();
 
-    if (attributesNeedingValues.length > 0) {
+    if (requestedAttributes.length > 0) {
         valuesMap = await studyViewDataClient.getClinicalDataValuesBatch(
             studyId,
-            attributesNeedingValues.map((attr) => attr.clinicalAttributeId)
+            requestedAttributes.map((attr) => attr.clinicalAttributeId)
         );
     }
 

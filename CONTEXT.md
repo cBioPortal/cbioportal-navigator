@@ -6,7 +6,13 @@ MCP server for AI-assisted cBioPortal navigation with dual mode support:
 - MCP protocol (stdio/HTTP) for Claude Desktop and other MCP clients
 - OpenAI-compatible Chat Completions API for LibreChat and similar platforms
 
-**Latest update:** Response system refactoring for multi-study support (2026-01-16)
+**Latest update:** Column-store integration for performance optimization (2026-01-16)
+- Implemented transparent URL rewriting to route API calls to column-store endpoints
+- Whitelist approach: 21 internalApi endpoints + studies/samples endpoints
+- Fixed allSampleCount bug: enabled dual sorting (keyword match + sample count)
+- Files: `cbioportalClient.ts`, `resolveAndRoute.ts`
+
+**Previous update:** Response system refactoring for multi-study support (2026-01-16)
 - Removed ambiguity response pattern (AI now handles multi-study selection intelligently)
 - Split response types: NavigationResponse (URL-based) vs DataResponse (data-based)
 - Router returns all matched studies with individual metadata for AI to auto-select
@@ -200,7 +206,32 @@ User: "show me lung adenocarcinoma with high tumor grade"
 - Multi-study: ~1500-2500 tokens (3-5 studies × metadata)
 - Acceptable cost for improved UX
 
-### 7. Chat Completions API Architecture
+### 7. Column-Store Integration
+
+**Problem:** Standard cBioPortal API endpoints had performance issues and data quality bugs:
+- `allSampleCount` incorrectly returned `1` for all studies (broke relevance sorting)
+- Clinical data queries slower than necessary
+
+**Solution:** Transparent URL rewriting to route specific endpoints to column-store backend.
+
+**Implementation:**
+- Whitelist-based approach (only endpoints with column-store implementations)
+- Override `request` method in API clients to rewrite URLs: `/api/xxx` → `/api/column-store/xxx`
+- 21 internalApi endpoints (StudyView queries) + studies/samples endpoints
+- Based on cbioportal-frontend's `proxyColumnStore` pattern
+
+**Why:**
+- Zero business logic changes (transparent to calling code)
+- Centralized configuration (whitelist in one place)
+- Performance: Faster queries via columnar storage
+- Data quality: Fixed allSampleCount bug, enabled dual sorting (keyword match + sample count)
+
+**Study Search Sorting:**
+- Primary: Keyword match count (relevance)
+- Secondary: Sample count (statistical significance)
+- Example: "TCGA lung adenocarcinoma" → `luad_tcga` (3 matches, 1166 samples) not `nsclc_mskimpact_2022` (1 match, 1800 samples)
+
+### 8. Chat Completions API Architecture
 
 **Key Features:**
 - Multi-provider support (Anthropic, Google, OpenAI)
