@@ -28,7 +28,7 @@
 import {
     buildCBioPortalPageUrl,
     QueryParams,
-} from '../../infrastructure/utils/cbioportalUrlBuilder.js';
+} from '../../../infrastructure/utils/cbioportalUrlBuilder.js';
 
 export interface PatientUrlOptions {
     studyId: string;
@@ -73,7 +73,7 @@ export function buildPatientUrl(options: PatientUrlOptions): string {
 }
 
 /**
- * Get Patient View URL (convenience function)
+ * Get PatientView URL (convenience function)
  */
 export function getPatientViewUrl(
     studyId: string,

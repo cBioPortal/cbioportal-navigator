@@ -1,5 +1,5 @@
 /**
- * MCP tool for navigating to cBioPortal StudyView pages.
+ * MCP tool for navigating to cBioPortal StudyView.
  *
  * StudyView provides cohort-level overview and analysis of cancer research
  * studies, including statistics, clinical features, survival analysis, and
@@ -8,7 +8,7 @@
  *
  * @remarks
  * Key exports:
- * - `navigateToStudyViewPageTool`: Tool definition with schema and documentation
+ * - `navigateToStudyViewTool`: Tool definition with schema and documentation
  * - `handleNavigateToStudyView()`: MCP tool handler
  * - `navigateToStudyView()`: Core navigation logic
  *
@@ -29,8 +29,8 @@
 
 import { z } from 'zod';
 import { studyResolver } from '../../infrastructure/resolvers/studyResolver.js';
-import { buildStudyUrl } from './buildStudyUrl.js';
-import { validateTabAvailability } from './validateStudyViewTab.js';
+import { buildStudyUrl } from './utils/buildStudyUrl.js';
+import { validateTabAvailability } from './utils/validateStudyViewTab.js';
 import {
     createNavigationResponse,
     createErrorResponse,
@@ -41,125 +41,15 @@ import {
     plotsSelectionParamSchema,
     plotsColoringParamSchema,
 } from './schemas/index.js';
+import { loadPrompt } from '../../infrastructure/utils/promptLoader.js';
 
 /**
  * Tool definition for MCP registration
  */
-export const navigateToStudyViewPageTool = {
+export const navigateToStudyViewTool = {
     name: 'navigate_to_studyview_page',
-    title: 'Navigate to StudyView Page',
-    description: `Navigate to cBioPortal StudyView page - research cohort overview and analysis.
-
-WHAT IS STUDYVIEW:
-StudyView provides a comprehensive overview of a research cohort, including:
-- Cohort statistics: sample counts, patient demographics, genomic summaries
-- Clinical features: age, gender, stage, treatment information
-- Genomic overview: most frequent mutations, copy number alterations, fusions
-- Survival analysis: overall survival, disease-free survival curves
-- Custom charts: visualizations of any data dimension
-
-AVAILABLE TABS:
-- summary: Study overview with key statistics (always available, default)
-- clinicalData: Clinical data table view (validated for sample availability)
-- cnSegments: Copy number segments view (validated for CN data existence)
-- plots: Custom scatter plots and charts (always available)
-
-TAB VALIDATION:
-The navigator validates tab availability before generating URLs. If you request a tab
-that doesn't have data for the study, you'll receive a clear error message explaining
-why, rather than generating a URL that would just redirect to Summary.
-
-ALWAYS AVAILABLE: summary, plots
-CONDITIONALLY AVAILABLE: clinicalData, cnSegments (validated automatically)
-
-PARAMETERS:
-
-Study Selection (required):
-- studyIds: Array of validated study IDs (e.g., ["luad_tcga", "brca_tcga"])
-  * For single study: ["luad_tcga"]
-  * For cross-study analysis: ["luad_tcga", "lusc_tcga"]
-  * These should be pre-resolved by route_to_target_page tool
-
-Tab Selection (optional):
-- tab: Specific tab to navigate to
-
-Filtering (optional):
-
-1. filterJson - Comprehensive filtering with StudyViewFilter object
-   Use for complex multi-attribute filtering. Supports:
-   - clinicalDataFilters: Filter by clinical attributes (age, gender, stage, etc.)
-     Example: {attributeId: "AGE", values: [{start: 40, end: 60}]}
-   - geneFilters: Filter by gene mutations or alterations
-     Example: {molecularProfileIds: ["study_mutations"], geneQueries: [[{hugoGeneSymbol: "TP53"}]]}
-     Full GeneFilterQuery structure with all fields is supported.
-   - genomicDataFilters: Filter by genomic data values (CNV, expression, etc.)
-   - mutationDataFilters: Filter by mutation properties
-   - sampleIdentifiers: Specific sample selection
-     Example: [{studyId: "luad_tcga", sampleId: "TCGA-05-4244-01"}]
-   - And 15+ more filter types - see StudyViewFilter type for complete list
-
-2. filterAttributeId + filterValues - Legacy simple filtering
-   Use for single clinical attribute filtering only
-   - filterAttributeId: Clinical attribute ID (e.g., "AGE", "CANCER_TYPE", "SEX")
-   - filterValues: Comma-separated values or ranges
-     * For numeric: "40-60,70-80" (ranges)
-     * For categorical: "Female,Male" (values)
-
-Plots Configuration (optional - for plots tab):
-- plotsHorzSelection: Configure horizontal axis
-  * selectedGeneOption: Gene entrez ID (number)
-  * dataType: "clinical_attribute", "MRNA_EXPRESSION", "MUTATION_EXTENDED", etc.
-  * selectedDataSourceOption: Clinical attribute ID or data source
-  * logScale: "true" or "false"
-
-- plotsVertSelection: Configure vertical axis (same structure as horizontal)
-
-- plotsColoringSelection: Configure point coloring
-  * selectedOption: Coloring attribute
-  * colorByMutationType: "true" or "false"
-  * colorByCopyNumber: "true" or "false"
-
-TYPICAL USE CASES:
-
-Basic navigation:
-- "Show me the TCGA lung cancer study" → studyIds: ["luad_tcga"]
-- "Navigate to BRCA study clinical data" → studyIds: ["brca_tcga"], tab: "clinicalData"
-- "Show CN segments for LUAD study" → studyIds: ["luad_tcga"], tab: "cnSegments"
-  (Will validate if CN data exists before generating URL)
-- "Compare TCGA lung adenocarcinoma and squamous" → studyIds: ["luad_tcga", "lusc_tcga"]
-
-Simple filtering (use filterAttributeId/filterValues):
-- "Filter lung study by patients age 40-60" →
-  studyIds: ["luad_tcga"], filterAttributeId: "AGE", filterValues: "40-60"
-- "Show only female patients" →
-  studyIds: ["brca_tcga"], filterAttributeId: "SEX", filterValues: "Female"
-
-Complex filtering (use filterJson):
-- "Show LUAD patients with TP53 mutations" →
-  studyIds: ["luad_tcga"], filterJson: {
-    geneFilters: [{
-      molecularProfileIds: ["luad_tcga_mutations"],
-      geneQueries: [[{hugoGeneSymbol: "TP53"}]]
-    }]
-  }
-- "Filter by age 40-60 AND stage III/IV" →
-  filterJson: {
-    clinicalDataFilters: [
-      {attributeId: "AGE", values: [{start: 40, end: 60}]},
-      {attributeId: "STAGE", values: [{value: "Stage III"}, {value: "Stage IV"}]}
-    ]
-  }
-
-Plots configuration:
-- "Open plots tab with age vs survival" →
-  studyIds: ["luad_tcga"], tab: "plots",
-  plotsHorzSelection: {dataType: "clinical_attribute", selectedDataSourceOption: "AGE"},
-  plotsVertSelection: {dataType: "clinical_attribute", selectedDataSourceOption: "OS_MONTHS"}
-
-Tab validation examples:
-- Request cnSegments for study WITHOUT CN data → Error returned with clear reason
-- Request clinicalData for study WITHOUT samples → Error returned
-- Request summary or plots → Always works, no validation needed`,
+    title: 'Navigate to StudyView',
+    description: loadPrompt('studyView/prompts/navigate_to_studyview.md'),
     inputSchema: {
         studyIds: z
             .array(z.string())
@@ -217,37 +107,35 @@ Tab validation examples:
 };
 
 // Infer type from Zod schema
-type NavigateToStudyViewPageInput = {
-    studyIds: z.infer<typeof navigateToStudyViewPageTool.inputSchema.studyIds>;
-    tab?: z.infer<typeof navigateToStudyViewPageTool.inputSchema.tab>;
-    filterJson?: z.infer<
-        typeof navigateToStudyViewPageTool.inputSchema.filterJson
-    >;
+type NavigateToStudyViewInput = {
+    studyIds: z.infer<typeof navigateToStudyViewTool.inputSchema.studyIds>;
+    tab?: z.infer<typeof navigateToStudyViewTool.inputSchema.tab>;
+    filterJson?: z.infer<typeof navigateToStudyViewTool.inputSchema.filterJson>;
     filterAttributeId?: z.infer<
-        typeof navigateToStudyViewPageTool.inputSchema.filterAttributeId
+        typeof navigateToStudyViewTool.inputSchema.filterAttributeId
     >;
     filterValues?: z.infer<
-        typeof navigateToStudyViewPageTool.inputSchema.filterValues
+        typeof navigateToStudyViewTool.inputSchema.filterValues
     >;
     plotsHorzSelection?: z.infer<
-        typeof navigateToStudyViewPageTool.inputSchema.plotsHorzSelection
+        typeof navigateToStudyViewTool.inputSchema.plotsHorzSelection
     >;
     plotsVertSelection?: z.infer<
-        typeof navigateToStudyViewPageTool.inputSchema.plotsVertSelection
+        typeof navigateToStudyViewTool.inputSchema.plotsVertSelection
     >;
     plotsColoringSelection?: z.infer<
-        typeof navigateToStudyViewPageTool.inputSchema.plotsColoringSelection
+        typeof navigateToStudyViewTool.inputSchema.plotsColoringSelection
     >;
 };
 
 /**
  * Tool handler for MCP
  */
-export async function handleNavigateToStudyViewPage(
-    input: NavigateToStudyViewPageInput
+export async function handleNavigateToStudyView(
+    input: NavigateToStudyViewInput
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
     try {
-        const result = await navigateToStudyViewPage(input);
+        const result = await navigateToStudyView(input);
         return {
             content: [
                 {
@@ -275,8 +163,8 @@ export async function handleNavigateToStudyViewPage(
 /**
  * Main navigation logic for StudyView
  */
-async function navigateToStudyViewPage(
-    params: NavigateToStudyViewPageInput
+async function navigateToStudyView(
+    params: NavigateToStudyViewInput
 ): Promise<ToolResponse> {
     const { studyIds } = params;
 

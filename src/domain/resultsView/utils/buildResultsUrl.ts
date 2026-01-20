@@ -31,7 +31,7 @@
 import {
     buildCBioPortalPageUrl,
     QueryParams,
-} from '../../infrastructure/utils/cbioportalUrlBuilder.js';
+} from '../../../infrastructure/utils/cbioportalUrlBuilder.js';
 
 export interface ResultsUrlOptions {
     studies: string[];

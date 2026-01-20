@@ -8,7 +8,7 @@ cBioPortal Navigator bridges the gap between natural language cancer genomics qu
 
 - Search and validate cancer studies, genes, and molecular profiles
 - Resolve ambiguous queries (e.g., "TCGA lung cancer" → specific study selection)
-- Build properly formatted cBioPortal URLs for study views, patient views, and results pages
+- Build properly formatted cBioPortal URLs for StudyView, PatientView, and ResultsView
 - Handle complex query parameters like gene lists, alteration types, and case sets
 
 ## Features
@@ -97,7 +97,7 @@ cbioportal-navigator/
      "mcpServers": {
        "cbioportal-navigator": {
          "command": "node",
-         "args": ["/FULL/PATH/TO/cbioportal-navigator/dist/index.js"]
+         "args": ["/FULL/PATH/TO/cbioportal-navigator/dist/server/index.js"]
        }
      }
    }
@@ -300,6 +300,27 @@ Navigator runs in one of two transport modes based on the `MCP_TRANSPORT` enviro
 | `npm run watch` | Auto-rebuild on file changes |
 | `npm run dev` | Run with tsx (no build needed) |
 | `npm start` | Run compiled version (requires build first) |
+
+### Updating Prompts
+
+All prompts are externalized to markdown files for easy editing:
+
+```bash
+# Edit prompts
+vim src/domain/router/prompts/resolve_and_route.md      # MCP tool prompts
+vim src/server/chat/prompts/system.md                   # Chat system prompt
+
+# Rebuild and restart
+npm run build && npm run dev
+```
+
+**Prompt locations:**
+- **MCP Tools**: `src/domain/<domain>/prompts/*.md`
+  - Router: `src/domain/router/prompts/resolve_and_route.md`
+  - StudyView: `src/domain/studyViewPage/prompts/*.md`
+  - PatientView: `src/domain/patientViewPage/prompts/*.md`
+  - ResultsView: `src/domain/resultsViewPage/prompts/*.md`
+- **Chat System**: `src/server/chat/prompts/system.md`
 
 ## Resources
 

@@ -103,8 +103,9 @@ export class CbioportalApiClient {
         this.overrideRequestMethod(this.api, (url) => {
             // Match studies endpoints: /api/studies or /api/studies/meta
             // Corresponds to: getAllStudies
-            if (/^\/api\/studies(\?|\/meta|$)/.test(url)) {
-                return url.replace(/^\/api\//, '/api/column-store/');
+            // Note: URL includes domain (e.g., https://www.cbioportal.org/api/studies)
+            if (/\/api\/studies(\?|\/meta|$)/.test(url)) {
+                return url.replace(/\/api\//, '/api/column-store/');
             }
 
             // Match samples endpoints:
@@ -112,11 +113,11 @@ export class CbioportalApiClient {
             // - /api/studies/{studyId}/samples (getAllSamplesInStudy, getSampleInStudy)
             // - /api/studies/{studyId}/patients/{patientId}/samples (getAllSamplesOfPatientInStudy)
             if (
-                /^\/api\/(samples|studies\/[^/]+\/(samples|patients\/[^/]+\/samples))/.test(
+                /\/api\/(samples|studies\/[^\/]+\/(samples|patients\/[^\/]+\/samples))/.test(
                     url
                 )
             ) {
-                return url.replace(/^\/api\//, '/api/column-store/');
+                return url.replace(/\/api\//, '/api/column-store/');
             }
 
             return url;
@@ -140,7 +141,14 @@ export class CbioportalApiClient {
             // args[2] = request body
             // args[3] = headers
             if (args[1] && typeof args[1] === 'string') {
-                args[1] = urlTransformer(args[1]);
+                const originalUrl = args[1];
+                const transformedUrl = urlTransformer(args[1]);
+                if (originalUrl !== transformedUrl) {
+                    console.error(
+                        `[Column Store] ${originalUrl} -> ${transformedUrl}`
+                    );
+                }
+                args[1] = transformedUrl;
             }
             return oldRequest.apply(this, args);
         };
@@ -205,6 +213,29 @@ export class CbioportalApiClient {
             studyId,
             patientId,
         });
+    }
+
+    /**
+     * Get sample count for a study
+     *
+     * @remarks
+     * This method uses /studies/{studyId}/samples?projection=META which:
+     * - Routes through column-store (matched by line 116-119 regex)
+     * - Returns only headers without fetching actual sample data (more efficient)
+     * - Provides accurate sample count via the 'total-count' response header
+     *
+     * This is preferred over using study.allSampleCount from /studies/{studyId}
+     * because that endpoint doesn't route through column-store and returns
+     * incorrect counts (typically 1 instead of actual count).
+     */
+    async getSampleCount(studyId: string): Promise<number> {
+        const response =
+            await this.api.getAllSamplesInStudyUsingGETWithHttpInfo({
+                studyId,
+                projection: 'META',
+            });
+        const totalCount = response.headers['total-count'];
+        return totalCount ? parseInt(totalCount, 10) : 0;
     }
 
     /**

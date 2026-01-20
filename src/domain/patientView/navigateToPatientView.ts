@@ -1,5 +1,5 @@
 /**
- * MCP tool for navigating to cBioPortal PatientView pages.
+ * MCP tool for navigating to cBioPortal PatientView.
  *
  * PatientView displays comprehensive data for individual patients or samples,
  * including clinical timeline, genomic alterations, pathways, tissue images,
@@ -8,7 +8,7 @@
  *
  * @remarks
  * Key exports:
- * - `navigateToPatientViewPageTool`: Tool definition with schema and documentation
+ * - `navigateToPatientViewTool`: Tool definition with schema and documentation
  * - `handleNavigateToPatientView()`: MCP tool handler
  * - `navigateToPatientView()`: Core navigation logic
  *
@@ -27,56 +27,21 @@
 
 import { z } from 'zod';
 import { studyResolver } from '../../infrastructure/resolvers/studyResolver.js';
-import { buildPatientUrl } from './buildPatientUrl.js';
+import { buildPatientUrl } from './utils/buildPatientUrl.js';
 import {
     createNavigationResponse,
     createErrorResponse,
 } from '../shared/responses.js';
 import type { ToolResponse } from '../shared/types.js';
+import { loadPrompt } from '../../infrastructure/utils/promptLoader.js';
 
 /**
  * Tool definition for MCP registration
  */
-export const navigateToPatientViewPageTool = {
+export const navigateToPatientViewTool = {
     name: 'navigate_to_patientview_page',
-    title: 'Navigate to PatientView Page',
-    description: `Navigate to cBioPortal PatientView page - detailed individual patient/sample information.
-
-WHAT IS PATIENTVIEW:
-PatientView displays comprehensive data for a single patient or sample:
-- Patient summary: basic demographics, sample overview, key alterations
-- Clinical timeline: diagnosis, treatments, follow-up events with temporal relationships
-- Genomic alterations: mutations, copy number changes, fusions, expression data
-- Pathway impact: affected signaling pathways and biological processes
-- Tissue images: pathology slides, IHC staining visualization
-- Treatment response: medication history, efficacy assessments
-
-AVAILABLE TABS:
-- summary: Patient overview with key information (default)
-- clinicalData: Clinical data table with all attributes
-- genomicTracks: Genomic data visualization tracks
-- pathways: Pathway diagrams with alterations highlighted
-- tissueImage: Pathology image viewer
-- trialMatch: Clinical trial matching results
-
-MULTI-STUDY SUPPORT:
-When multiple studyIds are provided, this tool generates a separate PatientView URL
-for each study. This is useful when you want to view the same patient ID across
-different studies or compare patients from different cohorts.
-
-TYPICAL USE CASES:
-- "Show me patient TCGA-001 from LUAD study" → studyIds: ["luad_tcga"], patientId: "TCGA-001"
-- "View patient TCGA-001 across lung studies" → studyIds: ["luad_tcga", "lusc_tcga"], patientId: "TCGA-001"
-- "Navigate to sample TCGA-001-01A" → studyIds: ["luad_tcga"], sampleId: "TCGA-001-01A"
-- "Open genomic tracks for this patient" → studyIds: ["luad_tcga"], patientId: "TCGA-001", tab: "genomicTracks"
-
-PARAMETERS:
-- studyIds: REQUIRED - Array of validated study IDs (e.g., ["luad_tcga"] or ["luad_tcga", "brca_tcga"])
-  * These should be pre-resolved by route_to_target_page tool
-  * A separate URL will be generated for each study
-- Provide either patientId OR sampleId (at least one required)
-- Optionally specify a tab to open directly
-- navIds can be provided to enable navigation through a cohort`,
+    title: 'Navigate to PatientView',
+    description: loadPrompt('patientView/prompts/navigate_to_patientview.md'),
     inputSchema: {
         studyIds: z
             .array(z.string())
@@ -110,28 +75,22 @@ PARAMETERS:
 };
 
 // Infer type from Zod schema
-type NavigateToPatientViewPageInput = {
-    studyIds: z.infer<
-        typeof navigateToPatientViewPageTool.inputSchema.studyIds
-    >;
-    patientId?: z.infer<
-        typeof navigateToPatientViewPageTool.inputSchema.patientId
-    >;
-    sampleId?: z.infer<
-        typeof navigateToPatientViewPageTool.inputSchema.sampleId
-    >;
-    tab?: z.infer<typeof navigateToPatientViewPageTool.inputSchema.tab>;
-    navIds?: z.infer<typeof navigateToPatientViewPageTool.inputSchema.navIds>;
+type NavigateToPatientViewInput = {
+    studyIds: z.infer<typeof navigateToPatientViewTool.inputSchema.studyIds>;
+    patientId?: z.infer<typeof navigateToPatientViewTool.inputSchema.patientId>;
+    sampleId?: z.infer<typeof navigateToPatientViewTool.inputSchema.sampleId>;
+    tab?: z.infer<typeof navigateToPatientViewTool.inputSchema.tab>;
+    navIds?: z.infer<typeof navigateToPatientViewTool.inputSchema.navIds>;
 };
 
 /**
  * Tool handler for MCP
  */
-export async function handleNavigateToPatientViewPage(
-    input: NavigateToPatientViewPageInput
+export async function handleNavigateToPatientView(
+    input: NavigateToPatientViewInput
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
     try {
-        const result = await navigateToPatientViewPage(input);
+        const result = await navigateToPatientView(input);
         return {
             content: [
                 {
@@ -159,8 +118,8 @@ export async function handleNavigateToPatientViewPage(
 /**
  * Main navigation logic for PatientView
  */
-async function navigateToPatientViewPage(
-    params: NavigateToPatientViewPageInput
+async function navigateToPatientView(
+    params: NavigateToPatientViewInput
 ): Promise<ToolResponse> {
     const { studyIds } = params;
 
@@ -190,17 +149,6 @@ async function navigateToPatientViewPage(
     const studyDetails = await Promise.all(
         studyIds.map((id) => studyResolver.getById(id))
     );
-
-    // Build a user-friendly message
-    const urlDescriptions = patientUrls
-        .map((item, index) => {
-            const study = studyDetails[index];
-            const identifier = params.patientId
-                ? `patient ${params.patientId}`
-                : `sample ${params.sampleId}`;
-            return `- ${study.name} (${item.studyId}): ${identifier}\n  URL: ${item.url}`;
-        })
-        .join('\n\n');
 
     // Use first URL as primary navigation URL
     const primaryUrl = patientUrls[0].url;

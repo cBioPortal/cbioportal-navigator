@@ -112,7 +112,7 @@ export function buildCBioPortalPageUrl(
     }
 
     // Handle structured hash parameters (e.g., filterJson)
-    // Matches cbioportal-frontend StudyViewPage.tsx:405-410
+    // Matches cbioportal-frontend StudyView.tsx:405-410
     if (params.hashParams) {
         const hashPairs = Object.entries(params.hashParams)
             .filter(([_, v]) => v !== undefined && v !== null)

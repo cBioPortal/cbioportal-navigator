@@ -82,12 +82,19 @@ export class StudyResolver {
      */
     async getById(studyId: string): Promise<ResolvedStudy> {
         const study = await apiClient.getStudy(studyId);
+
+        // Get accurate sample count from samples endpoint instead of study.allSampleCount
+        // Reason: /api/studies/{studyId} doesn't route through column-store and returns
+        // incorrect allSampleCount (typically 1). Using /studies/{studyId}/samples?projection=META
+        // routes through column-store and provides the correct count via total-count header.
+        const sampleCount = await apiClient.getSampleCount(studyId);
+
         return {
             studyId: study.studyId,
             name: study.name,
             description: study.description,
             cancerType: study.cancerType?.name,
-            allSampleCount: study.allSampleCount,
+            allSampleCount: sampleCount,
         };
     }
 }

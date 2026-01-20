@@ -5,7 +5,7 @@
  * filterJson parameters for StudyView. It encapsulates the cBioPortal API calls
  * and data transformations required to support MCP resources for filter options.
  *
- * Implementation follows patterns from cbioportal-frontend/src/pages/studyView/StudyViewPageStore.ts
+ * Implementation follows patterns from cbioportal-frontend/src/pages/studyViewPage/StudyViewPageStore.ts
  *
  * @packageDocumentation
  */

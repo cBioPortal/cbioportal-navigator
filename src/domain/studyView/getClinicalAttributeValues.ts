@@ -15,6 +15,7 @@ import {
     createErrorResponse,
 } from '../shared/responses.js';
 import type { ToolResponse } from '../shared/types.js';
+import { loadPrompt } from '../../infrastructure/utils/promptLoader.js';
 
 /**
  * Tool definition for MCP registration
@@ -22,48 +23,9 @@ import type { ToolResponse } from '../shared/types.js';
 export const getClinicalAttributeValuesTool = {
     name: 'get_clinical_attribute_values',
     title: 'Get Clinical Attribute Values for Filtering',
-    description: `Retrieve detailed information for clinical attributes to construct accurate filters.
-
-WHAT THIS TOOL DOES:
-Fetches datatype and valid option values for specific clinical attributes.
-Use this AFTER reviewing clinicalAttributeIds from the router response to get
-exact values needed for filterJson.clinicalDataFilters construction.
-
-WHEN TO USE:
-- User wants to filter by clinical attributes (age, gender, stage, etc.)
-- You need to know valid values for categorical attributes
-- You need to confirm datatype for proper filter construction
-
-INPUT:
-- studyId: The study identifier (from router response)
-- attributeIds: Array of clinical attribute IDs to fetch options for
-  Example: ["SEX", "TUMOR_GRADE", "AGE"]
-
-OUTPUT:
-Array of attribute details:
-- attributeId: The attribute identifier
-- displayName: Human-readable name
-- description: Attribute description
-- datatype: "STRING", "NUMBER", or "BOOLEAN"
-- values: Array of valid values for all types
-  - STRING types: Array of categorical values (e.g., ["Male", "Female"])
-  - BOOLEAN types: Array of boolean values (e.g., ["true", "false"])
-  - NUMBER types: Array of actual numeric values found in the data
-
-WORKFLOW EXAMPLE:
-1. Router returns: clinicalAttributeIds: ["AGE", "SEX", "TUMOR_GRADE", ...]
-2. User asks: "Show me female patients with high tumor grade"
-3. Call this tool: { studyId: "luad_tcga", attributeIds: ["SEX", "TUMOR_GRADE"] }
-4. Get response: [
-     { attributeId: "SEX", datatype: "STRING", values: ["Male", "Female"] },
-     { attributeId: "TUMOR_GRADE", datatype: "STRING", values: ["G1", "G2", "G3", "G4", "GX"] }
-   ]
-5. Construct filter with exact values: "Female", "G3", "G4"
-
-PERFORMANCE:
-- Uses batch API call to fetch values for multiple attributes at once
-- Fetches values for all attribute types when queried by ID
-- Typical response time: 150-250ms for 3-5 attributes`,
+    description: loadPrompt(
+        'studyView/prompts/get_clinical_attribute_values.md'
+    ),
     inputSchema: {
         studyId: z.string().describe('Study identifier (e.g., "luad_tcga")'),
         attributeIds: z

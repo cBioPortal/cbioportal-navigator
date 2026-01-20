@@ -1,5 +1,5 @@
 /**
- * MCP tool for navigating to cBioPortal ResultsView (OncoPrint) pages.
+ * MCP tool for navigating to cBioPortal ResultsView (OncoPrint).
  *
  * ResultsView analyzes specific genes across samples, displaying alteration
  * patterns through OncoPrint matrices, mutation details, copy number analysis,
@@ -8,7 +8,7 @@
  *
  * @remarks
  * Key exports:
- * - `navigateToResultsViewPageTool`: Tool definition with schema and documentation
+ * - `navigateToResultsViewTool`: Tool definition with schema and documentation
  * - `handleNavigateToResultsView()`: MCP tool handler
  * - `navigateToResultsView()`: Core navigation logic
  *
@@ -31,64 +31,21 @@ import { z } from 'zod';
 import { studyResolver } from '../../infrastructure/resolvers/studyResolver.js';
 import { geneResolver } from '../../infrastructure/resolvers/geneResolver.js';
 import { profileResolver } from '../../infrastructure/resolvers/profileResolver.js';
-import { buildResultsUrl } from './buildResultsUrl.js';
+import { buildResultsUrl } from './utils/buildResultsUrl.js';
 import {
     createNavigationResponse,
     createErrorResponse,
 } from '../shared/responses.js';
 import type { ToolResponse } from '../shared/types.js';
+import { loadPrompt } from '../../infrastructure/utils/promptLoader.js';
 
 /**
  * Tool definition for MCP registration
  */
-export const navigateToResultsViewPageTool = {
+export const navigateToResultsViewTool = {
     name: 'navigate_to_resultsview_page',
-    title: 'Navigate to ResultsView page',
-    description: `Navigate to cBioPortal ResultsView page - gene alteration analysis across samples.
-
-WHAT IS RESULTSVIEW:
-ResultsView (also known as Query Page) analyzes specific gene alterations across samples:
-- OncoPrint matrix: visual display of multi-gene alteration patterns
-- Mutation details: amino acid changes, functional impact, frequency statistics
-- Copy number analysis: amplifications and deletions distribution
-- Co-occurrence analysis: mutually exclusive or co-occurring relationships between gene alterations
-- Custom plots: bar charts and scatter plots of clinical and genomic data
-- Comparison analysis: compare clinical/genomic attributes between groups defined by gene alterations
-- Gene co-expression: mRNA/protein expression correlations and dependencies
-
-AVAILABLE TABS:
-For all studies with genomic alteration data:
-    - oncoprint: Alteration matrix visualization (default).
-    - cancerTypesSummary: Summary of alterations by cancer type.
-    - plots: Customizable bar and scatter plots of clinical and genomic data
-    - mutations: Detailed mutation table and lollipop plot for each query gene.
-    - comparison: Compare attributes between groups defined by gene alterations. Comparisons default to altered vs non-altered groups, but custom groups based on specific alteration patterns can also be created.
-    - pathways/pathwaymapper: Pathway diagrams with alterations. Only useful if queried genes are in the available pathways.
-    - pathways/ndex-cancer-pathways: NDEx cancer pathways with alterations. Only useful if queried genes are in the available pathways.
-    - downloads: Data download options
-For specific studies or queries:
-    - mutualExclusivity: Statistical analysis of co-occurrence and exclusivity between query genes/alterations. Available when multiple genes/alterations are queried.
-    - structuralVariants: Structural variant details. Available if SV data exists.
-    - coexpression: Explore genes whose mRNA/miRNA/protein levels correlate with query genes. Available if mRNA, miRNA, or protein expression data exists.
-    - cnSegments: Copy number segments visualization using the Integrated Genomics Viewer (IGV). Available if segment data exists.
-
-PARAMETERS:
-- studyIds: REQUIRED - Array of validated study IDs (e.g., ["luad_tcga"] or ["luad_tcga", "brca_tcga"])
-  * For single study: ["luad_tcga"]
-  * For cross-study analysis: ["luad_tcga", "lusc_tcga", "brca_tcga"]
-  * These should be pre-resolved by resolve_and_route tool
-- genes: REQUIRED - Array of gene symbols (at least 1)
-- caseSetId: Optional case set ID (defaults to {studyId}_all for all samples)
-- zScoreThreshold: Optional Z-score threshold for expression data
-- rppaScoreThreshold: Optional RPPA score threshold for protein data
-- tab: Optionally specify which analysis tab to open
-
-TYPICAL USE CASES:
-- "Show me TP53 and KRAS mutations in lung cancer" → studyIds: ["luad_tcga"], genes: ["TP53", "KRAS"]
-- "Analyze EGFR alterations in TCGA LUAD" → studyIds: ["luad_tcga"], genes: ["EGFR"]
-- "Compare TP53 mutations across TCGA lung studies" → studyIds: ["luad_tcga", "lusc_tcga"], genes: ["TP53"]
-- "Find co-occurring mutations with BRAF in melanoma" → studyIds: ["skcm_tcga"], genes: ["BRAF", ...]
-- "Survival analysis for patients with EGFR mutations" → studyIds: ["luad_tcga"], genes: ["EGFR"], tab: "survival"`,
+    title: 'Navigate to ResultsView',
+    description: loadPrompt('resultsView/prompts/navigate_to_resultsview.md'),
     inputSchema: {
         studyIds: z
             .array(z.string())
@@ -129,31 +86,27 @@ TYPICAL USE CASES:
 };
 
 // Infer type from Zod schema
-type NavigateToResultsViewPageInput = {
-    studyIds: z.infer<
-        typeof navigateToResultsViewPageTool.inputSchema.studyIds
-    >;
-    genes: z.infer<typeof navigateToResultsViewPageTool.inputSchema.genes>;
-    caseSetId?: z.infer<
-        typeof navigateToResultsViewPageTool.inputSchema.caseSetId
-    >;
-    tab?: z.infer<typeof navigateToResultsViewPageTool.inputSchema.tab>;
+type NavigateToResultsViewInput = {
+    studyIds: z.infer<typeof navigateToResultsViewTool.inputSchema.studyIds>;
+    genes: z.infer<typeof navigateToResultsViewTool.inputSchema.genes>;
+    caseSetId?: z.infer<typeof navigateToResultsViewTool.inputSchema.caseSetId>;
+    tab?: z.infer<typeof navigateToResultsViewTool.inputSchema.tab>;
     zScoreThreshold?: z.infer<
-        typeof navigateToResultsViewPageTool.inputSchema.zScoreThreshold
+        typeof navigateToResultsViewTool.inputSchema.zScoreThreshold
     >;
     rppaScoreThreshold?: z.infer<
-        typeof navigateToResultsViewPageTool.inputSchema.rppaScoreThreshold
+        typeof navigateToResultsViewTool.inputSchema.rppaScoreThreshold
     >;
 };
 
 /**
  * Tool handler for MCP
  */
-export async function handleNavigateToResultsViewPage(
-    input: NavigateToResultsViewPageInput
+export async function handleNavigateToResultsView(
+    input: NavigateToResultsViewInput
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
     try {
-        const result = await navigateToResultsViewPage(input);
+        const result = await navigateToResultsView(input);
         return {
             content: [
                 {
@@ -181,8 +134,8 @@ export async function handleNavigateToResultsViewPage(
 /**
  * Main navigation logic for ResultsView
  */
-async function navigateToResultsViewPage(
-    params: NavigateToResultsViewPageInput
+async function navigateToResultsView(
+    params: NavigateToResultsViewInput
 ): Promise<ToolResponse> {
     const { studyIds } = params;
 

@@ -14,7 +14,7 @@
  * - Base types: StudyIdentificationParams
  *
  * Re-exported from cbioportal-ts-api-client:
- * - StudyViewFilter: Comprehensive filter object for study views
+ * - StudyViewFilter: Comprehensive filter object for StudyView
  * - GeneFilterQuery, GeneFilter: Gene filtering structures
  *
  * All tool handlers use ToolResponse as their return type, which is a union

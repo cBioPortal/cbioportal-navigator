@@ -13,21 +13,21 @@ import {
     handleResolveAndRoute,
 } from '../../domain/router/resolveAndRoute.js';
 import {
-    navigateToStudyViewPageTool,
-    handleNavigateToStudyViewPage,
-} from '../../domain/studyViewPage/navigateToStudyView.js';
+    navigateToStudyViewTool,
+    handleNavigateToStudyView,
+} from '../../domain/studyView/navigateToStudyView.js';
 import {
-    navigateToPatientViewPageTool,
-    handleNavigateToPatientViewPage,
-} from '../../domain/patientViewPage/navigateToPatientView.js';
+    navigateToPatientViewTool,
+    handleNavigateToPatientView,
+} from '../../domain/patientView/navigateToPatientView.js';
 import {
-    navigateToResultsViewPageTool,
-    handleNavigateToResultsViewPage,
-} from '../../domain/resultsViewPage/navigateToResultsView.js';
+    navigateToResultsViewTool,
+    handleNavigateToResultsView,
+} from '../../domain/resultsView/navigateToResultsView.js';
 import {
     getClinicalAttributeValuesTool,
     handleGetClinicalAttributeValues,
-} from '../../domain/studyViewPage/getClinicalAttributeValues.js';
+} from '../../domain/studyView/getClinicalAttributeValues.js';
 
 /**
  * Register all MCP tools with the server.
@@ -51,33 +51,33 @@ export function registerTools(server: McpServer): void {
 
     // Register specialized navigation tools
     server.registerTool(
-        navigateToStudyViewPageTool.name,
+        navigateToStudyViewTool.name,
         {
-            title: navigateToStudyViewPageTool.title,
-            description: navigateToStudyViewPageTool.description,
-            inputSchema: navigateToStudyViewPageTool.inputSchema,
+            title: navigateToStudyViewTool.title,
+            description: navigateToStudyViewTool.description,
+            inputSchema: navigateToStudyViewTool.inputSchema,
         },
-        handleNavigateToStudyViewPage
+        handleNavigateToStudyView
     );
 
     server.registerTool(
-        navigateToPatientViewPageTool.name,
+        navigateToPatientViewTool.name,
         {
-            title: navigateToPatientViewPageTool.title,
-            description: navigateToPatientViewPageTool.description,
-            inputSchema: navigateToPatientViewPageTool.inputSchema,
+            title: navigateToPatientViewTool.title,
+            description: navigateToPatientViewTool.description,
+            inputSchema: navigateToPatientViewTool.inputSchema,
         },
-        handleNavigateToPatientViewPage
+        handleNavigateToPatientView
     );
 
     server.registerTool(
-        navigateToResultsViewPageTool.name,
+        navigateToResultsViewTool.name,
         {
-            title: navigateToResultsViewPageTool.title,
-            description: navigateToResultsViewPageTool.description,
-            inputSchema: navigateToResultsViewPageTool.inputSchema,
+            title: navigateToResultsViewTool.title,
+            description: navigateToResultsViewTool.description,
+            inputSchema: navigateToResultsViewTool.inputSchema,
         },
-        handleNavigateToResultsViewPage
+        handleNavigateToResultsView
     );
 
     server.registerTool(

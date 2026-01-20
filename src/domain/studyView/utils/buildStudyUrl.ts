@@ -30,7 +30,7 @@ import {
     buildCBioPortalPageUrl,
     QueryParams,
     BuildUrlParams,
-} from '../../infrastructure/utils/cbioportalUrlBuilder.js';
+} from '../../../infrastructure/utils/cbioportalUrlBuilder.js';
 
 export interface StudyUrlOptions {
     studyIds: string | string[];
@@ -47,6 +47,44 @@ export interface StudyUrlOptions {
     plotsHorzSelection?: Record<string, any>;
     plotsVertSelection?: Record<string, any>;
     plotsColoringSelection?: Record<string, any>;
+}
+
+/**
+ * Normalize filterJson by sorting molecularProfileIds arrays alphabetically.
+ * This ensures consistent URL generation regardless of input order.
+ */
+function normalizeFilterJson(
+    filterJson: Record<string, any>
+): Record<string, any> {
+    if (!filterJson) return filterJson;
+
+    const normalized = { ...filterJson };
+
+    // Sort molecularProfileIds in geneFilters
+    if (normalized.geneFilters && Array.isArray(normalized.geneFilters)) {
+        normalized.geneFilters = normalized.geneFilters.map((filter: any) => ({
+            ...filter,
+            molecularProfileIds: filter.molecularProfileIds
+                ? [...filter.molecularProfileIds].sort()
+                : filter.molecularProfileIds,
+        }));
+    }
+
+    // Sort molecularProfileIds in structuralVariantFilters
+    if (
+        normalized.structuralVariantFilters &&
+        Array.isArray(normalized.structuralVariantFilters)
+    ) {
+        normalized.structuralVariantFilters =
+            normalized.structuralVariantFilters.map((filter: any) => ({
+                ...filter,
+                molecularProfileIds: filter.molecularProfileIds
+                    ? [...filter.molecularProfileIds].sort()
+                    : filter.molecularProfileIds,
+            }));
+    }
+
+    return normalized;
 }
 
 /**
@@ -99,7 +137,9 @@ export function buildStudyUrl(options: StudyUrlOptions): string {
     };
 
     if (filterJson) {
-        buildParams.hashParams = { filterJson };
+        buildParams.hashParams = {
+            filterJson: normalizeFilterJson(filterJson),
+        };
     }
 
     return buildCBioPortalPageUrl(buildParams);

@@ -29,13 +29,17 @@
  */
 
 import { z } from 'zod';
-import { studyResolver } from '../../infrastructure/resolvers/studyResolver.js';
+import {
+    studyResolver,
+    type ResolvedStudy,
+} from '../../infrastructure/resolvers/studyResolver.js';
 import { studyViewDataClient } from '../../infrastructure/api/studyViewDataClient.js';
 import {
     createDataResponse,
     createErrorResponse,
 } from '../shared/responses.js';
 import type { ToolResponse } from '../shared/types.js';
+import { loadPrompt } from '../../infrastructure/utils/promptLoader.js';
 
 /**
  * Tool definition for MCP registration
@@ -43,172 +47,7 @@ import type { ToolResponse } from '../shared/types.js';
 export const resolveAndRouteTool = {
     name: 'resolve_and_route',
     title: 'Resolve Studies and Route to Page',
-    description: `Main router tool for cBioPortal navigation - resolves studies and recommends next tool.
-
-WHAT THIS TOOL DOES:
-1. Resolves study identifiers (keywords → studyIds or validates provided studyIds)
-2. Handles ambiguity when multiple studies match (returns options for user to choose)
-3. Recommends which specialized navigation tool to use next
-4. Returns validated studyIds for the AI to pass to the recommended tool
-
-This tool helps you choose the right cBioPortal page based on user intent and prepares
-the study context for specialized navigation tools.
-
-═══════════════════════════════════════════════════════════════════════════════
-HOW TO CHOOSE targetPage
-═══════════════════════════════════════════════════════════════════════════════
-
-📊 targetPage: 'study' (StudyView Page)
-────────────────────────────────────────────────────────────────────────────────
-PURPOSE: Research cohort overview and analysis
-
-USE WHEN THE USER WANTS TO:
-• View overall statistics of a research study/cohort
-• Compare different patient subgroups within a study
-• Filter patients by clinical attributes (age, gender, stage, etc.)
-• See survival analysis for the entire cohort
-• Explore genomic feature distributions across the study
-• View summary charts and custom visualizations
-
-EXAMPLE QUERIES:
-• "Show me the TCGA lung cancer study"
-• "What's the overview of the breast cancer cohort?"
-• "Display survival curves for melanoma study"
-• "Show clinical characteristics of pancreatic cancer patients"
-
-KEY FEATURES:
-• Cohort statistics (sample counts, mutation frequencies)
-• Clinical data distributions
-• Survival analysis with stratification
-• Custom charts and filters
-
-
-🧬 targetPage: 'patient' (PatientView Page)
-────────────────────────────────────────────────────────────────────────────────
-PURPOSE: Individual patient/sample detailed information
-
-USE WHEN THE USER WANTS TO:
-• View a specific patient's complete profile
-• Track a patient's clinical timeline and events
-• See all genomic alterations for one individual
-• Compare multiple samples from the same patient
-• View treatment response data for a case
-• Access pathology images for a patient
-
-EXAMPLE QUERIES:
-• "Show me patient TCGA-001 details"
-• "Display the clinical timeline for this case"
-• "What mutations does patient ID 12345 have?"
-• "Show genomic data for sample TCGA-001-01A"
-
-KEY FEATURES:
-• Patient summary and demographics
-• Clinical event timeline
-• Genomic alteration tracks
-• Pathway impact visualization
-• Tissue/pathology images
-
-
-🔬 targetPage: 'results' (ResultsView/OncoPrint Page)
-────────────────────────────────────────────────────────────────────────────────
-PURPOSE: Cross-sample gene alteration analysis
-
-USE WHEN THE USER WANTS TO:
-• Analyze specific genes across multiple samples
-• Find mutation patterns and frequencies
-• Identify co-occurring or mutually exclusive mutations
-• Compare alterations in multiple genes
-• Perform survival analysis by genotype
-• Analyze gene expression correlations
-
-EXAMPLE QUERIES:
-• "Show me TP53 mutations in lung cancer"
-• "Compare EGFR and KRAS alterations"
-• "Find co-occurring mutations with BRAF"
-• "Analyze PIK3CA mutation patterns"
-• "Survival analysis for EGFR mutant patients"
-
-KEY FEATURES:
-• OncoPrint visualization (alteration matrix)
-• Mutation details and frequencies
-• Copy number alterations
-• Gene co-occurrence analysis
-• Survival curves by genotype
-• Gene expression plots
-
-
-═══════════════════════════════════════════════════════════════════════════════
-DECISION FLOWCHART
-═══════════════════════════════════════════════════════════════════════════════
-
-Question 1: Does the user mention specific gene name(s)?
-├─ YES → targetPage: 'results'
-│        (Gene-focused analysis)
-│
-└─ NO → Question 1b: Is this a discovery question about genes (which/what/how many genes...)?
-        ├─ YES → targetPage: 'study' (for unbiased gene discovery)
-        │
-        └─ NO → Question 2: Is it about a specific patient/case?
-                ├─ YES → targetPage: 'patient'
-                │        (Individual patient focus)
-                │
-                └─ NO → targetPage: 'study'
-                        (Cohort/study overview)
-
-
-═══════════════════════════════════════════════════════════════════════════════
-ROUTING DETAILS
-═══════════════════════════════════════════════════════════════════════════════
-
-This tool will recommend one of these specialized tools:
-• navigate_to_studyview   - for StudyView (cohort overview) pages
-• navigate_to_patientview - for PatientView (individual patient) pages
-• navigate_to_resultsview - for ResultsView (gene alteration analysis) pages
-
-WORKFLOW EXAMPLE:
-1. User: "Show me TP53 mutations in TCGA lung cancer"
-2. AI calls: resolve_and_route(targetPage='results', studyKeywords=['TCGA', 'lung'])
-3. Router returns: {
-     status: 'success',
-     recommendedTool: 'navigate_to_resultsview',
-     resolvedStudyIds: ['luad_tcga', 'lusc_tcga'],
-     message: 'Found 2 studies. Use navigate_to_resultsview with these studyIds.',
-     metadata: { ... }
-   }
-4. AI calls: navigate_to_resultsview(studyIds=['luad_tcga', 'lusc_tcga'], genes=['TP53'])
-
-PARAMETERS:
-- targetPage: Which page type (study/patient/results)
-- studyKeywords: Array of keywords to search for studies (e.g., ["TCGA", "lung"]) OR
-- studyIds: Array of direct study IDs to validate (e.g., ["luad_tcga", "brca_tcga"])
-
-
-═══════════════════════════════════════════════════════════════════════════════
-METADATA RETURNED
-═══════════════════════════════════════════════════════════════════════════════
-
-The router provides lightweight filter metadata to help construct filters:
-
-1. clinicalAttributeIds: Array of clinical attribute IDs available for filtering
-   Example: ["AGE", "SEX", "TUMOR_GRADE", "TUMOR_STAGE", "OS_MONTHS"]
-   → Use get_clinical_attribute_values tool to get datatype + valid values
-
-2. caseLists: Complete case list information (5-10 lists, small dataset)
-   Example: [{ sampleListId: "study_all", name: "All Tumors", sampleCount: 566 }]
-   → Directly usable in filterJson.caseLists field
-
-3. molecularProfiles: Complete molecular profile information (5-15 profiles)
-   Example: [{ molecularProfileId: "study_mutations", name: "Mutations", ... }]
-   → Directly usable in filterJson genomicProfiles field
-
-For filter construction with clinical attributes:
-1. Check clinicalAttributeIds to see what's available
-2. Call get_clinical_attribute_values to get datatype and exact values
-3. Use exact values in filterJson.clinicalDataFilters
-
-
-For detailed information about parameters for each page type, please refer to
-the documentation of the specific navigation tools after receiving the recommendation.`,
+    description: loadPrompt('router/prompts/resolve_and_route.md'),
     inputSchema: {
         targetPage: z
             .enum(['study', 'patient', 'results'])
@@ -286,6 +125,7 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
     }
 
     let resolvedStudyIds: string[];
+    let resolvedStudies: ResolvedStudy[] | undefined;
 
     // 1. Resolve or validate study IDs
     if (studyIds && studyIds.length > 0) {
@@ -354,7 +194,8 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
         // Limit to top 5 most relevant studies
         const topMatches = sortedMatches.slice(0, 5);
 
-        // Return top 5 matched studies
+        // Save complete study objects (with correct allSampleCount from column-store)
+        resolvedStudies = topMatches;
         resolvedStudyIds = topMatches.map((s) => s.studyId);
     } else {
         return createErrorResponse(
@@ -372,20 +213,22 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
     const recommendedTool = toolMapping[targetPage];
 
     // 3. Get study details
-    const studyDetails = await Promise.all(
-        resolvedStudyIds.map((id) => studyResolver.getById(id))
-    );
+    // If we have complete study objects from search (with correct allSampleCount),
+    // use them directly. Otherwise fetch via getById (for studyIds path).
+    const studyDetails =
+        resolvedStudies ||
+        (await Promise.all(
+            resolvedStudyIds.map((id) => studyResolver.getById(id))
+        ));
 
     // 4. Fetch metadata for each study independently
     const studiesWithMetadata = await Promise.all(
         resolvedStudyIds.map(async (studyId) => {
             const study = studyDetails.find((s) => s.studyId === studyId)!;
 
-            const [clinicalAttributes] = await Promise.all([
+            const [clinicalAttributes, molecularProfiles] = await Promise.all([
                 studyViewDataClient.getClinicalAttributes([studyId]),
-                // TODO: Re-enable caseLists and molecularProfiles in future
-                // studyViewDataClient.getCaseLists(studyId),
-                // studyViewDataClient.getMolecularProfiles([studyId]),
+                studyViewDataClient.getMolecularProfiles([studyId]),
             ]);
 
             return {
@@ -396,22 +239,9 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
                     clinicalAttributeIds: clinicalAttributes.map(
                         (attr) => attr.clinicalAttributeId
                     ),
-                    // TODO: Re-enable caseLists and molecularProfiles in future
-                    // caseLists: caseLists.map((list) => ({
-                    //     sampleListId: list.sampleListId,
-                    //     name: list.name,
-                    //     description: list.description,
-                    //     category: list.category,
-                    //     sampleCount: list.sampleCount,
-                    // })),
-                    // molecularProfiles: molecularProfiles.map((profile) => ({
-                    //     molecularProfileId: profile.molecularProfileId,
-                    //     name: profile.name,
-                    //     description: profile.description,
-                    //     molecularAlterationType:
-                    //         profile.molecularAlterationType,
-                    //     datatype: profile.datatype,
-                    // })),
+                    molecularProfileIds: molecularProfiles
+                        .map((profile) => profile.molecularProfileId)
+                        .sort(),
                 },
             };
         })
