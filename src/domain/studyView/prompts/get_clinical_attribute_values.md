@@ -54,7 +54,7 @@ For each attribute:
 3. **Call this tool** with relevant attributes:
    ```json
    {
-     "studyId": "luad_tcga_pub",
+     "studyId": "luad_tcga_pan_can_atlas_2018",
      "attributeIds": ["SEX", "TUMOR_GRADE"]
    }
    ```

@@ -239,6 +239,68 @@ export class CbioportalApiClient {
     }
 
     /**
+     * Fetch filtered samples based on StudyViewFilter
+     *
+     * @remarks
+     * This endpoint routes through column-store (whitelisted on line 70).
+     * Returns samples matching the provided filter criteria.
+     *
+     * @param studyViewFilter - Filter object (uses studyIds if no other filters specified)
+     * @returns Array of Sample objects with studyId, sampleId, patientId
+     */
+    async fetchFilteredSamples(studyViewFilter?: any) {
+        return await this.internalApi.fetchFilteredSamplesUsingPOST({
+            studyViewFilter: studyViewFilter || { studyIds: [] },
+        });
+    }
+
+    /**
+     * Fetch clinical data for samples to enable grouping
+     *
+     * @remarks
+     * This fetches clinical attribute values for the specified samples.
+     * Used for group comparison to retrieve values for grouping samples.
+     *
+     * @param attributeId - Clinical attribute ID (e.g., "SEX", "PATH_T_STAGE")
+     * @param samples - Array of samples to fetch data for
+     * @param isPatientAttribute - Whether attribute is patient-level vs sample-level
+     * @returns Array of ClinicalData with studyId, entityId (patientId or sampleId), value
+     */
+    async fetchClinicalDataForSamples(
+        attributeId: string,
+        samples: any[],
+        isPatientAttribute: boolean
+    ) {
+        const entityIdKey = isPatientAttribute ? 'patientId' : 'sampleId';
+        return await this.api.fetchClinicalDataUsingPOST({
+            clinicalDataType: isPatientAttribute ? 'PATIENT' : 'SAMPLE',
+            clinicalDataMultiStudyFilter: {
+                attributeIds: [attributeId],
+                identifiers: samples.map((s) => ({
+                    studyId: s.studyId,
+                    entityId: s[entityIdKey],
+                })),
+            },
+        });
+    }
+
+    /**
+     * Get clinical attribute metadata to determine if it's patient-level
+     *
+     * @param studyIds - Array of study IDs
+     * @param attributeId - Clinical attribute ID
+     * @returns ClinicalAttribute object with patientAttribute boolean, or undefined if not found
+     */
+    async getClinicalAttribute(studyIds: string[], attributeId: string) {
+        const attributes = await this.api.fetchClinicalAttributesUsingPOST({
+            studyIds,
+        });
+        return attributes.find(
+            (attr) => attr.clinicalAttributeId === attributeId
+        );
+    }
+
+    /**
      * Get the underlying CBioPortalAPI instance for direct access
      * Use this for methods not wrapped by CbioportalApiClient
      */

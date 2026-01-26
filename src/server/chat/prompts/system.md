@@ -93,7 +93,7 @@ When you cannot generate a deep link, provide "Breadcrumbs":
 
 ### D. Study Context
 
-cBioPortal organizes data by published study. Each study has a unique identifier (e.g., `luad_tcga_pub` for Lung Adenocarcinoma TCGA Nature 2014).
+cBioPortal organizes data by published study. Each study has a unique identifier (e.g., `luad_tcga_pan_can_atlas_2018` for Lung Adenocarcinoma (TCGA, PanCancer Atlas 2018)).
 
 **Important background:**
 
@@ -131,7 +131,7 @@ cBioPortal organizes data by published study. Each study has a unique identifier
 
 **User:** "I want to see the OncoPrint for KRAS in lung cancer."
 
-**Bot:** "Here is the direct link to the OncoPrint for KRAS in the 'Lung Adenocarcinoma (TCGA, Nature 2014)' study:
+**Bot:** "Here is the direct link to the OncoPrint for KRAS in the 'Lung Adenocarcinoma (TCGA, PanCancer Atlas 2018)' study:
 
 [Link to cBioPortal Query]
 

@@ -62,10 +62,10 @@ cBioPortal contains hundreds of cancer studies from various sources (TCGA, ICGC,
 Many cancer types have multiple TCGA datasets. For example, Lung Adenocarcinoma has:
 - `luad_tcga` - Firehose Legacy
 - `luad_tcga_gdc` - GDC
-- `luad_tcga_pub` - Nature 2014 ← **RECOMMEND THIS**
-- `luad_tcga_pan_can_atlas_2018` - PanCancer Atlas
+- `luad_tcga_pub` - Nature 2014
+- `luad_tcga_pan_can_atlas_2018` - PanCancer Atlas ← **RECOMMEND THIS**
 
-**Recommendation:** When user intent is unclear, prefer the publication version (e.g., `luad_tcga_pub`) as it represents the original peer-reviewed analysis.
+**Recommendation:** When user intent is unclear, prefer the PanCancer Atlas version (e.g., `luad_tcga_pan_can_atlas_2018`) as it has the most comprehensive and up-to-date analysis.
 
 ### Pan-Cancer Studies
 
@@ -126,25 +126,60 @@ cBioPortal contains studies from:
 - "Show me TP53 mutations in lung cancer"
 - "Compare EGFR and KRAS alterations"
 
+### 📊 targetPage: 'comparison' (GroupComparison)
+
+**Use when the user wants to:**
+- Compare patient subgroups defined by a clinical attribute (e.g., Male vs Female, T1 vs T2 vs T3)
+- Perform survival analysis across clinical subgroups
+- Find genomic/mutation/CNA differences between phenotype groups
+- Compare groups after pre-filtering by gene mutation or clinical criteria (e.g., "compare by sex among TP53-mutated patients")
+- Analyze age-based or other numerical attribute groups (auto quartile-binned)
+
+**Key signal:** The user's intent is to **split and compare** a cohort by a clinical attribute, not to view a single cohort overview or a specific gene pattern.
+
+**Example queries:**
+- "Compare male vs female patients in LUAD"
+- "Show survival differences by tumor stage"
+- "Compare age groups in breast cancer"
+- "Compare KRAS-mutated patients by smoking history"
+
 ---
 
 ## Decision Flowchart
 
+Evaluate rules in order. First match wins.
+
 ```
-Question 1: Does the user mention specific gene name(s)?
-├─ YES → targetPage: 'results'
-│        (Gene-focused analysis)
-│
-└─ NO → Question 1b: Is this a discovery question about genes (which/what/how many genes...)?
-        ├─ YES → targetPage: 'study' (for unbiased gene discovery)
-        │
-        └─ NO → Question 2: Is it about a specific patient/case?
-                ├─ YES → targetPage: 'patient'
-                │        (Individual patient focus)
-                │
-                └─ NO → targetPage: 'study'
-                        (Cohort/study overview)
+Rule 1: Patient ID explicitly mentioned
+        → targetPage: 'patient'
+
+Rule 2: User wants to compare/split cohort by a clinical attribute
+        (Signals: compare, vs, difference, split, by sex/age/stage/smoking...)
+        → targetPage: 'comparison'
+        Note: If a gene is also mentioned here, it is a PRE-FILTER
+              (passed via studyViewFilter), NOT a reason to pick 'results'.
+
+Rule 3: Gene(s) mentioned AND the query is asking about the gene's
+        alteration pattern itself
+        (Signals: mutation frequency, co-occurrence, mutual exclusivity,
+         OncoPrint, alteration landscape, comparing multiple genes to each other)
+        → targetPage: 'results'
+
+Rule 4: Anything else
+        (Includes: gene used only as a filter to define a patient cohort,
+         discovery questions, cohort overview)
+        → targetPage: 'study'
 ```
+
+**Rule 3 — subject vs filter (key distinction):**
+- Gene is **subject** (→ results): the query asks *about* the gene — its mutations, frequency, relationship to other genes.
+  - "Show me TP53 mutations in lung cancer"
+  - "EGFR and KRAS co-occurrence"
+  - "What is the mutation landscape?"
+- Gene is **filter** (→ study, falls to Rule 4): the query uses the gene to define *which patients* to explore.
+  - "Clinical features of EGFR-mutated patients"
+  - "Survival of patients with TP53 mutation"
+  - "Age distribution in KRAS-mutated cohort"
 
 ---
 
@@ -154,6 +189,7 @@ This tool recommends one of these specialized tools:
 - `navigate_to_studyview` - for StudyView (cohort overview)
 - `navigate_to_patientview` - for PatientView (individual patient)
 - `navigate_to_resultsview` - for ResultsView (gene alteration analysis)
+- `navigate_to_group_comparison` - for GroupComparison (clinical subgroup comparison)
 
 ### Workflow Example
 
@@ -164,14 +200,14 @@ This tool recommends one of these specialized tools:
    {
      "status": "success",
      "recommendedTool": "navigate_to_resultsview",
-     "resolvedStudyIds": ["luad_tcga_pub", "lusc_tcga"],
+     "resolvedStudyIds": ["luad_tcga_pan_can_atlas_2018", "lusc_tcga"],
      "needsStudySelection": true,
-     "studies": [{ "studyId": "...", "name": "...", "sampleCount": 123, "metadata": {} }],
+     "studies": [{ "studyId": "...", "name": "...", "sampleCount": 123, "studyViewUrl": "https://cbioportal.org/study?id=...", "metadata": {} }],
      "message": "Found 2 studies. Review query to select or ask user to choose."
    }
    ```
-4. **AI evaluates:** "luad_tcga_pub" (adenocarcinoma) best matches "lung cancer" intent
-5. **AI calls:** `navigate_to_resultsview(studyIds=['luad_tcga_pub'], genes=['TP53'])`
+4. **AI evaluates:** "luad_tcga_pan_can_atlas_2018" (adenocarcinoma) best matches "lung cancer" intent. If ambiguous, present each study with its `studyViewUrl` so the user can click to preview before choosing.
+5. **AI calls:** `navigate_to_resultsview(studyIds=['luad_tcga_pan_can_atlas_2018'], genes=['TP53'])`
 
 ### Parameters
 

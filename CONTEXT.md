@@ -6,6 +6,60 @@ MCP server for AI-assisted cBioPortal navigation with dual mode support:
 - MCP protocol (stdio/HTTP) for Claude Desktop and other MCP clients
 - OpenAI-compatible Chat Completions API for LibreChat
 
+**Recent Changes (2026-02-03):**
+- **Group Comparison bug fixes & prompt alignment**
+  - `clinicalAttributeValues` filter now case-insensitive (was strict match, missed case variants)
+  - Per-group studyview URL generation now also triggers on `clinicalAttributeValues` (was only pre-filter)
+  - Prompt: added missing `clinicalAttributeValues` parameter documentation
+  - Prompt: `includeNA` default description aligned with code (categorical: true, numerical: false)
+  - Prompt: Scenario A/B example responses updated to match actual output (description format, attribute field)
+  - Prompt: Scenario A drill-down guidance added — instructs AI to call `navigate_to_studyview_page` for individual groups
+- **Code quality fixes**
+  - Removed duplicate `ClinicalDataItem` in `numericalBinning.ts`, now imports from `groupBuilder`
+  - `groups: any[]` → `SessionGroupData[]` in main handler
+  - `comparisonSessionClient.getSession` return type fixed, removed `as any`
+  - JSDoc flow steps aligned with actual code (9 → 10 steps)
+
+**Recent Changes (2026-02-02 - Session 2):**
+- **Group Comparison value subset selection** - New `clinicalAttributeValues` parameter
+  - Filter categorical attributes to specific values (e.g., `["White", "Asian"]` for RACE)
+  - Only creates groups for selected values, reducing noise in comparison
+  - Parameter is optional - omit to include all values (existing behavior)
+- **Smart NA default for numerical binning** - `includeNA` now defaults based on datatype
+  - Numerical attributes: `includeNA` defaults to `false` (quartiles are meaningful without NA)
+  - Categorical attributes: `includeNA` defaults to `true` (show all data including missing)
+  - Users can still override with explicit `includeNA: true/false`
+- **Attribute metadata in response** - Better context for AI explanations
+  - Response now includes: `attribute.id`, `attribute.name`, `attribute.datatype`
+  - Description updated: "Group comparison by Age (AGE)" instead of just "by AGE"
+  - Helps AI explain to users what attribute is being compared
+- **Frontend alignment fixes** - Matched cBioPortal frontend conventions exactly
+  - `formatNumber`: integers → 0 decimals, non-integers → 2 decimals (was: always 1 decimal)
+  - `clinicalAttributeName`: categorical → `displayName`; numerical → `"Quartiles of {displayName}"` (was: raw attribute ID)
+  - `groupNameOrder`: numerical sessions now pass group name order to preserve ascending display (was: omitted)
+
+**Recent Changes (2026-02-02 - Session 1):**
+- **Group Comparison enhancements** - Numerical binning, tab support, and studyview URL generation
+  - **Quartiles for numerical attributes**: NUMBER datatype now auto-creates 4 equal-sized groups instead of 20+ discrete groups
+    - Example: AGE creates "33.50-55", "55-67", "67-75.50", "75.50-89" (equal sample counts)
+    - Groups named by min-max value range (format: integers no decimal, non-integers 2 decimals — matches frontend)
+    - Implementation: `src/domain/groupComparison/utils/numericalBinning.ts`
+  - **NA group limit fix**: NA group now counts toward 20-group limit (was: max 21, now: max 20 total)
+  - **Tab parameter support**: Optional `tab` parameter to navigate directly to comparison tab (survival, clinical, alterations, etc.)
+  - **StudyView URL generation**: Returns studyview URLs for exploring individual groups
+    - Single attribute (no pre-filter): 1 base studyview URL without filters
+    - Multi-attribute (with pre-filter): 1 URL per group showing filter combination (e.g., TP53 mutation + SEX=Male)
+    - Categorical groups: use `{value: "Male"}`, Numerical groups: use `{start: 50, end: 70}` range filters
+  - Response format: `baseStudyViewUrl` + `urlExplanation` OR `groupUrls` array depending on scenario
+
+**Previous Changes (2026-01-30):**
+- **Group Comparison tool** - Create clinical attribute-based cohort comparisons
+  - Groups samples by categorical attributes (SEX, TUMOR_STAGE, etc.)
+  - Automatic NA group handling with patient-level vs sample-level distinction
+  - Returns group metadata (names, sample counts) for AI to explain to users
+  - Auto-injects studyIds into studyViewFilter for proper column-store routing
+  - Tool: `navigate_to_group_comparison` with includeNA parameter (default: true)
+
 **Recent Changes (2026-01-27):**
 - **Tiered study metadata in router response** - Optimized token usage and search precision
   - studyKeywords: Returns all matches, but only top 5 get full metadata (clinicalAttributes, molecularProfiles)
@@ -28,6 +82,7 @@ MCP server for AI-assisted cBioPortal navigation with dual mode support:
 
 **Supported Pages:**
 - StudyView (full support: filters, plots, tabs)
+- GroupComparison (full support: categorical/numerical grouping, tabs, studyview URLs per group)
 - ResultsView (basic navigation)
 - PatientView (basic navigation)
 
@@ -156,6 +211,56 @@ Decision: Manual maintenance (not auto-generated).
 - Source types have known issues
 - Low usage rate (~20 of 121 schemas actually used)
 - cBioPortal API is stable, manual precision preferred
+
+### 9. Group Comparison NA Handling
+
+**Problem:** Duplicate NA groups appearing in comparison results (frontend-inspired bug).
+
+**Root Cause:** Frontend doesn't auto-create NA groups - it only creates groups for values in `clinicalAttributeValues` parameter (user-selected from UI). Our MCP tool must auto-decide, but early implementation created NA groups twice:
+
+1. `groupSamplesByAttributeValue` assigned `value: 'NA'` for missing data → created first NA group
+2. `createNAGroup` calculated NA samples incorrectly for patient-level attributes → created second NA group with wrong count
+
+**Solution:** Three-part fix:
+```typescript
+// Fix 1: groupBuilder.ts - Don't assign 'NA', skip instead
+const dataWithSamples = samples
+    .map((sample) => {
+        const datum = patientKeyToData[sample.uniquePatientKey!];
+        if (!datum) return null;  // Skip, not 'NA'
+        return { ...sample, value: datum.value };
+    })
+    .filter(item => item !== null);
+
+// Fix 2: navigateToGroupComparison.ts - Filter out any "NA" groups defensively
+.filter(([groupName]) => groupName.toLowerCase() !== 'na')
+
+// Fix 3: createNAGroup - Check by patient keys for patient-level attributes
+if (isPatientAttribute) {
+    const patientsWithData = new Set(clinicalData.map(d => d.uniquePatientKey));
+    samples.forEach(sample => {
+        if (patientsWithData.has(sample.uniquePatientKey!)) {
+            samplesWithData.add(`${sample.studyId}_${sample.sampleId}`);
+        }
+    });
+}
+```
+
+**Why Patient-Level Needs Special Handling:**
+- Clinical data for patient attributes has `patientId`/`uniquePatientKey`, no `sampleId`
+- Multiple samples can belong to one patient → must map patient data to all patient's samples
+- Original bug: compared `studyId_patientId` (from clinicalData) vs `studyId_sampleId` (from samples) → never matched
+
+**Design Choice:** Default `includeNA: true` (different from frontend):
+- Frontend: User manually selects groups in UI (NA is optional)
+- MCP tool: Must auto-decide → default to "show all data" for transparency
+- Users can override with `includeNA: false` when they specifically want to exclude missing data
+
+**Numerical Attributes:** ✅ RESOLVED (2026-02-02)
+- NUMBER datatype now uses automatic quartile binning (4 equal-sized groups)
+
+**NA Group Counting:** ✅ RESOLVED (2026-02-02)
+- NA group now counts toward 20-group limit (max 20 total)
 
 ## Known Issues & Limitations
 

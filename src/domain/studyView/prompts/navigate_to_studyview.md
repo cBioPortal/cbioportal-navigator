@@ -18,8 +18,8 @@ Generates direct URL to cBioPortal StudyView - cohort overview and analysis.
 ### studyIds (required)
 
 - Array of study IDs from router response
-- **Single study:** `["luad_tcga_pub"]`
-- **Cross-study:** `["luad_tcga_pub", "lusc_tcga"]`
+- **Single study:** `["luad_tcga_pan_can_atlas_2018"]`
+- **Cross-study:** `["luad_tcga_pan_can_atlas_2018", "lusc_tcga"]`
 - **🚫 DO NOT invent study IDs** - use exact values from router
 
 ### tab (optional)
@@ -69,7 +69,7 @@ Before constructing clinical filters, call `get_clinical_attribute_values` to ge
 {
   "geneFilters": [
     {
-      "molecularProfileIds": ["luad_tcga_pub_mutations"],
+      "molecularProfileIds": ["luad_tcga_pan_can_atlas_2018_mutations"],
       "geneQueries": [[{"hugoGeneSymbol": "TP53"}]]
     }
   ]
@@ -99,7 +99,7 @@ Before constructing clinical filters, call `get_clinical_attribute_values` to ge
 {
   "geneFilters": [
     {
-      "molecularProfileIds": ["luad_tcga_pub_mutations"],
+      "molecularProfileIds": ["luad_tcga_pan_can_atlas_2018_mutations"],
       "geneQueries": [[
         {"hugoGeneSymbol": "TP53"},
         {"hugoGeneSymbol": "KRAS"}
@@ -128,7 +128,7 @@ Multiple filter types use AND logic.
     ],
     "geneFilters": [
       {
-        "molecularProfileIds": ["luad_tcga_pub_mutations"],
+        "molecularProfileIds": ["luad_tcga_pan_can_atlas_2018_mutations"],
         "geneQueries": [[{"hugoGeneSymbol": "TP53"}]]
       }
     ]
@@ -183,22 +183,22 @@ For SINGLE clinical attribute filtering only (use `filterJson` for multiple):
 ### Example 1: Basic Navigation
 
 **User:** "Show me the TCGA lung adenocarcinoma study"
-- **Call:** `studyIds: ["luad_tcga_pub"]`
+- **Call:** `studyIds: ["luad_tcga_pan_can_atlas_2018"]`
 - **Response:** Direct URL to study summary
 
 ### Example 2: Gene + Clinical Filtering
 
 **User:** "LUAD patients with EGFR mutations, stage III/IV"
-- **Router returns:** `molecularProfileIds: ["luad_tcga_pub_mutations", ...]`
+- **Router returns:** `molecularProfileIds: ["luad_tcga_pan_can_atlas_2018_mutations", ...]`
 - **Call** `get_clinical_attribute_values: ["TUMOR_STAGE"]`
 - **Returns:** TUMOR_STAGE values `["Stage I", "Stage II", "Stage III", "Stage IV"]`
 - **Call navigate:**
   ```json
   {
-    "studyIds": ["luad_tcga_pub"],
+    "studyIds": ["luad_tcga_pan_can_atlas_2018"],
     "filterJson": {
       "geneFilters": [{
-        "molecularProfileIds": ["luad_tcga_pub_mutations"],
+        "molecularProfileIds": ["luad_tcga_pan_can_atlas_2018_mutations"],
         "geneQueries": [[{"hugoGeneSymbol": "EGFR"}]]
       }],
       "clinicalDataFilters": [{

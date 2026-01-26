@@ -28,6 +28,10 @@ import {
     getClinicalAttributeValuesTool,
     handleGetClinicalAttributeValues,
 } from '../../domain/studyView/getClinicalAttributeValues.js';
+import {
+    navigateToGroupComparisonTool,
+    handleNavigateToGroupComparison,
+} from '../../domain/groupComparison/navigateToGroupComparison.js';
 
 /**
  * Register all MCP tools with the server.
@@ -88,5 +92,15 @@ export function registerTools(server: McpServer): void {
             inputSchema: getClinicalAttributeValuesTool.inputSchema,
         },
         handleGetClinicalAttributeValues
+    );
+
+    server.registerTool(
+        navigateToGroupComparisonTool.name,
+        {
+            title: navigateToGroupComparisonTool.title,
+            description: navigateToGroupComparisonTool.description,
+            inputSchema: navigateToGroupComparisonTool.inputSchema,
+        },
+        handleNavigateToGroupComparison
     );
 }

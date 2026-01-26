@@ -34,6 +34,7 @@ import {
     type ResolvedStudy,
 } from '../../infrastructure/resolvers/studyResolver.js';
 import { studyViewDataClient } from '../../infrastructure/api/studyViewDataClient.js';
+import { getStudySummaryUrl } from '../studyView/utils/buildStudyUrl.js';
 import {
     createDataResponse,
     createErrorResponse,
@@ -50,9 +51,9 @@ export const resolveAndRouteTool = {
     description: loadPrompt('router/prompts/resolve_and_route.md'),
     inputSchema: {
         targetPage: z
-            .enum(['study', 'patient', 'results'])
+            .enum(['study', 'patient', 'results', 'comparison'])
             .describe(
-                'The type of cBioPortal page to navigate to (study/patient/results)'
+                'The type of cBioPortal page to navigate to (study/patient/results/comparison)'
             ),
         studyKeywords: z
             .array(z.string())
@@ -207,6 +208,7 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
         study: 'navigate_to_studyview',
         patient: 'navigate_to_patientview',
         results: 'navigate_to_resultsview',
+        comparison: 'navigate_to_group_comparison',
     };
 
     const recommendedTool = toolMapping[targetPage];
@@ -246,6 +248,7 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
                 studyId: study.studyId,
                 name: study.name,
                 sampleCount: study.allSampleCount,
+                studyViewUrl: getStudySummaryUrl(study.studyId),
                 metadata: {
                     clinicalAttributeIds: clinicalAttributes.map(
                         (attr) => attr.clinicalAttributeId
@@ -265,6 +268,7 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
             studyId: study.studyId,
             name: study.name,
             sampleCount: study.allSampleCount,
+            studyViewUrl: getStudySummaryUrl(study.studyId),
         };
     });
 

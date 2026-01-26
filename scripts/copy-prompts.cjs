@@ -24,6 +24,7 @@ const dirs = [
     'domain/studyView/prompts',
     'domain/patientView/prompts',
     'domain/resultsView/prompts',
+    'domain/groupComparison/prompts',
     'server/chat/prompts',
 ];
 

@@ -18,8 +18,8 @@ Generates direct URL to cBioPortal ResultsView - gene alteration analysis and On
 ### studyIds (required)
 
 - Array of study IDs from router response
-- **Single study:** `["luad_tcga_pub"]`
-- **Cross-study analysis:** `["luad_tcga_pub", "lusc_tcga", "brca_tcga"]`
+- **Single study:** `["luad_tcga_pan_can_atlas_2018"]`
+- **Cross-study analysis:** `["luad_tcga_pan_can_atlas_2018", "lusc_tcga", "brca_tcga"]`
 - **🚫 DO NOT invent study IDs** - use exact values from router
 
 ### genes (required)
@@ -45,7 +45,7 @@ Generates direct URL to cBioPortal ResultsView - gene alteration analysis and On
 
 - Case set identifier for sample selection
 - **Defaults to:** `"{studyId}_all"` (all samples in study)
-- **Examples:** `"luad_tcga_pub_all"`, `"luad_tcga_pub_cnaseq"`
+- **Examples:** `"luad_tcga_pan_can_atlas_2018_all"`, `"luad_tcga_pan_can_atlas_2018_cnaseq"`
 - Only specify if user explicitly wants a specific case set
 
 ### zScoreThreshold (optional)
@@ -73,11 +73,11 @@ Generates direct URL to cBioPortal ResultsView - gene alteration analysis and On
 ### Example 1: Multiple Genes Query
 
 **User:** "Analyze EGFR, KRAS, and TP53 alterations in lung cancer"
-- **Router returns:** `studyId: "luad_tcga_pub"`
+- **Router returns:** `studyId: "luad_tcga_pan_can_atlas_2018"`
 - **Call navigate:**
   ```json
   {
-    "studyIds": ["luad_tcga_pub"],
+    "studyIds": ["luad_tcga_pan_can_atlas_2018"],
     "genes": ["EGFR", "KRAS", "TP53"]
   }
   ```
@@ -86,11 +86,11 @@ Generates direct URL to cBioPortal ResultsView - gene alteration analysis and On
 ### Example 2: Specific Tab Navigation
 
 **User:** "Show me survival analysis for EGFR mutated patients"
-- **Router returns:** `studyId: "luad_tcga_pub"`
+- **Router returns:** `studyId: "luad_tcga_pan_can_atlas_2018"`
 - **Call navigate:**
   ```json
   {
-    "studyIds": ["luad_tcga_pub"],
+    "studyIds": ["luad_tcga_pan_can_atlas_2018"],
     "genes": ["EGFR"],
     "tab": "survival"
   }

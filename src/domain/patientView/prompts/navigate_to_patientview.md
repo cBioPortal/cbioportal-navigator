@@ -18,8 +18,8 @@ Generates direct URL to cBioPortal PatientView - individual patient/sample detai
 ### studyIds (required)
 
 - Array of study IDs from router response
-- **Single study:** `["luad_tcga_pub"]`
-- **Multiple studies:** `["luad_tcga_pub", "lusc_tcga"]`
+- **Single study:** `["luad_tcga_pan_can_atlas_2018"]`
+- **Multiple studies:** `["luad_tcga_pan_can_atlas_2018", "lusc_tcga"]`
   - → Generates separate URL for EACH study
 - **🚫 DO NOT invent study IDs** - use exact values from router
 
@@ -51,10 +51,10 @@ When multiple `studyIds` provided:
 
 ### Example
 
-`studyIds: ["luad_tcga_pub", "lusc_tcga"]`, `patientId: "TCGA-05-4244"`
+`studyIds: ["luad_tcga_pan_can_atlas_2018", "lusc_tcga"]`, `patientId: "TCGA-05-4244"`
 
 **→ Returns 2 URLs:**
-1. PatientView for TCGA-05-4244 in luad_tcga_pub
+1. PatientView for TCGA-05-4244 in luad_tcga_pan_can_atlas_2018
 2. PatientView for TCGA-05-4244 in lusc_tcga
 
 ---
@@ -64,11 +64,11 @@ When multiple `studyIds` provided:
 ### Example 1: View Specific Patient
 
 **User:** "Show me patient TCGA-05-4244 from the TCGA lung adenocarcinoma study"
-- **Router returns:** `studyId: "luad_tcga_pub"`
+- **Router returns:** `studyId: "luad_tcga_pan_can_atlas_2018"`
 - **Call navigate:**
   ```json
   {
-    "studyIds": ["luad_tcga_pub"],
+    "studyIds": ["luad_tcga_pan_can_atlas_2018"],
     "patientId": "TCGA-05-4244"
   }
   ```
@@ -77,11 +77,11 @@ When multiple `studyIds` provided:
 ### Example 2: View Patient Across Multiple Studies
 
 **User:** "View patient TCGA-05-4244 in both lung cancer studies"
-- **Router returns:** `studyIds: ["luad_tcga_pub", "lusc_tcga"]`
+- **Router returns:** `studyIds: ["luad_tcga_pan_can_atlas_2018", "lusc_tcga"]`
 - **Call navigate:**
   ```json
   {
-    "studyIds": ["luad_tcga_pub", "lusc_tcga"],
+    "studyIds": ["luad_tcga_pan_can_atlas_2018", "lusc_tcga"],
     "patientId": "TCGA-05-4244"
   }
   ```

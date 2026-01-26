@@ -21,6 +21,7 @@ cBioPortal Navigator bridges the gap between natural language cancer genomics qu
   - `navigate_to_studyview` - Browse cancer study summaries and cohort analysis
   - `navigate_to_patientview` - View individual patient/sample detailed data
   - `navigate_to_resultsview` - Analyze gene alterations across samples (OncoPrint)
+  - `navigate_to_group_comparison` - Compare clinical subgroups (survival, mutations, CNA, etc.)
 
 ## Project Structure
 
@@ -54,9 +55,12 @@ cbioportal-navigator/
 │   │   ├── patientView/              # PatientView domain
 │   │   │   ├── tool.ts               # navigate_to_patientview
 │   │   │   └── urlBuilder.ts         # URL construction logic
-│   │   └── resultsView/              # ResultsView domain
-│   │       ├── tool.ts               # navigate_to_resultsview
-│   │       └── urlBuilder.ts         # URL construction logic
+│   │   ├── resultsView/              # ResultsView domain
+│   │   │   ├── tool.ts               # navigate_to_resultsview
+│   │   │   └── urlBuilder.ts         # URL construction logic
+│   │   └── groupComparison/          # GroupComparison domain
+│   │       ├── tool.ts               # navigate_to_group_comparison
+│   │       └── utils/                # Group building, URL construction, binning
 │   └── infrastructure/               # Infrastructure layer (API-facing)
 │       ├── api/                      # cBioPortal API clients
 │       │   ├── client.ts             # Main API client
@@ -320,6 +324,7 @@ npm run build && npm run dev
   - StudyView: `src/domain/studyViewPage/prompts/*.md`
   - PatientView: `src/domain/patientViewPage/prompts/*.md`
   - ResultsView: `src/domain/resultsViewPage/prompts/*.md`
+  - GroupComparison: `src/domain/groupComparison/prompts/*.md`
 - **Chat System**: `src/server/chat/prompts/system.md`
 
 ## Resources
