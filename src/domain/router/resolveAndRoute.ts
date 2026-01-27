@@ -126,6 +126,7 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
 
     let resolvedStudyIds: string[];
     let resolvedStudies: ResolvedStudy[] | undefined;
+    let isKeywordSearch = false; // Track if this is a keyword search
 
     // 1. Resolve or validate study IDs
     if (studyIds && studyIds.length > 0) {
@@ -191,12 +192,10 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
             })
             .map((item) => item.study);
 
-        // Limit to top 5 most relevant studies
-        const topMatches = sortedMatches.slice(0, 5);
-
-        // Save complete study objects (with correct allSampleCount from column-store)
-        resolvedStudies = topMatches;
-        resolvedStudyIds = topMatches.map((s) => s.studyId);
+        // Save all matched studies (no hard limit)
+        resolvedStudies = sortedMatches;
+        resolvedStudyIds = sortedMatches.map((s) => s.studyId);
+        isKeywordSearch = true;
     } else {
         return createErrorResponse(
             'Either studyKeywords or studyIds must be provided'
@@ -221,10 +220,22 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
             resolvedStudyIds.map((id) => studyResolver.getById(id))
         ));
 
-    // 4. Fetch metadata for each study independently
+    // 4. Fetch metadata
+    // - For studyIds (direct): fetch metadata for all studies
+    // - For studyKeywords (search): fetch metadata only for top 5, basic info for rest
+    const metadataLimit = isKeywordSearch ? 5 : resolvedStudyIds.length;
+    const studyIdsWithMetadata = resolvedStudyIds.slice(0, metadataLimit);
+    const studyIdsWithoutMetadata = resolvedStudyIds.slice(metadataLimit);
+
+    // Create lookup map for O(1) access
+    const studyDetailsMap = new Map(
+        studyDetails.map((study) => [study.studyId, study])
+    );
+
+    // Fetch metadata for selected studies
     const studiesWithMetadata = await Promise.all(
-        resolvedStudyIds.map(async (studyId) => {
-            const study = studyDetails.find((s) => s.studyId === studyId)!;
+        studyIdsWithMetadata.map(async (studyId) => {
+            const study = studyDetailsMap.get(studyId)!;
 
             const [clinicalAttributes, molecularProfiles] = await Promise.all([
                 studyViewDataClient.getClinicalAttributes([studyId]),
@@ -247,12 +258,27 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
         })
     );
 
+    // Basic info for remaining studies (keyword search only)
+    const otherStudies = studyIdsWithoutMetadata.map((studyId) => {
+        const study = studyDetailsMap.get(studyId)!;
+        return {
+            studyId: study.studyId,
+            name: study.name,
+            sampleCount: study.allSampleCount,
+        };
+    });
+
     // 5. Build response based on number of studies
     const needsStudySelection = resolvedStudyIds.length > 1;
+    const totalCount = resolvedStudyIds.length;
 
     let message: string;
     if (needsStudySelection) {
-        message = `Found ${resolvedStudyIds.length} matching studies. Review the user's original query to determine if it clearly matches one study. If yes, use that study's metadata to call ${recommendedTool}. If ambiguous, ask the user to choose.`;
+        const detailMessage =
+            otherStudies.length > 0
+                ? ` (showing top ${metadataLimit} with detailed metadata)`
+                : '';
+        message = `Found ${totalCount} matching studies${detailMessage}. Review the user's original query to determine if it clearly matches one study. If yes, use that study's metadata to call ${recommendedTool}. If ambiguous, ask the user to choose.`;
     } else {
         message = `Found 1 study. Use ${recommendedTool} with the provided study metadata.`;
     }
@@ -260,7 +286,9 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
     return createDataResponse(message, {
         recommendedTool,
         needsStudySelection,
+        totalCount,
         resolvedStudyIds,
-        studies: studiesWithMetadata,
+        studiesWithMetadata,
+        ...(otherStudies.length > 0 && { otherStudies }),
     });
 }

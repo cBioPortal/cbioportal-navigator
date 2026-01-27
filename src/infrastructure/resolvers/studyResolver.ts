@@ -37,7 +37,7 @@ export interface ResolvedStudy {
 export class StudyResolver {
     /**
      * Search for studies by keywords
-     * Returns studies where any keyword matches studyId, name, description, or cancer type
+     * Returns studies where ALL keywords match studyId, name, description, or cancer type
      */
     async search(keywords: string[]): Promise<ResolvedStudy[]> {
         const allStudies = await apiClient.getAllStudies();
@@ -53,7 +53,9 @@ export class StudyResolver {
                 .join(' ')
                 .toLowerCase();
 
-            return keywords.some((kw) => searchText.includes(kw.toLowerCase()));
+            return keywords.every((kw) =>
+                searchText.includes(kw.toLowerCase())
+            );
         });
 
         return matches.map((study) => ({

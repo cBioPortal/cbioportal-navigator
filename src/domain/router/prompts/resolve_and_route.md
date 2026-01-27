@@ -16,9 +16,34 @@ This tool helps you choose the right cBioPortal page based on user intent and pr
 
 ## Study Resolution Strategy
 
+### How to Extract studyKeywords
+
+**Provide 1-3 SPECIFIC keywords that uniquely identify the studies:**
+
+✅ **GOOD Keywords (use these):**
+- Cancer type specifics: `lung`, `breast`, `melanoma`, `glioblastoma`, `colon`
+- Histology/subtypes: `adenocarcinoma`, `squamous`, `ductal`, `carcinoma`
+- Institutions/sources: `TCGA`, `MSK`, `ICGC`, `TARGET`, `foundation`
+- Study identifiers: `pan_can_atlas`, `metastatic`, `pediatric`
+
+❌ **AVOID Generic Terms (too broad, match most studies):**
+- `cancer`, `tumor`, `study`, `patients`, `genomic`, `data`
+
+**Matching Logic:**
+- ALL keywords must match (AND logic)
+- Each keyword is searched across: studyId, name, description, cancerType
+
+**Examples:**
+- User: "lung cancer studies" → studyKeywords: `["lung"]`
+  (NOT `["lung", "cancer"]` - "cancer" is redundant, matches 90% of studies)
+- User: "TCGA lung adenocarcinoma" → studyKeywords: `["TCGA", "lung", "adenocarcinoma"]`
+- User: "MSK breast cancer" → studyKeywords: `["MSK", "breast"]`
+- User: "melanoma from TCGA" → studyKeywords: `["TCGA", "melanoma"]`
+- User: "pediatric brain tumor" → studyKeywords: `["pediatric", "brain"]`
+
 ### Search Behavior
 
-Returns top 5 studies ranked by:
+Returns top 5 studies with detailed metadata, ranked by:
 - **Primary:** keyword match count (how many keywords match)
 - **Secondary:** sample count (for equal match counts, larger studies ranked higher)
 - **Searches across:** studyId, name, description, cancerType fields
