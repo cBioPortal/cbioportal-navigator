@@ -9,7 +9,7 @@
     "cbioportal-navigator": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc && node scripts/copy-prompts.cjs",
+    "build": "tsc && cp -r src/prompts dist/prompts",
     "dev": "tsx src/index.ts",
     "start": "node dist/server/index.js",
     "watch": "tsc --watch",

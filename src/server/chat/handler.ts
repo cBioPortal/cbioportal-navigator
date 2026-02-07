@@ -8,15 +8,12 @@ import { generateText, streamText, stepCountIs } from 'ai';
 import type { Request, Response } from 'express';
 import { ZodError } from 'zod';
 import { chatCompletionRequestSchema } from './schemas.js';
-import { createProvider } from './providers/factory.js';
-import {
-    createMCPClientWithTools,
-    closeMCPClient,
-} from './mcp-client/toolsLoader.js';
-import { DEFAULT_SYSTEM_PROMPT, CONFIG } from './config/defaults.js';
-import { ChatCompletionError, createErrorResponse } from './utils/errors.js';
-import { RequestLogger, generateRequestId } from './utils/logger.js';
-import type { Provider } from './providers/types.js';
+import { createProvider } from './providerFactory.js';
+import { createMCPClientWithTools, closeMCPClient } from './toolsLoader.js';
+import { DEFAULT_SYSTEM_PROMPT, CONFIG } from './defaults.js';
+import { ChatCompletionError, createErrorResponse } from './errors.js';
+import { RequestLogger, generateRequestId } from './logger.js';
+import type { Provider } from './providerTypes.js';
 
 /**
  * Detect provider from model name
