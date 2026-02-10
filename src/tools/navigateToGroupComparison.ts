@@ -68,7 +68,7 @@ export const navigateToGroupComparisonTool = {
                 'Optional subset of attribute values to include in comparison (e.g., ["White", "Asian"] for RACE). If not specified, all values will be included. Only applies to categorical attributes.'
             ),
         studyViewFilter: z
-            .record(z.any())
+            .record(z.string(), z.any())
             .optional()
             .describe(
                 'Optional StudyViewFilter object to pre-filter samples before grouping (e.g., gene filters, clinical filters). Same format as navigate_to_studyview_page filterJson.'

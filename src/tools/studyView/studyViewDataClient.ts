@@ -155,6 +155,27 @@ export class StudyViewDataClient {
             projection: 'ID',
         });
     }
+
+    /**
+     * Get available treatments for one or more studies.
+     *
+     * Uses the patient-level endpoint /api/column-store/treatments/patient-counts/fetch
+     * to fetch all unique treatments available in the study.
+     *
+     * @param studyIds - Array of study identifiers
+     * @returns Array of unique treatment names, sorted alphabetically
+     */
+    async getTreatments(studyIds: string[]): Promise<string[]> {
+        const studyViewFilter = { studyIds } as StudyViewFilter;
+
+        const report =
+            await this.internalApi.fetchPatientTreatmentCountsUsingPOST({
+                studyViewFilter,
+            });
+
+        // Extract and sort treatment names
+        return report.patientTreatments.map((t) => t.treatment).sort();
+    }
 }
 
 // Singleton instance

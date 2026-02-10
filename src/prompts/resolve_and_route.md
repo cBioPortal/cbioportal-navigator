@@ -202,11 +202,11 @@ This tool recommends one of these specialized tools:
      "recommendedTool": "navigate_to_resultsview",
      "resolvedStudyIds": ["luad_tcga_pan_can_atlas_2018", "lusc_tcga"],
      "needsStudySelection": true,
-     "studies": [{ "studyId": "...", "name": "...", "sampleCount": 123, "studyViewUrl": "https://cbioportal.org/study?id=...", "metadata": {} }],
+     "studiesWithMetadata": [{ "studyId": "...", "name": "...", "sampleCount": 123, "metadata": {} }],
      "message": "Found 2 studies. Review query to select or ask user to choose."
    }
    ```
-4. **AI evaluates:** "luad_tcga_pan_can_atlas_2018" (adenocarcinoma) best matches "lung cancer" intent. If ambiguous, present each study with its `studyViewUrl` so the user can click to preview before choosing.
+4. **AI evaluates:** "luad_tcga_pan_can_atlas_2018" (adenocarcinoma) best matches "lung cancer" intent. If ambiguous, construct preview URLs (`https://www.cbioportal.org/study?id={studyId}`) and present them to the user for choosing.
 5. **AI calls:** `navigate_to_resultsview(studyIds=['luad_tcga_pan_can_atlas_2018'], genes=['TP53'])`
 
 ### Parameters
@@ -219,22 +219,52 @@ This tool recommends one of these specialized tools:
 
 ## Metadata Returned
 
-The router provides metadata to help construct filters and parameters:
+The router provides study context and metadata to help construct filters and parameters.
 
-### 1. clinicalAttributeIds
-Array of clinical attribute IDs available for filtering
+### needsStudySelection
 
-**Example:** `["AGE", "SEX", "TUMOR_GRADE", "TUMOR_STAGE", "OS_MONTHS"]`
+Boolean flag indicating whether the AI needs to determine which study to use:
 
-**→ Use `get_clinical_attribute_values` tool to get datatype + valid values**
+- `false` — Exactly 1 study found; proceed directly with the recommended tool
+- `true` — Multiple studies found; review the user's original query to determine if intent clearly points to one study. If yes, use that study. If ambiguous, ask the user to choose.
 
-### 2. molecularProfileIds
-Array of molecular profile IDs (5-15 per study)
+### Study URL Format
 
-**Example:** `["study_mutations", "study_gistic", "study_mrna", "study_methylation"]`
+To generate a study preview URL for any `studyId`:
 
-- Indicates available data types for this study
-- Used by specialized tools to determine what analyses are possible
+```
+https://www.cbioportal.org/study?id={studyId}
+```
+
+Use this when presenting study options to the user for selection.
+
+### Metadata Fields (studiesWithMetadata)
+
+#### clinicalAttributeIds
+Array of clinical attribute IDs available for filtering patients in this study.
+
+**Examples:** `["AGE", "SEX", "TUMOR_GRADE", "TUMOR_STAGE", "OS_MONTHS", "SMOKING_HISTORY"]`
+
+- Use `get_clinical_attribute_values` tool to get datatype + valid values before filtering
+- Required for constructing `filterJson.clinicalDataFilters`
+
+#### molecularProfileIds
+Array of molecular profile IDs indicating what genomic data is available (5-15 per study).
+
+**Examples:** `["luad_tcga_mutations", "luad_tcga_gistic", "luad_tcga_mrna_median_all_sample_zscores"]`
+
+- Required for gene-based filtering (`filterJson.geneFilters`)
+- Mutation profiles end in `_mutations`; CNA profiles typically end in `_gistic` or `_cna`
+
+#### treatments
+Array of drug/agent names documented in this study (may be absent or empty).
+
+**Examples:** `["CARBOPLATIN", "DOCETAXEL", "ERLOTINIB", "PEMBROLIZUMAB"]`
+
+- Only present in studies with treatment data; empty array `[]` means no treatment data
+- Same drug names apply to both patient-level and sample-level treatment filters:
+  - `patientTreatmentFilters` — filter patients who received this drug (no timing required)
+  - `sampleTreatmentFilters` — filter samples by drug + timing; requires `time: "Pre"` or `time: "Post"` (whether sample was collected before or after treatment)
 
 ### Filter Construction Workflow
 

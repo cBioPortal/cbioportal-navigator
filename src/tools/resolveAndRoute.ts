@@ -31,7 +31,6 @@
 import { z } from 'zod';
 import { studyResolver, type ResolvedStudy } from './router/studyResolver.js';
 import { studyViewDataClient } from './studyView/studyViewDataClient.js';
-import { getStudySummaryUrl } from './studyView/buildStudyUrl.js';
 import { createDataResponse, createErrorResponse } from './shared/responses.js';
 import type { ToolResponse } from './shared/types.js';
 import { loadPrompt } from './shared/promptLoader.js';
@@ -233,16 +232,17 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
         studyIdsWithMetadata.map(async (studyId) => {
             const study = studyDetailsMap.get(studyId)!;
 
-            const [clinicalAttributes, molecularProfiles] = await Promise.all([
-                studyViewDataClient.getClinicalAttributes([studyId]),
-                studyViewDataClient.getMolecularProfiles([studyId]),
-            ]);
+            const [clinicalAttributes, molecularProfiles, treatments] =
+                await Promise.all([
+                    studyViewDataClient.getClinicalAttributes([studyId]),
+                    studyViewDataClient.getMolecularProfiles([studyId]),
+                    studyViewDataClient.getTreatments([studyId]),
+                ]);
 
             return {
                 studyId: study.studyId,
                 name: study.name,
                 sampleCount: study.allSampleCount,
-                studyViewUrl: getStudySummaryUrl(study.studyId),
                 metadata: {
                     clinicalAttributeIds: clinicalAttributes.map(
                         (attr) => attr.clinicalAttributeId
@@ -250,6 +250,7 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
                     molecularProfileIds: molecularProfiles
                         .map((profile) => profile.molecularProfileId)
                         .sort(),
+                    treatments: treatments,
                 },
             };
         })
@@ -262,7 +263,6 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
             studyId: study.studyId,
             name: study.name,
             sampleCount: study.allSampleCount,
-            studyViewUrl: getStudySummaryUrl(study.studyId),
         };
     });
 

@@ -114,7 +114,7 @@ export const geneFilterQuerySchema = z.object({
     includeUnknownStatus: z.boolean().optional(),
     includeUnknownTier: z.boolean().optional(),
     includeVUS: z.boolean().optional(),
-    tiersBooleanMap: z.record(z.boolean()).optional(),
+    tiersBooleanMap: z.record(z.string(), z.boolean()).optional(),
 });
 
 export const geneFilterSchema = z.object({
@@ -123,7 +123,9 @@ export const geneFilterSchema = z.object({
 });
 
 export const alterationFilterSchema = z.object({
-    copyNumberAlterationEventTypes: z.record(z.boolean()).optional(),
+    copyNumberAlterationEventTypes: z
+        .record(z.string(), z.boolean())
+        .optional(),
     includeDriver: z.boolean().optional(),
     includeGermline: z.boolean().optional(),
     includeSomatic: z.boolean().optional(),
@@ -131,9 +133,9 @@ export const alterationFilterSchema = z.object({
     includeUnknownStatus: z.boolean().optional(),
     includeUnknownTier: z.boolean().optional(),
     includeVUS: z.boolean().optional(),
-    mutationEventTypes: z.record(z.boolean()).optional(),
+    mutationEventTypes: z.record(z.string(), z.boolean()).optional(),
     structuralVariants: z.boolean().optional(),
-    tiersBooleanMap: z.record(z.boolean()).optional(),
+    tiersBooleanMap: z.record(z.string(), z.boolean()).optional(),
 });
 
 // ============================================================================
@@ -181,7 +183,7 @@ export const structuralVariantFilterQuerySchema = z.object({
     includeUnknownStatus: z.boolean().optional(),
     includeUnknownTier: z.boolean().optional(),
     includeVUS: z.boolean().optional(),
-    tiersBooleanMap: z.record(z.boolean()).optional(),
+    tiersBooleanMap: z.record(z.string(), z.boolean()).optional(),
 });
 
 export const studyViewStructuralVariantFilterSchema = z.object({

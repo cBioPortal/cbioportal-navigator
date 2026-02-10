@@ -107,7 +107,7 @@ export async function handleChatCompletion(req: Request, res: Response) {
         if (error instanceof ZodError) {
             return res
                 .status(400)
-                .json(createErrorResponse('Invalid request', error.errors));
+                .json(createErrorResponse('Invalid request', error.issues));
         }
 
         if (error instanceof ChatCompletionError) {
