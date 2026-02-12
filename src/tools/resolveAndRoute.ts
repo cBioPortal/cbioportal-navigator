@@ -239,6 +239,16 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
                     studyViewDataClient.getTreatments([studyId]),
                 ]);
 
+            const regularProfileIds = molecularProfiles
+                .filter((p) => p.molecularAlterationType !== 'GENERIC_ASSAY')
+                .map((p) => p.molecularProfileId)
+                .sort();
+
+            const genericAssayProfileIds = molecularProfiles
+                .filter((p) => p.molecularAlterationType === 'GENERIC_ASSAY')
+                .map((p) => p.molecularProfileId)
+                .sort();
+
             return {
                 studyId: study.studyId,
                 name: study.name,
@@ -247,9 +257,10 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
                     clinicalAttributeIds: clinicalAttributes.map(
                         (attr) => attr.clinicalAttributeId
                     ),
-                    molecularProfileIds: molecularProfiles
-                        .map((profile) => profile.molecularProfileId)
-                        .sort(),
+                    molecularProfileIds: regularProfileIds,
+                    ...(genericAssayProfileIds.length > 0 && {
+                        genericAssayProfiles: genericAssayProfileIds,
+                    }),
                     treatments: treatments,
                 },
             };

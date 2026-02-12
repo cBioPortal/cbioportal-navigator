@@ -272,7 +272,7 @@ The tool returns a navigation response with:
 
 **Step 1:** Call router → get study and molecular profile IDs
 
-**Step 2:** Call get_clinical_attribute_values for AGE → determine filter format
+**Step 2:** Call get_studyviewfilter_options for AGE → determine filter format
 
 **Step 3:** Call navigate_to_group_comparison:
 ```json
@@ -462,7 +462,7 @@ Group comparison supports multiple studies:
 1. **router** → Get study IDs and available clinical attributes
 2. **navigate_to_group_comparison** → Create comparison session and return URL
 
-**Note:** You typically don't need `get_clinical_attribute_values` before calling this tool. The tool automatically:
+**Note:** You typically don't need `get_studyviewfilter_options` before calling this tool. The tool automatically:
 - Fetches all attribute values from the API
 - Groups samples by values
 - Returns group metadata (group names and sample counts)

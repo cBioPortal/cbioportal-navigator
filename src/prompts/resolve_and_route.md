@@ -245,16 +245,24 @@ Array of clinical attribute IDs available for filtering patients in this study.
 
 **Examples:** `["AGE", "SEX", "TUMOR_GRADE", "TUMOR_STAGE", "OS_MONTHS", "SMOKING_HISTORY"]`
 
-- Use `get_clinical_attribute_values` tool to get datatype + valid values before filtering
+- Use `get_studyviewfilter_options` tool to get datatype + valid values before filtering
 - Required for constructing `filterJson.clinicalDataFilters`
 
 #### molecularProfileIds
-Array of molecular profile IDs indicating what genomic data is available (5-15 per study).
+Array of **non-generic-assay** molecular profile IDs indicating what genomic data is available.
 
 **Examples:** `["luad_tcga_mutations", "luad_tcga_gistic", "luad_tcga_mrna_median_all_sample_zscores"]`
 
 - Required for gene-based filtering (`filterJson.geneFilters`)
 - Mutation profiles end in `_mutations`; CNA profiles typically end in `_gistic` or `_cna`
+
+#### genericAssayProfiles _(optional, only when study has GENERIC_ASSAY data)_
+Array of GENERIC_ASSAY profile IDs available for filtering (e.g. genetic ancestry, mutational signatures, treatment response scores).
+
+**Examples:** `["luad_tcga_pan_can_atlas_2018_genetic_ancestry", "luad_tcga_pan_can_atlas_2018_mutational_signature"]`
+
+- Call `get_studyviewfilter_options` with these IDs as `genericAssayProfileIds` to get entity stableIds, datatype, and values
+- Use stableIds + profileType in `filterJson.genericAssayDataFilters`
 
 #### treatments
 Array of drug/agent names documented in this study (may be absent or empty).
@@ -269,7 +277,7 @@ Array of drug/agent names documented in this study (may be absent or empty).
 ### Filter Construction Workflow
 
 1. Check `clinicalAttributeIds` to see what's available
-2. Call `get_clinical_attribute_values` to get datatype and exact values
+2. Call `get_studyviewfilter_options` to get datatype and exact values
 3. Use exact values in `filterJson.clinicalDataFilters`
 
 ---
@@ -281,7 +289,7 @@ After this router recommends a navigation tool, follow these critical rules when
 ### 🚫 NEVER GUESS OR INVENT
 
 - **Study IDs** - Use exact studyIds from this router's response
-- **Clinical attribute values** - Use exact values from `get_clinical_attribute_values` output (case-sensitive)
+- **Clinical attribute values** - Use exact values from `get_studyviewfilter_options` output (case-sensitive)
 - **Molecular profile IDs** - Use exact IDs from router metadata
 - **Patient/Sample IDs** - Use exact values from user query (preserve case and format)
 

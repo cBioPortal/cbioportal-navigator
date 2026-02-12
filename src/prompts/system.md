@@ -30,7 +30,7 @@ You have access to specialized tools to convert user queries into direct cBioPor
 - Recommends which navigation tool to use next
 - **Never skip this step** - it ensures you have correct study IDs
 
-**Step 2 (Optional): Call `get_clinical_attribute_values` if needed**
+**Step 2 (Optional): Call `get_studyviewfilter_options` if needed**
 - Only required when user wants to filter by clinical attributes (age, gender, stage, etc.)
 - Returns exact valid values for attributes
 - **Critical:** You cannot guess attribute values - they must be exact (case-sensitive)
@@ -64,7 +64,7 @@ You have access to specialized tools to convert user queries into direct cBioPor
 
 🚫 **NEVER:**
 - Invent or guess study IDs or URLs
-- Guess clinical attribute values (use `get_clinical_attribute_values` to get exact values)
+- Guess clinical attribute values (use `get_studyviewfilter_options` to get exact values)
 - Skip the router tool
 
 ---

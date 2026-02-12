@@ -14,6 +14,18 @@ MCP server for AI-assisted cBioPortal navigation with dual mode support:
 
 ## Recent Changes
 
+**2026-02-12: Generic assay filter support**
+- `resolve_and_route` now separates `genericAssayProfiles: string[]` from `molecularProfileIds` — only present when study has `GENERIC_ASSAY` profiles
+- Renamed tool `get_clinical_attribute_values` → `get_studyviewfilter_options` (new file: `getStudyviewfilterOptions.ts`)
+  - New optional param `genericAssayProfileIds`: pass IDs from `genericAssayProfiles`, returns `genericAssayEntities`
+  - Each entity: `{ stableId, name, values[] }` (CATEGORICAL/BINARY) or `{ stableId, name, continuous: true }` (LIMIT-VALUE)
+  - `profileType` returned per profile for direct use in `genericAssayDataFilters`
+- `studyViewDataClient` changes:
+  - `getMolecularProfiles`: removed `projection: 'ID'` → defaults to SUMMARY (needed for `molecularAlterationType`, `datatype`)
+  - New `getGenericAssayMeta(profileIds)` — calls `fetchGenericAssayMetaUsingPOST`
+  - New `getGenericAssayDataValues(studyId, profileType, stableIds)` — calls `fetchGenericAssayDataCountsUsingPOST` (already column-store whitelisted)
+- `navigate_to_studyview.md`: added `genericAssayDataFilters` section with LIMIT-VALUE range and categorical examples
+
 **2026-02-12: Gene-specific (genomic) filter support**
 - Added `mutationDataFilters` and `genomicDataFilters` documentation to `navigate_to_studyview.md`
 - `profileType` = molecularProfileId with `{studyId}_` prefix stripped (e.g., `msk_chord_2024_mutations` → `"mutations"`)
