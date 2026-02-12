@@ -138,9 +138,115 @@ Multiple filter types use AND logic.
 
 ---
 
-## Other Filter Types (Advanced)
+## Filtering - Gene Specific (Genomic)
 
-The `filterJson` supports 15+ filter types. Commonly used:
+These filters correspond to the "Gene Specific" charts in StudyView (add chart → search a gene → select profile type).
+
+### How to derive `profileType`
+
+`profileType` = molecularProfileId with the `{studyId}_` prefix stripped:
+- `msk_chord_2024_mutations` → `"mutations"`
+- `msk_chord_2024_cna` → `"cna"`
+- `luad_tcga_pan_can_atlas_2018_mrna_seq_v2_rsem` → `"mrna_seq_v2_rsem"`
+
+Use exact molecularProfileIds from router metadata to derive this.
+
+---
+
+### mutationDataFilters — Mutations profile, two modes
+
+#### Mode 1: Mutated vs Not Mutated (`categorization: "MUTATED"`)
+
+```json
+{
+  "mutationDataFilters": [{
+    "hugoGeneSymbol": "TP53",
+    "profileType": "mutations",
+    "categorization": "MUTATED",
+    "values": [[{"value": "MUTATED"}]]
+  }]
+}
+```
+
+- `values: [[{"value": "MUTATED"}]]` — samples WITH TP53 mutation
+- `values: [[{"value": "NOT_MUTATED"}]]` — samples WITHOUT TP53 mutation
+
+#### Mode 2: Mutation Types (`categorization: "MUTATION_TYPE"`)
+
+```json
+{
+  "mutationDataFilters": [{
+    "hugoGeneSymbol": "TP53",
+    "profileType": "mutations",
+    "categorization": "MUTATION_TYPE",
+    "values": [[{"value": "Missense_Mutation"}]]
+  }]
+}
+```
+
+Common mutation type values: `"Missense_Mutation"`, `"Nonsense_Mutation"`, `"Frame_Shift_Del"`, `"Frame_Shift_Ins"`, `"In_Frame_Del"`, `"In_Frame_Ins"`, `"Splice_Site"`. Exact values depend on study data.
+
+Multiple types (OR logic): `[[{"value": "Missense_Mutation"}], [{"value": "Nonsense_Mutation"}]]`
+
+---
+
+### genomicDataFilters — CNA (discrete) or expression (continuous) profiles
+
+```json
+{
+  "genomicDataFilters": [{
+    "hugoGeneSymbol": "MYC",
+    "profileType": "gistic",
+    "values": [{"value": "2"}]
+  }]
+}
+```
+
+**Discrete CNA values** (GISTIC/CNA profiles):
+- `"2"` = Amplification, `"1"` = Gain, `"0"` = Diploid, `"-1"` = Shallow deletion, `"-2"` = Deep deletion
+
+**Continuous expression values** (mRNA/protein profiles — numerical ranges):
+```json
+{
+  "genomicDataFilters": [{
+    "hugoGeneSymbol": "EGFR",
+    "profileType": "mrna_seq_v2_rsem_zscores_ref_all_samples",
+    "values": [{"start": 2.0}]
+  }]
+}
+```
+
+---
+
+### alterationFilter — only when non-default
+
+The frontend automatically applies default alteration settings. Only include `alterationFilter` when the user explicitly requests non-default behavior:
+
+- Drivers only: `{"includeDriver": true, "includeVUS": false, "includeUnknownOncogenicity": false}`
+- Somatic only: `{"includeGermline": false, "includeSomatic": true, "includeUnknownStatus": false}`
+- Specific CNA types: `{"copyNumberAlterationEventTypes": {"AMP": true, "HOMDEL": false}}`
+
+---
+
+### Gene Specific Examples
+
+**"Show patients with TP53 mutations (mutated vs not mutated)"**
+```json
+{
+  "mutationDataFilters": [{"hugoGeneSymbol": "TP53", "profileType": "mutations", "categorization": "MUTATED", "values": [[{"value": "MUTATED"}]]}]
+}
+```
+
+**"Show patients with MYC amplification (GISTIC)"**
+```json
+{
+  "genomicDataFilters": [{"hugoGeneSymbol": "MYC", "profileType": "gistic", "values": [{"value": "2"}]}]
+}
+```
+
+---
+
+## Other Filter Types (Advanced)
 
 ### sampleIdentifiers
 Select specific samples:
@@ -148,10 +254,16 @@ Select specific samples:
 {"sampleIdentifiers": [{"studyId": "luad_tcga", "sampleId": "TCGA-05-4244-01"}]}
 ```
 
-### Other Advanced Filters
-- **genomicDataFilters:** Filter by expression/CNV values
-- **mutationDataFilters:** Filter by mutation properties
-- **structuralVariantFilters:** Filter by gene fusions
+### structuralVariantFilters
+Filter by gene fusions:
+```json
+{
+  "structuralVariantFilters": [{
+    "molecularProfileIds": ["luad_tcga_sv"],
+    "structVarQueries": [[{"gene1Query": {"hugoSymbol": "ALK"}, "gene2Query": {"specialValue": "ANY_GENE"}}]]
+  }]
+}
+```
 
 For complete schema, refer to the Zod inputSchema (studyViewFilterSchema).
 
