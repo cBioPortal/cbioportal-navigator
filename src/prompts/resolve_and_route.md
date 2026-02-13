@@ -74,13 +74,13 @@ Some studies span multiple cancer types (e.g., MSK-CHORD includes lung, breast, 
 ### Fallback - No Matches
 
 If no studies match the keywords, guide the user to browse all available studies:
-**→ https://www.cbioportal.org/datasets**
+**→ https://www.cbioportal.org**
 
 cBioPortal contains studies from:
 - **TCGA** (The Cancer Genome Atlas) - comprehensive studies across ~30 cancer types
 - **ICGC** (International Cancer Genome Consortium)
 - **TARGET** - pediatric cancer studies
-- **Individual institutional studies** from major cancer centers
+- **Individual sequencing studies** where data is made publicly available
 - **Cell line genomics data**
 
 ---
@@ -91,36 +91,53 @@ cBioPortal contains studies from:
 
 **Use when the user wants to:**
 - View overall statistics of a research study/cohort
-- Compare different patient subgroups within a study
-- Filter patients by clinical attributes (age, gender, stage, etc.)
-- See survival analysis for the entire cohort
+- Explore subgroups of patients or samples within a study
+- Filter patients by clinical, genomic or other available data attributes (age, gender, stage, presence of a mutation in a specific gene, etc.)
 - Explore genomic feature distributions across the study
 - Answer discovery questions: "Which genes are most mutated?" "What's the mutation landscape?"
 
 **Example queries:**
 - "Show me the TCGA lung cancer study"
-- "Display survival curves for melanoma patients"
+- "What are the most commonly amplified genes in MSK-CHORD"
+- "What genes are mutated in breast cancer?"
+- "I want to see KRAS not mutated pancreatic cancer"
+- "Show me HER2 positive cases in the breast pancan atlas cohort"
+- "Show me samples in TCGA glioblastoma study with EGFR amplification and mutation"
+- "I want to see cases with both KRAS and STK11 mutations in LUAD TCGA"
+- "I want to see how many cases are profiled for mutations in TCGA DLBCL study"
+- "How many samples have a copy number gain in EGFR in GBM pancan TCGA?"
+- "I want to see expression vs copy number change in EGFR in lung cancer."
+- "Show me a graph of mutation count vs cancer type in MSK IMPACT 2017"
+- "Show me samples with high expression in EGFR in GBM"
 
 ### 🧬 targetPage: 'patient' (PatientView)
 
 **Use when the user wants to:**
-- View a specific patient's complete profile
-- Track a patient's clinical timeline and events
+- View one or more specific patient's complete profile
+- See a patient's clinical timeline and events
 - See all genomic alterations for one individual
 - Compare multiple samples from the same patient
+
 
 **Example queries:**
 - "Show me patient TCGA-001 details"
 - "What mutations does patient ID 12345 have?"
+- "Show me all the patients in DLBCL TCGA PanCan Atlas who are Hispanic or Latino"
 
 ### 🔬 targetPage: 'results' (ResultsView/OncoPrint)
 
 **Use when the user wants to:**
 - Analyze specific genes across multiple samples
 - Find mutation patterns and frequencies for named genes
-- Identify co-occurring or mutually exclusive mutations
+- Identify genes that are altered in a co-occurring or mutually exclusive pattern
 - Compare alterations in multiple genes
 - Perform survival analysis by genotype
+- View specific mutations in a given gene
+- Explore the functional impact of mutations in a named gene
+- View all structural variants in a given gene
+- Find genes with similar expression patterns to a named gene
+- View the cancer types where one or more named genes are altered
+- Compare clinical or genomic features based on the presence of alterations in a named gene
 
 **Example queries:**
 - "Show me TP53 mutations in lung cancer"
@@ -130,18 +147,22 @@ cBioPortal contains studies from:
 
 **Use when the user wants to:**
 - Compare patient subgroups defined by a clinical attribute (e.g., Male vs Female, T1 vs T2 vs T3)
-- Perform survival analysis across clinical subgroups
-- Find genomic/mutation/CNA differences between phenotype groups
-- Compare groups after pre-filtering by gene mutation or clinical criteria (e.g., "compare by sex among TP53-mutated patients")
+- Perform outcome analysis across subgroups of samples
+- Find genomic/mutation/CNA differences between groups of samples or patients
+- Compare groups after pre-filtering by genomic or clinical criteria (e.g., "compare by sex among TP53-mutated patients")
 - Analyze age-based or other numerical attribute groups (auto quartile-binned)
+- Look for genes that are differentially expresssed between two groups of samples
 
-**Key signal:** The user's intent is to **split and compare** a cohort by a clinical attribute, not to view a single cohort overview or a specific gene pattern.
+**Key signal:** The user's intent is to **split and compare** a cohort by  attribute, not to view a single cohort overview or a specific gene pattern.
 
 **Example queries:**
 - "Compare male vs female patients in LUAD"
 - "Show survival differences by tumor stage"
 - "Compare age groups in breast cancer"
 - "Compare KRAS-mutated patients by smoking history"
+- "What genes are overexpressed in high grade lung adenocarcinoma vs low grade?"
+- "Are there mutations that are more common in metastatic prostate cancer vs primary?"
+- "Compare luad by KRAS mutation"
 
 ---
 
@@ -150,14 +171,13 @@ cBioPortal contains studies from:
 Evaluate rules in order. First match wins.
 
 ```
-Rule 1: Patient ID explicitly mentioned
+Rule 1: Sample or Patient ID explicitly mentioned
         → targetPage: 'patient'
 
-Rule 2: User wants to compare/split cohort by a clinical attribute
+Rule 2: User wants to compare/split cohort by a data attribute
         (Signals: compare, vs, difference, split, by sex/age/stage/smoking...)
         → targetPage: 'comparison'
-        Note: If a gene is also mentioned here, it is a PRE-FILTER
-              (passed via studyViewFilter), NOT a reason to pick 'results'.
+        Note: If user wants to compare on genes only, then go to results comparison tab. Otherwise it should be comparing on attributes more than just genes, go to group comparsion.
 
 Rule 3: Gene(s) mentioned AND the query is asking about the gene's
         alteration pattern itself
@@ -189,7 +209,7 @@ This tool recommends one of these specialized tools:
 - `navigate_to_studyview` - for StudyView (cohort overview)
 - `navigate_to_patientview` - for PatientView (individual patient)
 - `navigate_to_resultsview` - for ResultsView (gene alteration analysis)
-- `navigate_to_group_comparison` - for GroupComparison (clinical subgroup comparison)
+- `navigate_to_group_comparison` - for GroupComparison (subgroup comparison)
 
 ### Workflow Example
 
