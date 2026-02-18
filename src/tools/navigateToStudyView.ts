@@ -67,7 +67,7 @@ export const navigateToStudyViewTool = {
             .partial()
             .optional()
             .describe(
-                'Comprehensive StudyViewFilter object for complex multi-attribute filtering. Supports clinicalDataFilters, geneFilters, genomicDataFilters, genomicProfiles, mutationDataFilters, sampleIdentifiers, and 15+ more filter types. See examples in tool description.'
+                'Comprehensive StudyViewFilter object for complex multi-attribute filtering. Key types: clinicalDataFilters (by clinical attribute), geneFilters (gene mutation/CNA binary), mutationDataFilters (gene-specific mutation categorization: "MUTATED" vs "MUTATION_TYPE"), genomicDataFilters (gene-specific CNA discrete values or expression ranges), structuralVariantFilters (fusions). alterationFilter only needed for non-default settings (e.g., drivers-only, somatic-only). See tool description for profileType derivation and examples.'
             ),
 
         // Legacy simple filtering

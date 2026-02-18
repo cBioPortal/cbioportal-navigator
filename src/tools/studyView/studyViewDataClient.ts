@@ -18,6 +18,8 @@ import type {
     MolecularProfile,
     StudyViewFilter,
     MolecularProfileFilter,
+    GenericAssayMeta,
+    GenericAssayMetaFilter,
 } from 'cbioportal-ts-api-client';
 
 export class StudyViewDataClient {
@@ -151,9 +153,71 @@ export class StudyViewDataClient {
         return await this.api.fetchMolecularProfilesUsingPOST({
             molecularProfileFilter: {
                 studyIds: studyIds,
-            } as MolecularProfileFilter, // Type assertion needed due to API client type definition
-            projection: 'ID',
+            } as MolecularProfileFilter,
+            // No projection - defaults to SUMMARY, needed for molecularAlterationType/genericAssayType/datatype
         });
+    }
+
+    /**
+     * Get generic assay entity metadata for one or more molecular profiles.
+     *
+     * Returns a list of entities (stableId, name, entityType) belonging to the
+     * given GENERIC_ASSAY molecular profile IDs.
+     *
+     * @param molecularProfileIds - Array of GENERIC_ASSAY profile IDs
+     * @returns Array of GenericAssayMeta objects
+     */
+    async getGenericAssayMeta(
+        molecularProfileIds: string[]
+    ): Promise<GenericAssayMeta[]> {
+        if (molecularProfileIds.length === 0) return [];
+        return await this.api.fetchGenericAssayMetaUsingPOST({
+            genericAssayMetaFilter: {
+                molecularProfileIds,
+            } as GenericAssayMetaFilter,
+        });
+    }
+
+    /**
+     * Get value distributions for categorical generic assay entities.
+     *
+     * Uses fetchGenericAssayDataCountsUsingPOST (column-store whitelisted).
+     * Only meaningful for CATEGORICAL/BINARY datatypes; for LIMIT-VALUE callers
+     * should skip this and rely on numerical range filters instead.
+     *
+     * @param studyId - Study identifier
+     * @param profileType - Profile suffix (molecularProfileId minus "{studyId}_")
+     * @param stableIds - Entity stable IDs to fetch value distributions for
+     * @returns Map of stableId → array of distinct values found in the study
+     */
+    async getGenericAssayDataValues(
+        studyId: string,
+        profileType: string,
+        stableIds: string[]
+    ): Promise<Map<string, string[]>> {
+        if (stableIds.length === 0) return new Map();
+
+        const result =
+            await this.internalApi.fetchGenericAssayDataCountsUsingPOST({
+                genericAssayDataCountFilter: {
+                    genericAssayDataFilters: stableIds.map((stableId) => ({
+                        profileType,
+                        stableId,
+                    })) as any,
+                    studyViewFilter: {
+                        studyIds: [studyId],
+                    } as StudyViewFilter,
+                } as any,
+            });
+
+        const map = new Map<string, string[]>();
+        for (const item of result) {
+            map.set(
+                item.stableId,
+                item.counts.map((c) => c.value)
+            );
+        }
+        return map;
     }
 
     /**

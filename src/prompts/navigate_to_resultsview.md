@@ -1,6 +1,6 @@
 # Navigate to ResultsView
 
-Generates direct URL to cBioPortal ResultsView - gene alteration analysis and OncoPrint.
+Generates direct URL to cBioPortal ResultsView — gene alteration analysis and OncoPrint.
 
 **→ See router tool for universal guidelines (no guessing IDs, exact values, Link First principle).**
 
@@ -16,83 +16,32 @@ Generates direct URL to cBioPortal ResultsView - gene alteration analysis and On
 ## Required Inputs
 
 ### studyIds (required)
-
-- Array of study IDs from router response
-- **Single study:** `["luad_tcga_pan_can_atlas_2018"]`
-- **Cross-study analysis:** `["luad_tcga_pan_can_atlas_2018", "lusc_tcga", "brca_tcga"]`
-- **🚫 DO NOT invent study IDs** - use exact values from router
+Array of study IDs from router response. Supports cross-study analysis.
 
 ### genes (required)
-
-- Array of gene symbols (at least 1)
-- **Examples:** `["TP53"]`, `["TP53", "KRAS", "EGFR"]`
-- **Gene symbols must be UPPERCASE:** TP53, KRAS, EGFR (not tp53, kras, egfr)
-- Use human HUGO Gene Symbols
+Array of UPPERCASE HUGO gene symbols: `["TP53"]`, `["TP53", "KRAS", "EGFR"]`
 
 ### tab (optional)
-
-- `"oncoprint"` (default), `"mutations"`, `"coexpression"`, `"comparison"`, `"survival"`
-- `"cancerTypesSummary"`, `"plots"`, `"downloads"`
-- `"mutualExclusivity"` (requires multiple genes)
-- `"cnSegments"`, `"structuralVariants"` (if data available)
-- Opens specific analysis directly
+`"oncoprint"` (default), `"mutations"`, `"coexpression"`, `"comparison"`, `"survival"`, `"cancerTypesSummary"`, `"plots"`, `"downloads"`, `"mutualExclusivity"` (requires multiple genes), `"cnSegments"`, `"structuralVariants"` (if data available)
 
 ---
 
 ## Optional Parameters
 
-### caseSetId (optional)
-
-- Case set identifier for sample selection
-- **Defaults to:** `"{studyId}_all"` (all samples in study)
-- **Examples:** `"luad_tcga_pan_can_atlas_2018_all"`, `"luad_tcga_pan_can_atlas_2018_cnaseq"`
-- Only specify if user explicitly wants a specific case set
-
-### zScoreThreshold (optional)
-
-- Z-score threshold for mRNA expression data filtering
-- **Default:** 2.0
-- Only relevant for expression-based queries
-
-### rppaScoreThreshold (optional)
-
-- RPPA score threshold for protein data filtering
-- **Default:** 2.0
-- Only relevant for protein expression queries
+- **caseSetId:** Sample selection. Defaults to `"{studyId}_all"`. Only specify if user wants a specific case set.
+- **zScoreThreshold:** mRNA expression z-score threshold. Default: 2.0
+- **rppaScoreThreshold:** Protein expression threshold. Default: 2.0
 
 ---
 
-## Gene Symbol Formatting
+## Example
 
-**Gene symbols MUST be UPPERCASE** (TP53, not tp53). Use HUGO symbols (TP53, not p53). See router for complete rules.
+**User:** "Analyze EGFR, KRAS, and TP53 in lung cancer, show survival tab"
 
----
-
-## Complete Examples
-
-### Example 1: Multiple Genes Query
-
-**User:** "Analyze EGFR, KRAS, and TP53 alterations in lung cancer"
-- **Router returns:** `studyId: "luad_tcga_pan_can_atlas_2018"`
-- **Call navigate:**
-  ```json
-  {
-    "studyIds": ["luad_tcga_pan_can_atlas_2018"],
-    "genes": ["EGFR", "KRAS", "TP53"]
-  }
-  ```
-- **Response:** Direct URL to multi-gene OncoPrint
-
-### Example 2: Specific Tab Navigation
-
-**User:** "Show me survival analysis for EGFR mutated patients"
-- **Router returns:** `studyId: "luad_tcga_pan_can_atlas_2018"`
-- **Call navigate:**
-  ```json
-  {
-    "studyIds": ["luad_tcga_pan_can_atlas_2018"],
-    "genes": ["EGFR"],
-    "tab": "survival"
-  }
-  ```
-- **Response:** Direct URL to survival tab
+```json
+{
+  "studyIds": ["luad_tcga_pan_can_atlas_2018"],
+  "genes": ["EGFR", "KRAS", "TP53"],
+  "tab": "survival"
+}
+```

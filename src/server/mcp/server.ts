@@ -14,7 +14,7 @@
  * - `navigate_to_studyview`: StudyView navigation
  * - `navigate_to_patientview`: PatientView navigation
  * - `navigate_to_resultsview`: ResultsView/OncoPrint navigation
- * - `get_clinical_attribute_values`: Get clinical attribute values for filtering (on-demand)
+ * - `get_studyviewfilter_options`: Get clinical attribute values / generic assay entities for filtering (on-demand)
  *
  * Architecture:
  * The server is stateless and can be instantiated per-request (HTTP mode) or
@@ -39,7 +39,7 @@ export function createMcpServer(): McpServer {
     // Register all tools
     registerTools(server);
 
-    // Resources removed - replaced by router metadata + get_clinical_attribute_values tool
+    // Resources removed - replaced by router metadata + get_studyviewfilter_options tool
     // This provides better UX for Chat Completions API (lightweight, on-demand fetching)
 
     return server;

@@ -1,6 +1,6 @@
 # Navigate to StudyView
 
-Generates direct URL to cBioPortal StudyView - cohort overview and analysis.
+Generates direct URL to cBioPortal StudyView — cohort overview and analysis.
 
 **→ See router tool for universal guidelines (no guessing IDs, exact values, Link First principle).**
 
@@ -16,196 +16,194 @@ Generates direct URL to cBioPortal StudyView - cohort overview and analysis.
 ## Required Inputs
 
 ### studyIds (required)
-
-- Array of study IDs from router response
-- **Single study:** `["luad_tcga_pan_can_atlas_2018"]`
-- **Cross-study:** `["luad_tcga_pan_can_atlas_2018", "lusc_tcga"]`
-- **🚫 DO NOT invent study IDs** - use exact values from router
+Array of study IDs from router response. Single or cross-study: `["luad_tcga_pan_can_atlas_2018"]` or `["luad_tcga", "lusc_tcga"]`.
 
 ### tab (optional)
-
-- `"summary"` (default), `"clinicalData"`, `"cnSegments"`, `"plots"`
-- Tool validates tab availability automatically
-- If tab has no data, error explains why (don't generate invalid URL)
+`"summary"` (default), `"clinicalData"`, `"cnSegments"`, `"plots"`. Tool validates tab availability automatically.
 
 ---
 
-## Filtering - Clinical Attributes
+## Filtering — Clinical Attributes
 
-**USE `get_clinical_attribute_values` FIRST:**
-Before constructing clinical filters, call `get_clinical_attribute_values` to get exact valid values. Do NOT guess values.
+**Call `get_studyviewfilter_options` first** to get exact valid values. Never guess.
 
-### filterJson.clinicalDataFilters Structure
+### filterJson.clinicalDataFilters
+
 ```json
 {
   "clinicalDataFilters": [
-    {
-      "attributeId": "SEX",
-      "values": [{"value": "Female"}]
-    },
-    {
-      "attributeId": "AGE",
-      "values": [{"start": 40, "end": 60}]
-    }
+    {"attributeId": "SEX", "values": [{"value": "Female"}]},
+    {"attributeId": "AGE", "values": [{"start": 40, "end": 60}]}
   ]
 }
 ```
 
-### Key Rules
-
-- **attributeId:** From router response `clinicalAttributeIds`
-- **values array elements:**
-  - **Categorical:** `{"value": "Female"}` - exact string from `get_clinical_attribute_values`
-  - **Numerical range:** `{"start": 40, "end": 60}`
-  - **Open-ended:** `{"start": 65}` or `{"end": 40}`
-- **🚫 NEVER guess attribute values** - always use `get_clinical_attribute_values` output
+- **attributeId:** from router `clinicalAttributeIds`
+- **Categorical:** `{"value": "Female"}` — exact string from `get_studyviewfilter_options`
+- **Numerical range:** `{"start": 40, "end": 60}`, open-ended: `{"start": 65}` or `{"end": 40}`
 
 ---
 
-## Filtering - Gene Mutations
+## Filtering — Gene (Mutation / CNA / Structural Variant)
 
-### filterJson.geneFilters Structure
+All use `geneFilters`. The molecular profile ID determines alteration type.
+
+### Profile type identification
+
+| Type | Profile ID pattern |
+|------|--------------------|
+| Mutation | `_mutations` |
+| CNA | `_cna`, `_gistic` (DISCRETE only) |
+| Structural Variant | `_structural_variants` |
+
+Use exact profile IDs from router metadata.
+
+### filterJson.geneFilters
+
+```json
+{
+  "geneFilters": [{
+    "molecularProfileIds": ["luad_tcga_pan_can_atlas_2018_mutations"],
+    "geneQueries": [[{"hugoGeneSymbol": "TP53"}]]
+  }]
+}
+```
+
+### Union vs Intersection
+
+- **Union** (ANY gene): `"geneQueries": [[{"hugoGeneSymbol": "TP53"}, {"hugoGeneSymbol": "KRAS"}]]`
+- **Intersection** (ALL genes): `"geneQueries": [[{"hugoGeneSymbol": "TP53"}], [{"hugoGeneSymbol": "KRAS"}]]`
+
+### CNA `alterations` field
+
+For CNA profiles, specify copy number types. Valid: `"AMP"`, `"GAIN"`, `"DIPLOID"`, `"HETLOSS"`, `"HOMDEL"`. Omit or `[]` for all types.
+
+```json
+{"hugoGeneSymbol": "MYC", "alterations": ["AMP"]}
+```
+
+### Cross-type intersection
+
+Different alteration types require separate `geneFilters` entries:
+
 ```json
 {
   "geneFilters": [
     {
       "molecularProfileIds": ["luad_tcga_pan_can_atlas_2018_mutations"],
       "geneQueries": [[{"hugoGeneSymbol": "TP53"}]]
+    },
+    {
+      "molecularProfileIds": ["luad_tcga_pan_can_atlas_2018_gistic"],
+      "geneQueries": [[{"hugoGeneSymbol": "MYC", "alterations": ["AMP"]}]]
     }
   ]
 }
 ```
 
-### Key Rules
+---
 
-- **molecularProfileIds:** From router response metadata
-  - Usually ends with `_mutations` for mutation data
-  - Use exact IDs from router - do NOT construct or guess
-- **geneQueries:** Nested arrays `[[{...}]]`
-  - Each gene: `{hugoGeneSymbol: "TP53"}`
-  - Multiple genes in OR: `[[{hugoGeneSymbol: "TP53"}, {hugoGeneSymbol: "KRAS"}]]`
-- **Gene symbols:** UPPERCASE (TP53, KRAS, EGFR)
+## Filtering — Gene Specific (Genomic)
 
-### Common Gene Filter Options (all optional)
+These correspond to "Gene Specific" charts in StudyView (add chart → search gene → select profile).
 
-- `alterations: ["AMP", "HOMDEL"]` - specific CNV types
-- `includeDriver: true` - driver mutations only
-- `includeVUS: false` - exclude variants of unknown significance
+### profileType derivation
 
-### Example
+Strip `{studyId}_` prefix from molecularProfileId:
+- `msk_chord_2024_mutations` → `"mutations"`
+- `luad_tcga_pan_can_atlas_2018_mrna_seq_v2_rsem` → `"mrna_seq_v2_rsem"`
 
-**User:** "Show LUAD patients with TP53 or KRAS mutations"
+### mutationDataFilters — two modes
+
+**Mode 1: Mutated vs Not Mutated**
+```json
+{"hugoGeneSymbol": "TP53", "profileType": "mutations", "categorization": "MUTATED", "values": [[{"value": "MUTATED"}]]}
+```
+Values: `"MUTATED"` or `"NOT_MUTATED"`
+
+**Mode 2: Mutation Types**
+```json
+{"hugoGeneSymbol": "TP53", "profileType": "mutations", "categorization": "MUTATION_TYPE", "values": [[{"value": "Missense_Mutation"}]]}
+```
+Common types: `"Missense_Mutation"`, `"Nonsense_Mutation"`, `"Frame_Shift_Del"`, `"Frame_Shift_Ins"`, `"In_Frame_Del"`, `"In_Frame_Ins"`, `"Splice_Site"`.
+Multiple types (OR): `[[{"value": "Missense_Mutation"}], [{"value": "Nonsense_Mutation"}]]`
+
+### genomicDataFilters — CNA or expression profiles
+
+**Discrete CNA** (GISTIC/CNA profiles):
+```json
+{"hugoGeneSymbol": "MYC", "profileType": "gistic", "values": [{"value": "2"}]}
+```
+Values: `"2"` = Amp, `"1"` = Gain, `"0"` = Diploid, `"-1"` = Shallow del, `"-2"` = Deep del
+
+**Continuous expression** (mRNA/protein — numerical ranges):
+```json
+{"hugoGeneSymbol": "EGFR", "profileType": "mrna_seq_v2_rsem_zscores_ref_all_samples", "values": [{"start": 2.0}]}
+```
+
+### alterationFilter — only when non-default
+
+Only include when user explicitly requests:
+- Drivers only: `{"includeDriver": true, "includeVUS": false, "includeUnknownOncogenicity": false}`
+- Somatic only: `{"includeGermline": false, "includeSomatic": true, "includeUnknownStatus": false}`
+- Specific CNA: `{"copyNumberAlterationEventTypes": {"AMP": true, "HOMDEL": false}}`
+
+---
+
+## Filtering — Generic Assay
+
+For studies with `genericAssayProfiles` in router metadata (genetic ancestry, mutational signatures, etc.).
+
+**Workflow:** Router returns profiles → call `get_studyviewfilter_options` with `genericAssayProfileIds` → use returned `profileType` and `stableId` in filter.
+
 ```json
 {
-  "geneFilters": [
-    {
-      "molecularProfileIds": ["luad_tcga_pan_can_atlas_2018_mutations"],
-      "geneQueries": [[
-        {"hugoGeneSymbol": "TP53"},
-        {"hugoGeneSymbol": "KRAS"}
-      ]]
-    }
-  ]
+  "genericAssayDataFilters": [{
+    "profileType": "genetic_ancestry",
+    "stableId": "European",
+    "values": [{"start": 0.8}]
+  }]
 }
 ```
+
+- **profileType:** molecularProfileId with `{studyId}_` prefix stripped
+- **stableId:** from `get_studyviewfilter_options` response
+- **LIMIT-VALUE (continuous):** `{"start": 0.8}`, `{"end": 0.5}`, or `{"start": 0.2, "end": 0.8}`
+- **CATEGORICAL/BINARY:** `{"value": "High"}`
+
+---
+
+## Other Filter Types
+
+### sampleIdentifiers
+```json
+{"sampleIdentifiers": [{"studyId": "luad_tcga", "sampleId": "TCGA-05-4244-01"}]}
+```
+
+### Legacy: filterAttributeId + filterValues
+For SINGLE clinical attribute only. Use `filterJson` for anything more complex.
+- `filterAttributeId: "SEX"`, `filterValues: "Female"`
+- Ranges: `filterAttributeId: "AGE"`, `filterValues: "40-60"`
 
 ---
 
 ## Combining Filters
 
-Multiple filter types use AND logic.
+Multiple filter types use AND logic. Full example:
 
-### Example
-
-**User:** "Female LUAD patients with TP53 mutations, age 50-70"
-
+**"Female LUAD patients with EGFR mutations, stage III/IV, age 50-70"**
 ```json
 {
   "filterJson": {
     "clinicalDataFilters": [
       {"attributeId": "SEX", "values": [{"value": "Female"}]},
-      {"attributeId": "AGE", "values": [{"start": 50, "end": 70}]}
+      {"attributeId": "AGE", "values": [{"start": 50, "end": 70}]},
+      {"attributeId": "TUMOR_STAGE", "values": [{"value": "Stage III"}, {"value": "Stage IV"}]}
     ],
-    "geneFilters": [
-      {
-        "molecularProfileIds": ["luad_tcga_pan_can_atlas_2018_mutations"],
-        "geneQueries": [[{"hugoGeneSymbol": "TP53"}]]
-      }
-    ]
+    "geneFilters": [{
+      "molecularProfileIds": ["luad_tcga_pan_can_atlas_2018_mutations"],
+      "geneQueries": [[{"hugoGeneSymbol": "EGFR"}]]
+    }]
   }
 }
 ```
-
----
-
-## Other Filter Types (Advanced)
-
-The `filterJson` supports 15+ filter types. Commonly used:
-
-### sampleIdentifiers
-Select specific samples:
-```json
-{"sampleIdentifiers": [{"studyId": "luad_tcga", "sampleId": "TCGA-05-4244-01"}]}
-```
-
-### Other Advanced Filters
-- **genomicDataFilters:** Filter by expression/CNV values
-- **mutationDataFilters:** Filter by mutation properties
-- **structuralVariantFilters:** Filter by gene fusions
-
-For complete schema, refer to the Zod inputSchema (studyViewFilterSchema).
-
----
-
-## Legacy Simple Filtering
-
-For SINGLE clinical attribute filtering only (use `filterJson` for multiple):
-
-### filterAttributeId + filterValues
-
-**Example:**
-- `filterAttributeId: "SEX"`
-- `filterValues: "Female"`
-
-**For ranges:**
-- `filterAttributeId: "AGE"`
-- `filterValues: "40-60"`
-
-**🚫 DO NOT use legacy filtering for:**
-- Multiple attributes
-- Gene filters
-- Complex filters
-
----
-
-## Complete Examples
-
-### Example 1: Basic Navigation
-
-**User:** "Show me the TCGA lung adenocarcinoma study"
-- **Call:** `studyIds: ["luad_tcga_pan_can_atlas_2018"]`
-- **Response:** Direct URL to study summary
-
-### Example 2: Gene + Clinical Filtering
-
-**User:** "LUAD patients with EGFR mutations, stage III/IV"
-- **Router returns:** `molecularProfileIds: ["luad_tcga_pan_can_atlas_2018_mutations", ...]`
-- **Call** `get_clinical_attribute_values: ["TUMOR_STAGE"]`
-- **Returns:** TUMOR_STAGE values `["Stage I", "Stage II", "Stage III", "Stage IV"]`
-- **Call navigate:**
-  ```json
-  {
-    "studyIds": ["luad_tcga_pan_can_atlas_2018"],
-    "filterJson": {
-      "geneFilters": [{
-        "molecularProfileIds": ["luad_tcga_pan_can_atlas_2018_mutations"],
-        "geneQueries": [[{"hugoGeneSymbol": "EGFR"}]]
-      }],
-      "clinicalDataFilters": [{
-        "attributeId": "TUMOR_STAGE",
-        "values": [{"value": "Stage III"}, {"value": "Stage IV"}]
-      }]
-    }
-  }
-  ```
-- **Response:** Direct filtered URL

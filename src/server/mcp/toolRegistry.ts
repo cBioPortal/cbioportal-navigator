@@ -25,9 +25,9 @@ import {
     handleNavigateToResultsView,
 } from '../../tools/navigateToResultsView.js';
 import {
-    getClinicalAttributeValuesTool,
-    handleGetClinicalAttributeValues,
-} from '../../tools/getClinicalAttributeValues.js';
+    getStudyviewfilterOptionsTool,
+    handleGetStudyviewfilterOptions,
+} from '../../tools/getStudyviewfilterOptions.js';
 import {
     navigateToGroupComparisonTool,
     handleNavigateToGroupComparison,
@@ -85,13 +85,13 @@ export function registerTools(server: McpServer): void {
     );
 
     server.registerTool(
-        getClinicalAttributeValuesTool.name,
+        getStudyviewfilterOptionsTool.name,
         {
-            title: getClinicalAttributeValuesTool.title,
-            description: getClinicalAttributeValuesTool.description,
-            inputSchema: getClinicalAttributeValuesTool.inputSchema,
+            title: getStudyviewfilterOptionsTool.title,
+            description: getStudyviewfilterOptionsTool.description,
+            inputSchema: getStudyviewfilterOptionsTool.inputSchema,
         },
-        handleGetClinicalAttributeValues
+        handleGetStudyviewfilterOptions
     );
 
     server.registerTool(
