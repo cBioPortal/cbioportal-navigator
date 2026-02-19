@@ -43,9 +43,9 @@ import { loadPrompt } from './shared/promptLoader.js';
  * Tool definition for MCP registration
  */
 export const navigateToResultsViewTool = {
-    name: 'navigate_to_resultsview_page',
+    name: 'navigate_to_results_view',
     title: 'Navigate to ResultsView',
-    description: loadPrompt('navigate_to_resultsview.md'),
+    description: loadPrompt('navigate_to_results_view.md'),
     inputSchema: {
         studyIds: z
             .array(z.string())
@@ -65,12 +65,16 @@ export const navigateToResultsViewTool = {
             .enum([
                 'oncoprint',
                 'mutations',
-                'cna',
+                'structuralVariants',
+                'cancerTypesSummary',
+                'mutualExclusivity',
                 'plots',
                 'survival',
                 'coexpression',
-                'enrichments',
+                'comparison',
+                'cnSegments',
                 'pathways',
+                'download',
             ])
             .optional()
             .describe('Specific tab to navigate to'),

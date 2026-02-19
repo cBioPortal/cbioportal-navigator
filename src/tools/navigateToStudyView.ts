@@ -47,9 +47,9 @@ import { loadPrompt } from './shared/promptLoader.js';
  * Tool definition for MCP registration
  */
 export const navigateToStudyViewTool = {
-    name: 'navigate_to_studyview_page',
+    name: 'navigate_to_study_view',
     title: 'Navigate to StudyView',
-    description: loadPrompt('navigate_to_studyview.md'),
+    description: loadPrompt('navigate_to_study_view.md'),
     inputSchema: {
         studyIds: z
             .array(z.string())

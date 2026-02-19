@@ -27,7 +27,7 @@ Clinical attribute ID to group by (e.g., `"SEX"`, `"PATH_T_STAGE"`, `"SMOKING_HI
 ## Optional Inputs
 
 ### studyViewFilter
-Pre-filter samples before grouping. Same format as `navigate_to_studyview` filterJson. `studyIds` are auto-injected — don't include them inside.
+Pre-filter samples before grouping. Same format as `navigate_to_study_view` filterJson. `studyIds` are auto-injected — don't include them inside.
 
 ### clinicalAttributeValues
 Subset of values to compare (categorical only). Reduces noise when attribute has many values. Case-insensitive matching. When specified, returns per-group studyview URLs.

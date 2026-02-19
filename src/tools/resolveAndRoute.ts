@@ -18,9 +18,9 @@
  * 4. AI calls the recommended nav tool with resolved studyIds
  *
  * Routing logic:
- * - targetPage='study' → recommends navigate_to_studyview
- * - targetPage='patient' → recommends navigate_to_patientview
- * - targetPage='results' → recommends navigate_to_resultsview
+ * - targetPage='study' → recommends navigate_to_study_view
+ * - targetPage='patient' → recommends navigate_to_patient_view
+ * - targetPage='results' → recommends navigate_to_results_view
  *
  * The tool provides extensive inline documentation explaining when to use each
  * page type, including use cases, example queries, and key features for each.
@@ -198,9 +198,9 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
 
     // 2. Determine recommended tool based on target page
     const toolMapping = {
-        study: 'navigate_to_studyview',
-        patient: 'navigate_to_patientview',
-        results: 'navigate_to_resultsview',
+        study: 'navigate_to_study_view',
+        patient: 'navigate_to_patient_view',
+        results: 'navigate_to_results_view',
         comparison: 'navigate_to_group_comparison',
     };
 

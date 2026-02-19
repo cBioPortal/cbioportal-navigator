@@ -11,9 +11,9 @@
  *
  * Registered tools:
  * - `resolve_and_route`: Main router that delegates to specialized tools (includes filter metadata)
- * - `navigate_to_studyview`: StudyView navigation
- * - `navigate_to_patientview`: PatientView navigation
- * - `navigate_to_resultsview`: ResultsView/OncoPrint navigation
+ * - `navigate_to_study_view`: StudyView navigation
+ * - `navigate_to_patient_view`: PatientView navigation
+ * - `navigate_to_results_view`: ResultsView/OncoPrint navigation
  * - `get_studyviewfilter_options`: Get clinical attribute values / generic assay entities for filtering (on-demand)
  *
  * Architecture:

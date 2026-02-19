@@ -71,7 +71,7 @@ export const navigateToGroupComparisonTool = {
             .record(z.string(), z.any())
             .optional()
             .describe(
-                'Optional StudyViewFilter object to pre-filter samples before grouping (e.g., gene filters, clinical filters). Same format as navigate_to_studyview_page filterJson.'
+                'Optional StudyViewFilter object to pre-filter samples before grouping (e.g., gene filters, clinical filters). Same format as navigate_to_study_view filterJson.'
             ),
         includeNA: z
             .boolean()

@@ -99,6 +99,6 @@ Use the returned `profileType` and `stableId` directly in the filter:
    }
    ```
 3. **Tool returns** entities with stableIds and value hints
-4. **Call** `navigate_to_studyview` with `genericAssayDataFilters` using exact stableIds
+4. **Call** `navigate_to_study_view` with `genericAssayDataFilters` using exact stableIds
 
 Both `attributeIds` and `genericAssayProfileIds` can be requested in a single call.

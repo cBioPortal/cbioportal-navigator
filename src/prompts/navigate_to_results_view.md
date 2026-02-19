@@ -22,7 +22,9 @@ Array of study IDs from router response. Supports cross-study analysis.
 Array of UPPERCASE HUGO gene symbols: `["TP53"]`, `["TP53", "KRAS", "EGFR"]`
 
 ### tab (optional)
-`"oncoprint"` (default), `"mutations"`, `"coexpression"`, `"comparison"`, `"survival"`, `"cancerTypesSummary"`, `"plots"`, `"downloads"`, `"mutualExclusivity"` (requires multiple genes), `"cnSegments"`, `"structuralVariants"` (if data available)
+`"oncoprint"` (default), `"mutations"`, `"structuralVariants"`, `"cancerTypesSummary"`, `"mutualExclusivity"` (requires multiple genes), `"plots"`, `"coexpression"`, `"comparison"`, `"cnSegments"`, `"pathways"`, `"download"`
+
+**Note:** `"survival"` is a redirect alias for `"comparison"` — both open the Comparison/Survival tab. Use `"comparison"` as the canonical value; `"survival"` also works if that's what the user asks for.
 
 ---
 

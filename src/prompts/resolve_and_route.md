@@ -10,9 +10,9 @@ Resolves study identifiers (keywords → studyIds), handles ambiguity (up to 5 m
 
 ## Recommended Tools
 
-- `navigate_to_studyview` — cohort overview
-- `navigate_to_patientview` — individual patient
-- `navigate_to_resultsview` — gene alteration analysis
+- `navigate_to_study_view` — cohort overview
+- `navigate_to_patient_view` — individual patient
+- `navigate_to_results_view` — gene alteration analysis
 - `navigate_to_group_comparison` — subgroup comparison
 
 ---

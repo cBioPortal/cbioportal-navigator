@@ -39,9 +39,9 @@ import { loadPrompt } from './shared/promptLoader.js';
  * Tool definition for MCP registration
  */
 export const navigateToPatientViewTool = {
-    name: 'navigate_to_patientview_page',
+    name: 'navigate_to_patient_view',
     title: 'Navigate to PatientView',
-    description: loadPrompt('navigate_to_patientview.md'),
+    description: loadPrompt('navigate_to_patient_view.md'),
     inputSchema: {
         studyIds: z
             .array(z.string())
