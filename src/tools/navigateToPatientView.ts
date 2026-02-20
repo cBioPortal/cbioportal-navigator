@@ -28,6 +28,8 @@
 import { z } from 'zod';
 import { studyResolver } from './router/studyResolver.js';
 import { buildPatientUrl } from './patientView/buildPatientUrl.js';
+import { apiClient } from './shared/cbioportalClient.js';
+import { buildStudyUrl } from './studyView/buildStudyUrl.js';
 import {
     createNavigationResponse,
     createErrorResponse,
@@ -71,6 +73,12 @@ export const navigateToPatientViewTool = {
             )
             .optional()
             .describe('Navigation IDs for cohort browsing'),
+        studyViewFilter: z
+            .record(z.string(), z.any())
+            .optional()
+            .describe(
+                'StudyViewFilter object to navigate a filtered patient cohort. When provided, fetches all matching patients and opens the first one with full cohort navigation (navCaseIds). patientId and sampleId are not required when this is provided. Same format as navigate_to_study_view filterJson.'
+            ),
     },
 };
 
@@ -81,6 +89,9 @@ type NavigateToPatientViewInput = {
     sampleId?: z.infer<typeof navigateToPatientViewTool.inputSchema.sampleId>;
     tab?: z.infer<typeof navigateToPatientViewTool.inputSchema.tab>;
     navIds?: z.infer<typeof navigateToPatientViewTool.inputSchema.navIds>;
+    studyViewFilter?: z.infer<
+        typeof navigateToPatientViewTool.inputSchema.studyViewFilter
+    >;
 };
 
 /**
@@ -123,13 +134,83 @@ async function navigateToPatientView(
 ): Promise<ToolResponse> {
     const { studyIds } = params;
 
-    if (!params.patientId && !params.sampleId) {
-        return createErrorResponse(
-            'Either patientId or sampleId must be provided'
-        );
+    // Get study details for metadata (used in both paths)
+    const studyDetails = await Promise.all(
+        studyIds.map((id) => studyResolver.getById(id))
+    );
+
+    // Filter path: fetch patients from filter → build cohort navigation URL
+    if (params.studyViewFilter) {
+        const filter = { ...params.studyViewFilter, studyIds };
+        const samples = await apiClient.fetchFilteredSamples(filter);
+
+        if (samples.length === 0) {
+            return createErrorResponse(
+                'No samples match the provided studyViewFilter'
+            );
+        }
+
+        // Deduplicate to unique patients preserving order
+        const seen = new Set<string>();
+        const patients: Array<{ patientId: string; studyId: string }> = [];
+        for (const s of samples) {
+            const key = `${s.studyId}:${s.patientId}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                patients.push({ patientId: s.patientId, studyId: s.studyId });
+            }
+        }
+
+        const PATIENT_NAV_LIMIT = 20;
+
+        // Large cohort: fall back to StudyView with filter applied
+        if (patients.length > PATIENT_NAV_LIMIT) {
+            const studyViewUrl = buildStudyUrl({
+                studyIds,
+                filterJson: params.studyViewFilter,
+            });
+
+            return createNavigationResponse(studyViewUrl, {
+                studyIds,
+                studies: studyDetails.map((s) => ({
+                    studyId: s.studyId,
+                    name: s.name,
+                })),
+                filteredPatientCount: patients.length,
+                fallback: true,
+                fallbackReason: `${patients.length} patients exceed the direct navigation limit (${PATIENT_NAV_LIMIT}). Showing StudyView with filter applied instead.`,
+                instructions: `Click "View selected cases" in StudyView to open PatientView with full cohort navigation.`,
+            });
+        }
+
+        // Small cohort: direct PatientView URL with navCaseIds
+        const first = patients[0];
+        const url = buildPatientUrl({
+            studyId: first.studyId,
+            caseId: first.patientId,
+            tab: params.tab,
+            navIds: patients,
+        });
+
+        return createNavigationResponse(url, {
+            studyIds,
+            studies: studyDetails.map((s) => ({
+                studyId: s.studyId,
+                name: s.name,
+            })),
+            filteredPatientCount: patients.length,
+            firstPatientId: first.patientId,
+            firstStudyId: first.studyId,
+            tab: params.tab,
+        });
     }
 
-    // studyIds are already validated by router, no need to validate again
+    // Default path: navigate to a specific known patient/sample
+    if (!params.patientId && !params.sampleId) {
+        return createErrorResponse(
+            'Either patientId, sampleId, or studyViewFilter must be provided'
+        );
+    }
 
     // Build URLs for each study
     const patientUrls = studyIds.map((studyId) => {
@@ -145,12 +226,6 @@ async function navigateToPatientView(
         return { studyId, url };
     });
 
-    // Get study details for metadata
-    const studyDetails = await Promise.all(
-        studyIds.map((id) => studyResolver.getById(id))
-    );
-
-    // Use first URL as primary navigation URL
     const primaryUrl = patientUrls[0].url;
 
     return createNavigationResponse(primaryUrl, {

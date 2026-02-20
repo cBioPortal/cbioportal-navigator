@@ -32,6 +32,10 @@ import { studyResolver } from './router/studyResolver.js';
 import { geneResolver } from './router/geneResolver.js';
 import { profileResolver } from './router/profileResolver.js';
 import { buildResultsUrl } from './resultsView/buildResultsUrl.js';
+import { MainSessionClient } from './resultsView/mainSessionClient.js';
+import { apiClient } from './shared/cbioportalClient.js';
+import { getConfig } from './shared/config.js';
+import { buildCBioPortalPageUrl } from './shared/cbioportalUrlBuilder.js';
 import {
     createNavigationResponse,
     createErrorResponse,
@@ -86,6 +90,12 @@ export const navigateToResultsViewTool = {
             .number()
             .optional()
             .describe('RPPA score threshold for protein data'),
+        studyViewFilter: z
+            .record(z.string(), z.any())
+            .optional()
+            .describe(
+                'StudyViewFilter object to restrict analysis to a filtered sample subset. When provided, fetches matching samples and creates a session-based URL (?session_id=...). Same format as navigate_to_study_view filterJson.'
+            ),
     },
 };
 
@@ -100,6 +110,9 @@ type NavigateToResultsViewInput = {
     >;
     rppaScoreThreshold?: z.infer<
         typeof navigateToResultsViewTool.inputSchema.rppaScoreThreshold
+    >;
+    studyViewFilter?: z.infer<
+        typeof navigateToResultsViewTool.inputSchema.studyViewFilter
     >;
 };
 
@@ -167,10 +180,69 @@ async function navigateToResultsView(
         );
     }
 
-    // 2. Determine case set ID
-    // For single study: use {studyId}_all (e.g., "luad_tcga_all")
-    // For multi-study: use "all"
-    // User can override with params.caseSetId
+    // Get study details and profiles (used in both paths)
+    const [studyDetails, profiles] = await Promise.all([
+        Promise.all(studyIds.map((id) => studyResolver.getById(id))),
+        Promise.all(
+            studyIds.map((id) => profileResolver.getForStudy(id, 'mutation'))
+        ),
+    ]);
+
+    // 2a. Filter path: fetch samples → create session → session_id URL
+    if (params.studyViewFilter) {
+        const filter = { ...params.studyViewFilter, studyIds };
+        const samples = await apiClient.fetchFilteredSamples(filter);
+
+        if (samples.length === 0) {
+            return createErrorResponse(
+                'No samples match the provided studyViewFilter'
+            );
+        }
+
+        const caseIds = samples
+            .map((s) => `${s.studyId}:${s.sampleId}`)
+            .join('+');
+
+        const config = getConfig();
+        const sessionClient = new MainSessionClient(config.baseUrl);
+        const { id: sessionId } = await sessionClient.createSession({
+            cancer_study_list: studyIds.join(','),
+            gene_list: validGenes.join(' '),
+            case_set_id: '-1',
+            case_ids: caseIds,
+            tab_index: 'tab_visualize',
+            Action: 'Submit',
+            ...(params.zScoreThreshold !== undefined && {
+                Z_SCORE_THRESHOLD: String(params.zScoreThreshold),
+            }),
+            ...(params.rppaScoreThreshold !== undefined && {
+                RPPA_SCORE_THRESHOLD: String(params.rppaScoreThreshold),
+            }),
+        });
+
+        const url = buildCBioPortalPageUrl(
+            params.tab ? `/results/${params.tab}` : '/results',
+            { session_id: sessionId }
+        );
+
+        return createNavigationResponse(url, {
+            studyIds,
+            studies: studyDetails.map((s) => ({
+                studyId: s.studyId,
+                name: s.name,
+                sampleCount: s.allSampleCount,
+            })),
+            genes: validGenes,
+            filteredSampleCount: samples.length,
+            caseSetId: '-1',
+            sessionId,
+            molecularProfiles: profiles
+                .filter((p) => p)
+                .map((p) => p!.molecularProfileId),
+        });
+    }
+
+    // 2b. Default path: case set ID
     let caseSetId: string;
     if (params.caseSetId) {
         caseSetId = params.caseSetId;
@@ -190,16 +262,6 @@ async function navigateToResultsView(
         },
         tab: params.tab,
     });
-
-    // Get study details for metadata
-    const studyDetails = await Promise.all(
-        studyIds.map((id) => studyResolver.getById(id))
-    );
-
-    // Get molecular profiles (optional, for metadata)
-    const profiles = await Promise.all(
-        studyIds.map((id) => profileResolver.getForStudy(id, 'mutation'))
-    );
 
     return createNavigationResponse(url, {
         studyIds,
