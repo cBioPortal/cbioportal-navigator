@@ -9,7 +9,7 @@ Generates direct URL to cBioPortal PatientView — individual patient/sample det
 - Patient summary with key alterations
 - Clinical timeline (diagnosis, treatments, events)
 - Genomic alterations (mutations, CNV, fusions)
-- Pathway analysis and tissue images
+- Pathway analysis
 
 ---
 
@@ -24,7 +24,7 @@ Array of study IDs from router response. When multiple studies provided, generat
 - Case-sensitive — use exact values from user or tool responses.
 
 ### tab (optional)
-`"summary"` (default), `"clinicalData"`, `"genomicTracks"`, `"pathways"`, `"tissueImage"`, `"trialMatch"`
+`"summary"` (default), `"clinicalData"`, `"pathways"`
 
 ### navIds (optional)
 Enables cohort navigation. Rarely used — only if user explicitly requests it.

@@ -146,7 +146,7 @@ Values: `"2"` = Amp, `"1"` = Gain, `"0"` = Diploid, `"-1"` = Shallow del, `"-2"`
 Only include when user explicitly requests:
 - Drivers only: `{"includeDriver": true, "includeVUS": false, "includeUnknownOncogenicity": false}`
 - Somatic only: `{"includeGermline": false, "includeSomatic": true, "includeUnknownStatus": false}`
-- Specific CNA: `{"copyNumberAlterationEventTypes": {"AMP": true, "HOMDEL": false}}`
+- Specific CNA: `{"copyNumberAlterationEventTypes": {"AMP": true, "HOMDEL": false}}` — only `AMP` and `HOMDEL` are supported here; for `GAIN`, `HETLOSS`, or `DIPLOID`, use `geneFilters` with `alterations` instead
 
 ---
 

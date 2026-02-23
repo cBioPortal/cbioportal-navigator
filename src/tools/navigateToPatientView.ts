@@ -14,7 +14,7 @@
  *
  * Features:
  * - Requires studyId and either patientId or sampleId
- * - Supports tabs: summary, clinicalData, genomicTracks, pathways, tissueImage, trialMatch
+ * - Supports tabs: summary, clinicalData, pathways
  * - Navigation IDs (navIds) for browsing through patient cohorts
  *
  * Architecture:
@@ -54,14 +54,7 @@ export const navigateToPatientViewTool = {
         patientId: z.string().optional().describe('Patient/case identifier'),
         sampleId: z.string().optional().describe('Sample identifier'),
         tab: z
-            .enum([
-                'summary',
-                'clinicalData',
-                'genomicTracks',
-                'pathways',
-                'tissueImage',
-                'trialMatch',
-            ])
+            .enum(['summary', 'clinicalData', 'pathways'])
             .optional()
             .describe('Specific tab to navigate to'),
         navIds: z
