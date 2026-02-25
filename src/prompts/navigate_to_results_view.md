@@ -46,6 +46,10 @@ Use `studyViewFilter` when the user wants to analyze genes **within a specific s
 
 Without `studyViewFilter`, ResultsView uses all samples in the study.
 
+### Companion StudyView URL
+
+When `studyViewFilter` is provided, the response includes a `studyViewUrl` alongside the primary `url`. Present both to the user — the ResultsView link for gene analysis, and the StudyView link for exploring the filtered cohort's clinical features and other attributes.
+
 ---
 
 ## Examples

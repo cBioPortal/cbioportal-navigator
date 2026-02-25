@@ -24,6 +24,12 @@ Returns exact valid values for clinical attributes and generic assay entities. R
 - `navigate_to_results_view` — gene alteration analysis, OncoPrint
 - `navigate_to_group_comparison` — subgroup comparison
 
+### Companion URLs
+Navigation tools may return a `studyViewUrl` alongside the primary `url`. When present, offer both to the user — the primary link for the main analysis, and the StudyView link for exploring the cohort.
+
+### Dual Tool Calls (Comparison + Results)
+When the user's comparison query mentions specific genes (e.g., "compare TP53 mutation frequency by sex"), call **both** `navigate_to_group_comparison` and `navigate_to_results_view` (with the same `studyViewFilter` if applicable). These are independent calls and can be made in parallel. Present both links to the user — the comparison page for group-level analysis, and the ResultsView for gene-level detail.
+
 ---
 
 ## Interaction Guidelines

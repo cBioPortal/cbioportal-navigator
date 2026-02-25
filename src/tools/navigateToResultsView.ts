@@ -42,6 +42,7 @@ import {
 } from './shared/responses.js';
 import type { ToolResponse } from './shared/types.js';
 import { loadPrompt } from './shared/promptLoader.js';
+import { buildStudyUrl } from './studyView/buildStudyUrl.js';
 
 /**
  * Tool definition for MCP registration
@@ -225,6 +226,12 @@ async function navigateToResultsView(
             { session_id: sessionId }
         );
 
+        // Build companion StudyView URL for exploring the filtered cohort
+        const studyViewUrl = buildStudyUrl({
+            studyIds,
+            filterJson: params.studyViewFilter,
+        });
+
         return createNavigationResponse(url, {
             studyIds,
             studies: studyDetails.map((s) => ({
@@ -239,6 +246,7 @@ async function navigateToResultsView(
             molecularProfiles: profiles
                 .filter((p) => p)
                 .map((p) => p!.molecularProfileId),
+            studyViewUrl,
         });
     }
 

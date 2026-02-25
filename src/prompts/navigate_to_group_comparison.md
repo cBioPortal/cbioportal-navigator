@@ -56,11 +56,11 @@ Include "NA" group for samples missing the attribute. Default: `true` (categoric
 
 The tool returns:
 - **url:** Direct link to comparison page (with optional tab)
+- **studyViewUrl:** StudyView link for exploring the cohort (with pre-filter applied if provided)
 - **groups:** Array with name and sample count per group
-- **Simple comparison (no filter/subset):** `baseStudyViewUrl` for exploring the study
-- **Pre-filter or value subset:** `groupUrls` array — one studyview URL per group with combined filters
+- **groupUrls** _(when pre-filter or value subset is used):_ one StudyView URL per group with combined filters
 
-When presenting results, include group names and sample counts. For `groupUrls`, provide each group's URL for detailed exploration.
+When presenting results, include group names and sample counts. Always offer both the comparison link and the `studyViewUrl`. For `groupUrls`, provide each group's URL for detailed exploration.
 
 ---
 

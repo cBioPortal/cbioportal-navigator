@@ -145,13 +145,11 @@ export async function handleNavigateToGroupComparison(
             groups: result.groupInfo,
         };
 
-        // Add studyview URLs based on scenario
-        if (result.baseStudyViewUrl) {
-            // Single attribute comparison (no pre-filter)
-            responseData.baseStudyViewUrl = result.baseStudyViewUrl;
-            responseData.urlExplanation = result.urlExplanation;
-        } else if (result.groupUrls) {
-            // Multi-attribute comparison (with pre-filter)
+        // Always include studyViewUrl for cohort exploration
+        responseData.studyViewUrl = result.studyViewUrl;
+
+        // Add per-group URLs when available (pre-filter or value subset)
+        if (result.groupUrls) {
             responseData.groupUrls = result.groupUrls;
         }
 
@@ -201,15 +199,13 @@ export interface GroupUrl {
  */
 export interface GroupComparisonResult {
     url: string;
+    studyViewUrl: string;
     groupInfo: GroupInfo[];
     // Attribute information
     attributeId: string;
     attributeName: string;
     attributeDatatype: string;
-    // Single attribute scenario (no pre-filter)
-    baseStudyViewUrl?: string;
-    urlExplanation?: string;
-    // Multi-attribute scenario (with pre-filter)
+    // Per-group URLs (when pre-filter or value subset is used)
     groupUrls?: GroupUrl[];
 }
 
@@ -434,82 +430,85 @@ export async function navigateToGroupComparison(
         ),
     }));
 
-    // Step 10: Generate studyview URLs based on scenario
+    // Step 10: Generate studyview URLs
+    // studyViewUrl: always present — base study view (with pre-filter if provided)
+    const studyViewUrl = buildStudyUrl({
+        studyIds,
+        filterJson: hasFiltersOtherThanStudyIds(studyViewFilter)
+            ? studyViewFilter
+            : undefined,
+    });
+
     // Per-group URLs when: pre-filter exists OR user selected a value subset
     const shouldGeneratePerGroupUrls =
         hasFiltersOtherThanStudyIds(studyViewFilter) ||
         (clinicalAttributeValues && clinicalAttributeValues.length > 0);
 
     if (!shouldGeneratePerGroupUrls) {
-        // Simple comparison (all values, no filter): return base studyview URL only
-        const baseStudyViewUrl = buildStudyUrl({ studyIds });
-        const groupNames = groupInfo.map((g) => g.name).join(', ');
-        const urlExplanation = `Base study view for ${studyIds.join(', ')}. Comparison groups: ${groupNames}`;
-
         return {
             url,
+            studyViewUrl,
             groupInfo,
             attributeId: clinicalAttributeId,
             attributeName: attribute.displayName,
             attributeDatatype: attribute.datatype,
-            baseStudyViewUrl,
-            urlExplanation,
         };
-    } else {
-        // Pre-filter or value subset: return 1 URL per group
-        const groupUrls: GroupUrl[] = groupInfo.map((group, index) => {
-            // Start with base filter
-            const filterJson = studyViewFilter
-                ? JSON.parse(JSON.stringify(studyViewFilter))
-                : {};
+    }
 
-            // Ensure studyIds
-            filterJson.studyIds = studyIds;
+    // Pre-filter or value subset: also return 1 URL per group
+    const groupUrls: GroupUrl[] = groupInfo.map((group, index) => {
+        // Start with base filter
+        const filterJson = studyViewFilter
+            ? JSON.parse(JSON.stringify(studyViewFilter))
+            : {};
 
-            // Add clinical attribute filter for this group
-            if (!filterJson.clinicalDataFilters) {
-                filterJson.clinicalDataFilters = [];
-            }
+        // Ensure studyIds
+        filterJson.studyIds = studyIds;
 
-            if (isNumerical && quartiles && quartiles[index]) {
-                // Use range filter for numerical
-                filterJson.clinicalDataFilters.push({
-                    attributeId: clinicalAttributeId,
-                    values: [
-                        {
-                            start: quartiles[index].minValue,
-                            end: quartiles[index].maxValue,
-                        },
-                    ],
-                });
-            } else {
-                // Use categorical value filter
-                filterJson.clinicalDataFilters.push({
-                    attributeId: clinicalAttributeId,
-                    values: [{ value: group.name }],
-                });
-            }
+        // Add clinical attribute filter for this group
+        if (!filterJson.clinicalDataFilters) {
+            filterJson.clinicalDataFilters = [];
+        }
 
-            const groupUrl = buildStudyUrl({
-                studyIds,
-                filterJson,
+        if (isNumerical && quartiles && quartiles[index]) {
+            // Use range filter for numerical
+            filterJson.clinicalDataFilters.push({
+                attributeId: clinicalAttributeId,
+                values: [
+                    {
+                        start: quartiles[index].minValue,
+                        end: quartiles[index].maxValue,
+                    },
+                ],
             });
+        } else {
+            // Use categorical value filter
+            filterJson.clinicalDataFilters.push({
+                attributeId: clinicalAttributeId,
+                values: [{ value: group.name }],
+            });
+        }
 
-            return {
-                groupName: group.name,
-                url: groupUrl,
-            };
+        const groupUrl = buildStudyUrl({
+            studyIds,
+            filterJson,
         });
 
         return {
-            url,
-            groupInfo,
-            attributeId: clinicalAttributeId,
-            attributeName: attribute.displayName,
-            attributeDatatype: attribute.datatype,
-            groupUrls,
+            groupName: group.name,
+            url: groupUrl,
         };
-    }
+    });
+
+    return {
+        url,
+        studyViewUrl,
+        groupInfo,
+        attributeId: clinicalAttributeId,
+        attributeName: attribute.displayName,
+        attributeDatatype: attribute.datatype,
+        groupUrls,
+    };
 }
 
 /**

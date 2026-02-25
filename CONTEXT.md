@@ -71,6 +71,11 @@ src/
 
 9. **StudyView→PatientView via navCaseIds** — `navigate_to_patient_view` with `studyViewFilter`: ≤20 patients → PatientView URL with `navCaseIds` in hash (frontend's `handleLongUrls()` strips to `window.navCaseIdsCache` only at >60000 chars); >20 patients → StudyView URL with `filterJson`.
 
+10. **Companion URLs** — Navigation tools return a `studyViewUrl` alongside the primary `url` when a filtered subset is involved:
+    - `navigate_to_results_view` with `studyViewFilter`: returns `studyViewUrl` (StudyView with same filter) so users can explore the cohort.
+    - `navigate_to_group_comparison`: always returns `studyViewUrl` (base study or with pre-filter). When pre-filter or value subset is used, also returns `groupUrls` (per-group StudyView URLs).
+    - `system.md` instructs the LLM to present both links, and to make dual tool calls (comparison + results in parallel) when a comparison query mentions specific genes.
+
 ## Frontend Reference (cbioportal-frontend)
 
 Key enums/types referenced by this project:
