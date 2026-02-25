@@ -184,6 +184,19 @@ async function resolveClinicalAttributes(
 // Generic assay profiles
 // ---------------------------------------------------------------------------
 
+/**
+ * Maximum number of generic assay entities to enumerate in the response.
+ *
+ * Profiles like methylation arrays (hm27: ~27K, hm450: ~450K) have far too
+ * many entities to be useful in an LLM context window. Returning a partial
+ * list would be misleading — the AI would treat it as complete. Instead, when
+ * a profile exceeds this limit we skip entity enumeration entirely and return
+ * a `tooLarge` flag so the AI can direct the user to the cBioPortal web UI.
+ *
+ * 200 entities ≈ 3,000 tokens — acceptable for a tool response.
+ */
+const GENERIC_ASSAY_ENTITY_LIMIT = 200;
+
 async function resolveGenericAssayProfiles(
     studyId: string,
     profileIds: string[]
@@ -203,7 +216,26 @@ async function resolveGenericAssayProfiles(
             const profileType = profileId.replace(`${studyId}_`, '');
             const isContinuous = datatype === 'LIMIT-VALUE';
 
-            // Fetch entity list
+            // Lightweight count check using ID projection (~6x smaller than SUMMARY).
+            // If the profile has too many entities, skip full metadata fetch entirely
+            // rather than returning a misleading partial list.
+            const entityCount =
+                await studyViewDataClient.getGenericAssayEntityCount([
+                    profileId,
+                ]);
+
+            if (entityCount > GENERIC_ASSAY_ENTITY_LIMIT) {
+                return {
+                    molecularProfileId: profileId,
+                    profileType,
+                    datatype,
+                    entityCount,
+                    tooLarge: true,
+                    note: `Profile has ${entityCount} entities — too many to enumerate here. Direct the user to the cBioPortal web UI: StudyView → Add Chart → select this profile → search for the entity of interest.`,
+                };
+            }
+
+            // Within limit: fetch full metadata (SUMMARY projection)
             const metaList = await studyViewDataClient.getGenericAssayMeta([
                 profileId,
             ]);

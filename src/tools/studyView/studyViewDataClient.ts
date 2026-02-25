@@ -159,6 +159,33 @@ export class StudyViewDataClient {
     }
 
     /**
+     * Get the number of generic assay entities for one or more molecular profiles.
+     *
+     * Uses ID projection (stableId only) which is ~6x lighter than SUMMARY.
+     * Intended as a cheap pre-check before deciding whether to fetch full metadata:
+     * if the count exceeds the caller's threshold, skip the expensive SUMMARY fetch.
+     *
+     * Note: META projection does NOT return a count-only response for this endpoint
+     * (confirmed via curl — returns the same payload as SUMMARY). ID projection is
+     * the lightest option available.
+     *
+     * @param molecularProfileIds - Array of GENERIC_ASSAY profile IDs
+     * @returns Total number of entities across the given profiles
+     */
+    async getGenericAssayEntityCount(
+        molecularProfileIds: string[]
+    ): Promise<number> {
+        if (molecularProfileIds.length === 0) return 0;
+        const ids = await this.api.fetchGenericAssayMetaUsingPOST({
+            projection: 'ID',
+            genericAssayMetaFilter: {
+                molecularProfileIds,
+            } as GenericAssayMetaFilter,
+        });
+        return ids.length;
+    }
+
+    /**
      * Get generic assay entity metadata for one or more molecular profiles.
      *
      * Returns a list of entities (stableId, name, entityType) belonging to the

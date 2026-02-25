@@ -92,6 +92,7 @@ Key enums/types referenced by this project:
 - StudyView URL params not implemented: `sharedGroups`, `sharedCustomData`, `geneset_list`
 - Treatment tier data (AgentClass/AgentTarget) — identical to base data on public cBioPortal
 - LibreChat doesn't display tool call progress in UI
+- Generic assay profiles with >200 entities (e.g. methylation hm27/hm450) return `tooLarge: true` instead of entity list — AI should direct user to web UI for those
 
 ## Development
 
