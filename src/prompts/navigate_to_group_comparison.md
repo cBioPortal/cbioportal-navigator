@@ -1,6 +1,6 @@
 # Navigate to Group Comparison
 
-Creates group comparison sessions based on clinical attribute values and generates URL to cBioPortal's Group Comparison page.
+Creates group comparison sessions and generates URL to cBioPortal's Group Comparison page.
 
 **→ See router tool for universal guidelines (no guessing IDs, exact values, Link First principle).**
 
@@ -14,25 +14,24 @@ Creates group comparison sessions based on clinical attribute values and generat
 
 ---
 
-## Required Inputs
+## Parameters
 
 ### studyIds (required)
 Array of study IDs from router response. Cross-study supported, but the clinical attribute **must exist in all specified studies** with compatible value types.
 
-### clinicalAttributeId (required)
-Clinical attribute ID to group by (e.g., `"SEX"`, `"PATH_T_STAGE"`, `"SMOKING_HISTORY"`). Must be from router `clinicalAttributeIds`.
+### clinicalAttributeId
+Clinical attribute ID to group by (e.g., `"SEX"`, `"PATH_T_STAGE"`). Tool discovers all values and creates one group per value automatically. **Cannot be used together with `groups`.**
 
----
-
-## Optional Inputs
+### groups
+Array of custom groups (≥ 2), each with `name` and `studyViewFilter`. Use when grouping logic cannot be expressed as a single attribute (merged values, gene-based splits, multi-cohort). `studyIds` are auto-injected into each group's filter. **Cannot be used together with `clinicalAttributeId`, `clinicalAttributeValues`, or `includeNA`.** Can be combined with `studyViewFilter` for global pre-filtering.
 
 ### studyViewFilter
-Pre-filter samples before grouping. Same format as `navigate_to_study_view` filterJson. `studyIds` are auto-injected — don't include them inside.
+Pre-filter samples before grouping. Works with both `clinicalAttributeId` and `groups` — when used with `groups`, it is intersected with each group's filter. Same format as `navigate_to_study_view` filterJson. `studyIds` are auto-injected — don't include them inside.
 
-### clinicalAttributeValues
-Subset of values to compare (categorical only). Reduces noise when attribute has many values. Case-insensitive matching. When specified, returns per-group studyview URLs.
+### clinicalAttributeValues (clinicalAttributeId only)
+Subset of values to compare (categorical only). Reduces noise when attribute has many values. Case-insensitive matching.
 
-### includeNA
+### includeNA (clinicalAttributeId only)
 Include "NA" group for samples missing the attribute. Default: `true` (categorical), `false` (numerical).
 
 ### tab
@@ -40,7 +39,7 @@ Include "NA" group for samples missing the attribute. Default: `true` (categoric
 
 ---
 
-## Grouping Behavior
+## Grouping Behavior (clinicalAttributeId)
 
 **Categorical (STRING):** Groups by unique values. Top 19 + NA = max 20 groups, sorted by sample count.
 
@@ -58,7 +57,7 @@ The tool returns:
 - **url:** Direct link to comparison page (with optional tab)
 - **studyViewUrl:** StudyView link for exploring the cohort (with pre-filter applied if provided)
 - **groups:** Array with name and sample count per group
-- **groupUrls** _(when pre-filter or value subset is used):_ one StudyView URL per group with combined filters
+- **groupUrls** _(when pre-filter, value subset, or custom groups are used):_ one StudyView URL per group with combined filters
 
 When presenting results, include group names and sample counts. Always offer both the comparison link and the `studyViewUrl`. For `groupUrls`, provide each group's URL for detailed exploration.
 
@@ -66,7 +65,7 @@ When presenting results, include group names and sample counts. Always offer bot
 
 ## Examples
 
-### Simple: Compare by Sex
+### Compare by attribute
 ```json
 {
   "studyIds": ["luad_tcga_pan_can_atlas_2018"],
@@ -74,7 +73,7 @@ When presenting results, include group names and sample counts. Always offer bot
 }
 ```
 
-### With Pre-filter: TP53-mutated patients by Sex, age > 60
+### Compare by attribute within a sub-cohort
 ```json
 {
   "studyIds": ["luad_tcga_pan_can_atlas_2018"],
@@ -89,7 +88,7 @@ When presenting results, include group names and sample counts. Always offer bot
 }
 ```
 
-### Numerical Attribute: Age Quartiles
+### Numerical attribute (auto quartiles)
 ```json
 {
   "studyIds": ["luad_tcga_pan_can_atlas_2018"],
@@ -97,6 +96,83 @@ When presenting results, include group names and sample counts. Always offer bot
 }
 ```
 → Creates 4 quartile groups automatically.
+
+### Compare subset of values
+```json
+{
+  "studyIds": ["luad_tcga_pan_can_atlas_2018"],
+  "clinicalAttributeId": "RACE",
+  "clinicalAttributeValues": ["White", "Asian", "Black or African American"]
+}
+```
+
+### Custom groups — merged stage values
+```json
+{
+  "studyIds": ["luad_tcga_pan_can_atlas_2018"],
+  "groups": [
+    {
+      "name": "Early (T1+T2)",
+      "studyViewFilter": {
+        "clinicalDataFilters": [{"attributeId": "PATH_T_STAGE", "values": [{"value": "T1"}, {"value": "T2"}]}]
+      }
+    },
+    {
+      "name": "Late (T3+T4)",
+      "studyViewFilter": {
+        "clinicalDataFilters": [{"attributeId": "PATH_T_STAGE", "values": [{"value": "T3"}, {"value": "T4"}]}]
+      }
+    }
+  ]
+}
+```
+
+### Custom groups — altered vs unaltered (within a sub-cohort)
+```json
+{
+  "studyIds": ["luad_tcga_pan_can_atlas_2018"],
+  "studyViewFilter": {
+    "clinicalDataFilters": [{"attributeId": "PATH_T_STAGE", "values": [{"value": "T3"}, {"value": "T4"}]}]
+  },
+  "groups": [
+    {
+      "name": "PTEN Altered",
+      "studyViewFilter": {
+        "mutationDataFilters": [{"hugoGeneSymbol": "PTEN", "profileType": "mutations", "categorization": "MUTATED", "values": [[{"value": "MUTATED"}]]}]
+      }
+    },
+    {
+      "name": "PTEN Unaltered",
+      "studyViewFilter": {
+        "mutationDataFilters": [{"hugoGeneSymbol": "PTEN", "profileType": "mutations", "categorization": "MUTATED", "values": [[{"value": "NOT_MUTATED"}]]}]
+      }
+    }
+  ],
+  "tab": "survival"
+}
+```
+→ Global `studyViewFilter` (Stage T3+T4) is intersected with each group's filter.
+
+### Custom groups — multi-cohort split
+```json
+{
+  "studyIds": ["luad_tcga_pan_can_atlas_2018", "lusc_tcga_pan_can_atlas_2018"],
+  "groups": [
+    {
+      "name": "LUAD",
+      "studyViewFilter": {
+        "clinicalDataFilters": [{"attributeId": "CANCER_TYPE_DETAILED", "values": [{"value": "Lung Adenocarcinoma"}]}]
+      }
+    },
+    {
+      "name": "LUSC",
+      "studyViewFilter": {
+        "clinicalDataFilters": [{"attributeId": "CANCER_TYPE_DETAILED", "values": [{"value": "Lung Squamous Cell Carcinoma"}]}]
+      }
+    }
+  ]
+}
+```
 
 ---
 
@@ -107,3 +183,4 @@ When presenting results, include group names and sample counts. Always offer bot
 | No samples | Filter too restrictive | Adjust filter criteria |
 | Attribute not found | Invalid clinicalAttributeId | Check router `clinicalAttributeIds` |
 | < 2 groups | All samples same value | Choose different attribute |
+| Incompatible params | `groups` used with `clinicalAttributeId`, `clinicalAttributeValues`, or `includeNA` | Use one approach or the other |

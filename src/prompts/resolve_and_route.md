@@ -57,9 +57,12 @@ View a patient's complete profile, clinical timeline, genomic alterations, or co
 - "Show me all the patients in DLBCL TCGA PanCan Atlas who are Hispanic or Latino"
 
 ### Rule 2 → `comparison`
-**User wants to compare/split a cohort by a data attribute.**
+**User wants to compare/split a cohort into groups.**
 Signals: compare, vs, difference, split, by sex/age/stage/smoking...
-Numerical attributes (e.g., age) are auto quartile-binned.
+
+Two approaches:
+- **By attribute:** group by a single clinical attribute (auto-discovers values; numerical attributes are auto quartile-binned)
+- **Custom groups:** each group defined by its own filter — use for merged values (T1+T2 vs T3+T4), multi-cohort splits (LUAD vs LUSC), or gene-based splits (TP53-mut vs wt)
 
 If comparing on genes only (e.g., "EGFR vs KRAS alterations"), use `results` comparison tab instead.
 
@@ -68,6 +71,8 @@ If comparing on genes only (e.g., "EGFR vs KRAS alterations"), use `results` com
 - "Compare KRAS-mutated patients by smoking history"
 - "What genes are overexpressed in high grade lung adenocarcinoma vs low grade?"
 - "Compare luad by KRAS mutation"
+- "Compare early stage (T1+T2) vs late stage (T3+T4)"
+- "LUAD vs LUSC mutation comparison"
 
 ### Rule 3 → `results`
 **Gene(s) mentioned AND query asks about the gene's alteration pattern itself.**

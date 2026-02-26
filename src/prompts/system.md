@@ -22,7 +22,7 @@ Returns exact valid values for clinical attributes and generic assay entities. R
 - `navigate_to_study_view` — cohort overview, filtered patient groups
 - `navigate_to_patient_view` — individual patient profiles
 - `navigate_to_results_view` — gene alteration analysis, OncoPrint
-- `navigate_to_group_comparison` — subgroup comparison
+- `navigate_to_group_comparison` — subgroup comparison (by clinical attribute, or custom filter-based groups)
 
 ### Companion URLs
 Navigation tools may return a `studyViewUrl` alongside the primary `url`. When present, offer both to the user — the primary link for the main analysis, and the StudyView link for exploring the cohort.
