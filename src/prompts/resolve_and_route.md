@@ -1,19 +1,20 @@
-# Main Router — Resolve Studies & Route to Navigation Tool
+# Study Resolver — Resolve Studies & Provide Metadata
 
-Resolves study identifiers (keywords → studyIds), handles ambiguity (up to 5 matches), and recommends the next specialized navigation tool.
+Resolves study identifiers (keywords → studyIds), handles ambiguity (up to 5 matches), and returns study metadata for navigation tool selection.
 
 ## Parameters
 
-- **targetPage:** `study` | `patient` | `results` | `comparison`
 - **studyKeywords:** 1-3 specific keywords to search (e.g., `["TCGA", "lung"]`) — OR —
 - **studyIds:** Direct study IDs to validate (e.g., `["luad_tcga"]`)
 
-## Recommended Tools
+## Available Navigation Tools
 
-- `navigate_to_study_view` — cohort overview
-- `navigate_to_patient_view` — individual patient
-- `navigate_to_results_view` — gene alteration analysis
-- `navigate_to_group_comparison` — subgroup comparison
+After resolving studies, choose one or more based on the user's intent:
+
+- `navigate_to_study_view` — cohort overview, clinical distributions, gene filters
+- `navigate_to_patient_view` — individual patient profiles
+- `navigate_to_results_view` — gene alteration analysis (OncoPrint, mutations, comparison, plots)
+- `navigate_to_group_comparison` — subgroup comparison by clinical attributes or custom groups
 
 ---
 
@@ -44,11 +45,13 @@ Top 5 studies ranked by: keyword match count (primary) → sample count (seconda
 
 ---
 
-## Choosing targetPage — Decision Rules
+## Navigation Tool Selection Guide
+
+After resolving studies, use these rules to choose the right navigation tool(s). You may call **multiple tools in parallel** when the query spans multiple views.
 
 Evaluate in order. **First match wins.**
 
-### Rule 1 → `patient`
+### Rule 1 → `navigate_to_patient_view`
 **Patient or Sample ID explicitly mentioned.**
 View a patient's complete profile, clinical timeline, genomic alterations, or compare samples from the same patient.
 
@@ -56,15 +59,17 @@ View a patient's complete profile, clinical timeline, genomic alterations, or co
 - "What mutations does patient ID 12345 have?"
 - "Show me all the patients in DLBCL TCGA PanCan Atlas who are Hispanic or Latino"
 
-### Rule 2 → `comparison`
-**User wants to compare/split a cohort into groups.**
+### Rule 2 → `navigate_to_group_comparison`
+**User wants to compare/split a cohort into symmetric groups.**
 Signals: compare, vs, difference, split, by sex/age/stage/smoking...
 
 Two approaches:
 - **By attribute:** group by a single clinical attribute (auto-discovers values; numerical attributes are auto quartile-binned)
 - **Custom groups:** each group defined by its own filter — use for merged values (T1+T2 vs T3+T4), multi-cohort splits (LUAD vs LUSC), or gene-based splits (TP53-mut vs wt)
 
-If comparing on genes only (e.g., "EGFR vs KRAS alterations"), use `results` comparison tab instead.
+**Important — when NOT to use group comparison:**
+- Comparing genes to each other (e.g., "EGFR vs KRAS alterations") → use `navigate_to_results_view` comparison tab
+- Gene alteration vs molecular readout (e.g., "PTEN alteration vs pAKT protein") → use `navigate_to_results_view` comparison tab (see Rule 3)
 
 - "Compare male vs female patients in LUAD"
 - "Show survival differences by tumor stage"
@@ -74,25 +79,37 @@ If comparing on genes only (e.g., "EGFR vs KRAS alterations"), use `results` com
 - "Compare early stage (T1+T2) vs late stage (T3+T4)"
 - "LUAD vs LUSC mutation comparison"
 
-### Rule 3 → `results`
-**Gene(s) mentioned AND query asks about the gene's alteration pattern itself.**
-Signals: mutation frequency, co-occurrence, mutual exclusivity, OncoPrint, comparing genes to each other, survival by genotype, functional impact, structural variants, expression correlation, cancer type summary for named genes.
+### Rule 3 → `navigate_to_results_view`
+**Gene(s) mentioned AND query asks about the gene's alteration pattern or its downstream molecular effects.**
 
+Covers two sub-scenarios:
+
+**3a. Gene alteration pattern** — mutation frequency, co-occurrence, mutual exclusivity, OncoPrint, functional impact, structural variants, cancer type summary.
 - "Show me TP53 mutations in lung cancer"
 - "Compare EGFR and KRAS alterations"
 - "What structural variants exist in ALK?"
-- "Find genes with similar expression to EGFR"
+
+**3b. Gene alteration vs downstream molecular data** — how a gene's alteration status affects protein, mRNA, methylation, or survival. Use the comparison tab with the appropriate subtab (`comparison/protein`, `comparison/mrna`, `comparison/survival`, etc.).
+- "PTEN alteration vs pAKT protein in lung squamous" → tab: `comparison/protein`
+- "TP53 mutation vs CDKN1A expression" → tab: `comparison/mrna`
+- "BRCA1 deletion and survival" → tab: `comparison/survival`
+
+**Key signal — "alteration":** The word "alteration" means mutation + CNA combined. StudyView filters treat these separately (mutationDataFilters vs cnaGeneFilters), making it hard to express. ResultsView handles alteration as a unified concept — altered vs unaltered grouping is built in. When the user says "alteration", strongly prefer `navigate_to_results_view`.
+
+**Key distinction — "vs" semantics:**
+- **Symmetric groups** (two cohort subsets) → Rule 2: "male vs female", "stage I vs stage II"
+- **Asymmetric** (gene alteration → molecular readout) → Rule 3b: "PTEN alteration vs pAKT", "TP53 mutation vs survival"
+- **Gene vs gene** (alteration comparison) → Rule 3a: "EGFR vs KRAS alterations"
 
 **Key distinction — gene as subject vs filter:**
-- **Subject → results:** query asks *about* the gene (mutations, frequency, co-occurrence)
-- **Filter → study (Rule 4):** query uses gene to define *which patients* to explore
 
-| Gene as subject (→ results) | Gene as filter (→ study) |
+| Pattern | Tool |
 |---|---|
-| "Show me TP53 mutations in lung cancer" | "Clinical features of EGFR-mutated patients" |
-| "EGFR and KRAS co-occurrence" | "Survival of patients with TP53 mutation" |
+| Gene alteration pattern (mutations, co-occurrence) | `results` (oncoprint/mutations) |
+| Gene alteration → downstream effect (protein, mRNA, survival) | `results` (comparison/{subtab}) |
+| Gene as patient filter (clinical features of X-mutated patients) | `study` (Rule 4) |
 
-### Rule 4 → `study` (default)
+### Rule 4 → `navigate_to_study_view` (default)
 **Everything else:** cohort overview, discovery questions, gene used only as a patient filter.
 
 - "Show me the TCGA lung cancer study"

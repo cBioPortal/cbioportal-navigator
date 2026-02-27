@@ -77,12 +77,19 @@ export const navigateToResultsViewTool = {
                 'survival',
                 'coexpression',
                 'comparison',
+                'comparison/overlap',
+                'comparison/survival',
+                'comparison/clinical',
+                'comparison/mrna',
+                'comparison/protein',
+                'comparison/dna_methylation',
+                'comparison/alterations',
                 'cnSegments',
                 'pathways',
                 'download',
             ])
             .optional()
-            .describe('Specific tab to navigate to'),
+            .describe('Tab (or tab/subtab) to navigate to'),
         zScoreThreshold: z
             .number()
             .optional()

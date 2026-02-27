@@ -6,7 +6,7 @@ MCP server for AI-assisted cBioPortal navigation. Dual mode: MCP protocol (stdio
 
 | Tool | Description |
 |------|-------------|
-| `resolve_and_route` | Main router — resolves studies/genes/profiles, returns metadata for the LLM to decide next tool |
+| `resolve_and_route` | Study resolver — resolves studies, returns metadata; LLM decides which navigation tool(s) to call |
 | `get_studyviewfilter_options` | On-demand filter metadata (clinical attributes + generic assay entities) |
 | `navigate_to_study_view` | StudyView URL with filters, plots, tabs, treatment filters |
 | `navigate_to_group_comparison` | Group Comparison — categorical/numerical grouping, tabs, per-group StudyView URLs |
@@ -29,7 +29,7 @@ src/
 │       ├── mcpClient.ts       # Internal MCP client (tools sync)
 │       └── toolsLoader.ts     # MCP→Chat tool conversion
 ├── tools/
-│   ├── resolveAndRoute.ts          # Router tool
+│   ├── resolveAndRoute.ts          # Study resolver (no targetPage — LLM chooses tools)
 │   ├── getStudyviewfilterOptions.ts
 │   ├── navigateToStudyView.ts
 │   ├── navigateToGroupComparison.ts
@@ -74,7 +74,9 @@ src/
 10. **Companion URLs** — Navigation tools return a `studyViewUrl` alongside the primary `url` when a filtered subset is involved:
     - `navigate_to_results_view` with `studyViewFilter`: returns `studyViewUrl` (StudyView with same filter) so users can explore the cohort.
     - `navigate_to_group_comparison`: always returns `studyViewUrl` (base study or with pre-filter). When pre-filter or value subset is used, also returns `groupUrls` (per-group StudyView URLs).
-    - `system.md` instructs the LLM to present both links, and to make dual tool calls (comparison + results in parallel) when a comparison query mentions specific genes.
+    - `system.md` instructs the LLM to present both links, and allows parallel navigation tool calls when a query spans multiple views.
+
+11. **No targetPage Constraint** — `resolve_and_route` only resolves studies and returns metadata. The LLM decides which navigation tool(s) to call based on the selection guide in the tool description. This allows multi-tool calls and flexible routing in multi-turn conversations.
 
 ## Frontend Reference (cbioportal-frontend)
 
@@ -83,6 +85,7 @@ Key enums/types referenced by this project:
 - **PatientViewPageTabs** (`PatientViewPageTabs.tsx`): `summary`, `genomicEvolution`, `clinicalData`, `filesAndLinks`, `pathologyReport`, `tissueImage`, `MSKTissueImage`, `trialMatchTab`, `mutationalSignatures`, `pathways`
   - We expose only always-visible: `summary`, `clinicalData`, `pathways`
 - **ResultsViewTab** (`ResultsViewPageHelpers.tsx`): `oncoprint`, `survival` (redirect→comparison), `cancerTypesSummary`, `mutualExclusivity`, `plots`, `mutations`, `structuralVariants`, `coexpression`, `comparison`, `cnSegments`, `network`, `pathways`, `expression` (redirect), `download`
+- **ResultsViewComparisonSubTab** (`ResultsViewPageHelpers.tsx`): `overlap`, `survival`, `clinical`, `mrna`, `protein`, `dna_methylation`, `alterations`, `generic_assay` (prefix). URL pattern: `/results/comparison/{subtab}`. Our tool supports these via composite tab values like `comparison/protein`.
 - **ALTERATION_FILTER_DEFAULTS** (`StudyViewUtils.tsx`): `copyNumberAlterationEventTypes` only supports `AMP`/`HOMDEL`; for `GAIN`/`HETLOSS`/`DIPLOID` use `geneFilters`
 - **navCaseIds** (`PatientViewUrlWrapper.ts`, `handleLongUrls.ts`): hashed URL param for cohort navigation; `handleLongUrls()` moves to `window.navCaseIdsCache` when >60000 chars
 - **Column-store** (`proxyColumnStore.ts`): rewrites `$domain` to `/api/column-store` for whitelisted endpoints (ClinicalDataCounts, FilteredSamples, etc.)

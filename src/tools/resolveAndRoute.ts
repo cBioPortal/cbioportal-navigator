@@ -17,13 +17,8 @@
  * 3. Return recommendation: which tool to use + resolved studyIds
  * 4. AI calls the recommended nav tool with resolved studyIds
  *
- * Routing logic:
- * - targetPage='study' → recommends navigate_to_study_view
- * - targetPage='patient' → recommends navigate_to_patient_view
- * - targetPage='results' → recommends navigate_to_results_view
- *
- * The tool provides extensive inline documentation explaining when to use each
- * page type, including use cases, example queries, and key features for each.
+ * The tool provides study metadata (clinical attributes, molecular profiles,
+ * treatments) so the AI can decide which navigation tool(s) to call next.
  *
  * @packageDocumentation
  */
@@ -43,11 +38,6 @@ export const resolveAndRouteTool = {
     title: 'Resolve Studies and Route to Page',
     description: loadPrompt('resolve_and_route.md'),
     inputSchema: {
-        targetPage: z
-            .enum(['study', 'patient', 'results', 'comparison'])
-            .describe(
-                'The type of cBioPortal page to navigate to (study/patient/results/comparison)'
-            ),
         studyKeywords: z
             .array(z.string())
             .optional()
@@ -65,7 +55,6 @@ export const resolveAndRouteTool = {
 
 // Infer type from Zod schema
 type ToolInput = {
-    targetPage: z.infer<typeof resolveAndRouteTool.inputSchema.targetPage>;
     studyKeywords?: z.infer<
         typeof resolveAndRouteTool.inputSchema.studyKeywords
     >;
@@ -109,7 +98,7 @@ export async function handleResolveAndRoute(
  * Main routing logic
  */
 async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
-    const { targetPage, studyKeywords, studyIds } = params;
+    const { studyKeywords, studyIds } = params;
 
     // Validate input - must provide either studyKeywords or studyIds
     if (!studyKeywords && !studyIds) {
@@ -196,17 +185,7 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
         );
     }
 
-    // 2. Determine recommended tool based on target page
-    const toolMapping = {
-        study: 'navigate_to_study_view',
-        patient: 'navigate_to_patient_view',
-        results: 'navigate_to_results_view',
-        comparison: 'navigate_to_group_comparison',
-    };
-
-    const recommendedTool = toolMapping[targetPage];
-
-    // 3. Get study details
+    // 2. Get study details
     // If we have complete study objects from search (with correct allSampleCount),
     // use them directly. Otherwise fetch via getById (for studyIds path).
     const studyDetails =
@@ -287,13 +266,12 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
             otherStudies.length > 0
                 ? ` (showing top ${metadataLimit} with detailed metadata)`
                 : '';
-        message = `Found ${totalCount} matching studies${detailMessage}. Review the user's original query to determine if it clearly matches one study. If yes, use that study's metadata to call ${recommendedTool}. If ambiguous, ask the user to choose.`;
+        message = `Found ${totalCount} matching studies${detailMessage}. Review the user's original query to determine if it clearly matches one study. If yes, use that study's metadata to call the appropriate navigation tool(s). If ambiguous, ask the user to choose.`;
     } else {
-        message = `Found 1 study. Use ${recommendedTool} with the provided study metadata.`;
+        message = `Found 1 study. Use the study metadata to call the appropriate navigation tool(s).`;
     }
 
     return createDataResponse(message, {
-        recommendedTool,
         needsStudySelection,
         totalCount,
         resolvedStudyIds,

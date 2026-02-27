@@ -9,6 +9,7 @@ Generates direct URL to cBioPortal ResultsView — gene alteration analysis and 
 - **OncoPrint:** visual matrix of gene alterations across samples
 - **Mutation details:** amino acid changes, functional impact, frequencies
 - **Co-occurrence analysis:** mutually exclusive or co-occurring alterations
+- **Comparison:** altered vs unaltered groups — survival, protein, mRNA, clinical differences
 - **Survival analysis, plots, pathway diagrams**
 
 ---
@@ -22,9 +23,25 @@ Array of study IDs from router response. Supports cross-study analysis.
 Array of UPPERCASE HUGO gene symbols: `["TP53"]`, `["TP53", "KRAS", "EGFR"]`
 
 ### tab (optional)
-`"oncoprint"` (default), `"mutations"`, `"structuralVariants"`, `"cancerTypesSummary"`, `"mutualExclusivity"` (requires multiple genes), `"plots"`, `"coexpression"`, `"comparison"`, `"cnSegments"`, `"pathways"`, `"download"`
+Main tabs: `"oncoprint"` (default), `"mutations"`, `"structuralVariants"`, `"cancerTypesSummary"`, `"mutualExclusivity"` (requires multiple genes), `"plots"`, `"coexpression"`, `"comparison"`, `"cnSegments"`, `"pathways"`, `"download"`
 
 **Note:** `"survival"` is a redirect alias for `"comparison"` — both open the Comparison/Survival tab. Use `"comparison"` as the canonical value; `"survival"` also works if that's what the user asks for.
+
+### Comparison subtabs
+
+The comparison tab has subtabs accessible via `"comparison/{subtab}"`:
+
+| tab value | Shows |
+|---|---|
+| `"comparison/overlap"` | Sample overlap between altered/unaltered groups |
+| `"comparison/survival"` | Survival analysis by alteration status |
+| `"comparison/clinical"` | Clinical attribute differences between groups |
+| `"comparison/mrna"` | mRNA expression comparison (z-scores) |
+| `"comparison/protein"` | Protein/phosphoprotein expression comparison (RPPA) |
+| `"comparison/dna_methylation"` | DNA methylation comparison |
+| `"comparison/alterations"` | Enriched alterations between groups |
+
+**Best for:** Queries asking about a gene's alteration effect on a molecular readout — "PTEN alteration vs pAKT protein", "TP53 mutation and survival", "BRCA1 deletion vs mRNA expression". The comparison tab automatically splits samples into altered vs unaltered groups for the queried gene(s).
 
 ---
 
@@ -60,7 +77,17 @@ When `studyViewFilter` is provided, the response includes a `studyViewUrl` along
 {
   "studyIds": ["luad_tcga_pan_can_atlas_2018"],
   "genes": ["EGFR", "KRAS", "TP53"],
-  "tab": "survival"
+  "tab": "comparison/survival"
+}
+```
+
+**User:** "PTEN alteration vs pAKT in lung squamous"
+
+```json
+{
+  "studyIds": ["lusc_tcga_pan_can_atlas_2018"],
+  "genes": ["PTEN"],
+  "tab": "comparison/protein"
 }
 ```
 
