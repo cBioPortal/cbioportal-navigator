@@ -94,6 +94,9 @@ Covers two sub-scenarios:
 - "TP53 mutation vs CDKN1A expression" → tab: `comparison/mrna`
 - "BRCA1 deletion and survival" → tab: `comparison/survival`
 
+**Gene-in-disease pattern — call BOTH study view and results view:**
+When the user asks about a specific gene in a disease or study context (e.g., "tell me about IDH1 mutations in glioma", "TP53 in lung cancer", "BRCA1 alterations in breast cancer"), call **both** `navigate_to_study_view` (with the gene as a mutation/CNA filter) **and** `navigate_to_results_view` in parallel. Present the **study view link first** — it gives the cohort overview with the gene filter applied (demographics, clinical distributions, sample counts). Present the **results view link second** — it provides the detailed gene analysis (mutation table, OncoPrint, cancer type summary). This gives the user a complete picture: cohort context first, then gene-level detail.
+
 **Key signal — "alteration":** The word "alteration" means mutation + CNA combined. StudyView filters treat these separately (mutationDataFilters vs cnaGeneFilters), making it hard to express. ResultsView handles alteration as a unified concept — altered vs unaltered grouping is built in. When the user says "alteration", strongly prefer `navigate_to_results_view`.
 
 **Key distinction — "vs" semantics:**
