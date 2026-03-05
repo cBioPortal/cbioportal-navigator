@@ -31,8 +31,8 @@ src/
 │   ├── groupComparison/       # Group builder, numerical binning, session client
 │   ├── resultsView/           # URL builder, main session client
 │   ├── patientView/           # URL builder
-│   └── shared/                # Config, types, responses, validators, API client, URL builder
-└── prompts/                   # All prompt markdown files (copied to dist/ at build)
+│   └── shared/                # Config, types, responses, validators, API client, URL builder, promptLoader
+└── prompts/                   # Local prompt .md files (fallback for Langfuse)
     ├── system.md
     ├── resolve_and_route.md
     ├── get_studyviewfilter_options.md
@@ -65,6 +65,8 @@ src/
 
 11. **No targetPage Constraint** — `resolve_and_route` only resolves studies and returns metadata. The LLM decides which navigation tool(s) to call based on the selection guide in the tool description. This allows multi-tool calls and flexible routing in multi-turn conversations.
 
+12. **Langfuse Prompt Management** — Prompts are managed in Langfuse under the `navigator/` folder (e.g. `navigator/resolve-and-route`). `promptLoader.ts` pre-fetches all prompts at startup via `initPrompts()` with local `.md` files as `fallback` parameter. Tool files use factory functions (`createXxxTool()`) instead of module-level constants so that `loadPrompt()` runs after `initPrompts()`. SDK: `@langfuse/client` (`LangfuseClient`). Env vars: `LANGFUSE_SECRET_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_BASE_URL`.
+
 ## Frontend Reference (cbioportal-frontend)
 
 Key enums/types referenced by this project:
@@ -89,6 +91,6 @@ Key enums/types referenced by this project:
 - `npm run dev` — run with tsx (no build needed, entry: `src/index.ts`)
 - `npm start` — run compiled (`dist/index.js`)
 
-**Adding tools:** Create in `src/tools/<name>.ts` → register in `src/toolRegistry.ts`.
+**Adding tools:** Create in `src/tools/<name>.ts` (export `createXxxTool()` factory + handler) → register in `src/toolRegistry.ts` → add prompt mapping in `promptLoader.ts` `PROMPT_NAMES` → create prompt in Langfuse under `navigator/`.
 
 **Claude Desktop config:** `~/Library/Application Support/Claude/claude_desktop_config.json` — use absolute path to `dist/index.js`, restart after changes.

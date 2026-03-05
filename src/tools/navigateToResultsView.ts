@@ -45,83 +45,84 @@ import { loadPrompt } from './shared/promptLoader.js';
 import { buildStudyUrl } from './studyView/buildStudyUrl.js';
 
 /**
- * Tool definition for MCP registration
+ * Tool definition schema (without description, which is loaded at startup)
  */
-export const navigateToResultsViewTool = {
-    name: 'navigate_to_results_view',
-    title: 'Navigate to ResultsView',
-    description: loadPrompt('navigate_to_results_view.md'),
-    inputSchema: {
-        studyIds: z
-            .array(z.string())
-            .min(1)
-            .describe(
-                'Array of validated study IDs (e.g., ["luad_tcga"] or ["luad_tcga", "lusc_tcga"] for cross-study). These should be pre-resolved by route_to_target_page tool.'
-            ),
-        genes: z
-            .array(z.string())
-            .min(1)
-            .describe('Gene symbols (required, at least 1)'),
-        caseSetId: z
-            .string()
-            .optional()
-            .describe('Case set ID (defaults to {studyId}_all)'),
-        tab: z
-            .enum([
-                'oncoprint',
-                'mutations',
-                'structuralVariants',
-                'cancerTypesSummary',
-                'mutualExclusivity',
-                'plots',
-                'survival',
-                'coexpression',
-                'comparison',
-                'comparison/overlap',
-                'comparison/survival',
-                'comparison/clinical',
-                'comparison/mrna',
-                'comparison/protein',
-                'comparison/dna_methylation',
-                'comparison/alterations',
-                'cnSegments',
-                'pathways',
-                'download',
-            ])
-            .optional()
-            .describe('Tab (or tab/subtab) to navigate to'),
-        zScoreThreshold: z
-            .number()
-            .optional()
-            .describe('Z-score threshold for expression data'),
-        rppaScoreThreshold: z
-            .number()
-            .optional()
-            .describe('RPPA score threshold for protein data'),
-        studyViewFilter: z
-            .record(z.string(), z.any())
-            .optional()
-            .describe(
-                'StudyViewFilter object to restrict analysis to a filtered sample subset. When provided, fetches matching samples and creates a session-based URL (?session_id=...). Same format as navigate_to_study_view filterJson.'
-            ),
-    },
+const inputSchema = {
+    studyIds: z
+        .array(z.string())
+        .min(1)
+        .describe(
+            'Array of validated study IDs (e.g., ["luad_tcga"] or ["luad_tcga", "lusc_tcga"] for cross-study). These should be pre-resolved by route_to_target_page tool.'
+        ),
+    genes: z
+        .array(z.string())
+        .min(1)
+        .describe('Gene symbols (required, at least 1)'),
+    caseSetId: z
+        .string()
+        .optional()
+        .describe('Case set ID (defaults to {studyId}_all)'),
+    tab: z
+        .enum([
+            'oncoprint',
+            'mutations',
+            'structuralVariants',
+            'cancerTypesSummary',
+            'mutualExclusivity',
+            'plots',
+            'survival',
+            'coexpression',
+            'comparison',
+            'comparison/overlap',
+            'comparison/survival',
+            'comparison/clinical',
+            'comparison/mrna',
+            'comparison/protein',
+            'comparison/dna_methylation',
+            'comparison/alterations',
+            'cnSegments',
+            'pathways',
+            'download',
+        ])
+        .optional()
+        .describe('Tab (or tab/subtab) to navigate to'),
+    zScoreThreshold: z
+        .number()
+        .optional()
+        .describe('Z-score threshold for expression data'),
+    rppaScoreThreshold: z
+        .number()
+        .optional()
+        .describe('RPPA score threshold for protein data'),
+    studyViewFilter: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe(
+            'StudyViewFilter object to restrict analysis to a filtered sample subset. When provided, fetches matching samples and creates a session-based URL (?session_id=...). Same format as navigate_to_study_view filterJson.'
+        ),
 };
+
+/**
+ * Factory function for MCP registration (call after initPrompts)
+ */
+export function createNavigateToResultsViewTool() {
+    return {
+        name: 'navigate_to_results_view',
+        title: 'Navigate to ResultsView',
+        description: loadPrompt('navigate_to_results_view.md'),
+        inputSchema,
+    };
+}
 
 // Infer type from Zod schema
 type NavigateToResultsViewInput = {
-    studyIds: z.infer<typeof navigateToResultsViewTool.inputSchema.studyIds>;
-    genes: z.infer<typeof navigateToResultsViewTool.inputSchema.genes>;
-    caseSetId?: z.infer<typeof navigateToResultsViewTool.inputSchema.caseSetId>;
-    tab?: z.infer<typeof navigateToResultsViewTool.inputSchema.tab>;
-    zScoreThreshold?: z.infer<
-        typeof navigateToResultsViewTool.inputSchema.zScoreThreshold
-    >;
-    rppaScoreThreshold?: z.infer<
-        typeof navigateToResultsViewTool.inputSchema.rppaScoreThreshold
-    >;
-    studyViewFilter?: z.infer<
-        typeof navigateToResultsViewTool.inputSchema.studyViewFilter
-    >;
+    studyIds: z.infer<typeof inputSchema.studyIds>;
+    genes: z.infer<typeof inputSchema.genes>;
+    caseSetId?: z.infer<typeof inputSchema.caseSetId>;
+    tab?: z.infer<typeof inputSchema.tab>;
+    zScoreThreshold?: z.infer<typeof inputSchema.zScoreThreshold>;
+    rppaScoreThreshold?: z.infer<typeof inputSchema.rppaScoreThreshold>;
+    studyViewFilter?: z.infer<typeof inputSchema.studyViewFilter>;
 };
 
 /**
