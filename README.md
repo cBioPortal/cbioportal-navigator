@@ -27,17 +27,8 @@ cBioPortal Navigator bridges natural language cancer genomics queries and cBioPo
 ```
 cbioportal-navigator/
 ├── src/
-│   ├── server/
-│   │   ├── index.ts               # Entry point (stdio/HTTP mode selection)
-│   │   ├── mcp/
-│   │   │   ├── server.ts          # MCP server creation
-│   │   │   └── toolRegistry.ts    # Central tool registration
-│   │   └── chat/
-│   │       ├── handler.ts         # Chat Completions API handler
-│   │       ├── auth.ts            # Multi-provider API key resolution
-│   │       ├── providerFactory.ts # AI SDK provider creation
-│   │       ├── mcpClient.ts       # Internal MCP client
-│   │       └── toolsLoader.ts     # MCP→Chat tool conversion
+│   ├── index.ts               # Entry point (stdio/HTTP mode selection, MCP server creation)
+│   ├── toolRegistry.ts        # Central tool registration
 │   ├── tools/
 │   │   ├── resolveAndRoute.ts     # Router tool
 │   │   ├── getStudyviewfilterOptions.ts
@@ -54,8 +45,6 @@ cbioportal-navigator/
 │   └── prompts/                   # Prompt markdown files (copied to dist/ at build)
 ├── Dockerfile
 ├── docker-compose.mcp.yml        # Standalone MCP server
-├── docker-compose.agent.yml      # LibreChat integration override
-├── librechat.example.yaml        # LibreChat endpoint config
 └── package.json
 ```
 
@@ -74,7 +63,7 @@ cbioportal-navigator/
      "mcpServers": {
        "cbioportal-navigator": {
          "command": "node",
-         "args": ["/FULL/PATH/TO/cbioportal-navigator/dist/server/index.js"]
+         "args": ["/FULL/PATH/TO/cbioportal-navigator/dist/index.js"]
        }
      }
    }
@@ -105,30 +94,6 @@ environment:
   - CBIOPORTAL_BASE_URL=https://www.cbioportal.org  # Change for private instance
 ```
 
-### Option 3: LibreChat Integration (Docker)
-
-1. **Configure API keys** in LibreChat's `.env`:
-   ```bash
-   ANTHROPIC_API_KEY=sk-ant-...
-   GOOGLE_KEY=AIzaSy...
-   OPENAI_API_KEY=sk-proj-...
-   ```
-
-2. **Copy config files** to LibreChat directory:
-   ```bash
-   cp docker-compose.agent.yml /path/to/LibreChat/docker-compose.override.yml
-   cp librechat.example.yaml /path/to/LibreChat/librechat.yaml
-   ```
-
-3. **Start** (from LibreChat directory):
-   ```bash
-   docker compose up -d
-   ```
-
-4. **Use**: Open LibreChat → select "cBioPortal Navigator" → choose any model → ask questions
-
-**How it works**: Navigator detects provider from model name (`claude-*` → Anthropic, `gemini-*` → Google, `gpt-*` → OpenAI) and uses the corresponding environment variable.
-
 ## Environment Variables
 
 | Variable | Description | Default |
@@ -136,9 +101,6 @@ environment:
 | `CBIOPORTAL_BASE_URL` | cBioPortal instance URL | `https://www.cbioportal.org` |
 | `MCP_TRANSPORT` | Transport mode (`stdio` or `http`) | `stdio` |
 | `PORT` | HTTP server port (HTTP mode only) | `8002` |
-| `ANTHROPIC_API_KEY` | Anthropic API key (Claude models) | - |
-| `GOOGLE_API_KEY` | Google API key (Gemini models) | - |
-| `OPENAI_API_KEY` | OpenAI API key (GPT models) | - |
 
 ## Architecture
 
@@ -147,12 +109,12 @@ environment:
 Claude Desktop → MCP (stdio) → Navigator → cBioPortal API
 ```
 
-**HTTP mode** — LibreChat and remote clients:
+**HTTP mode** — remote MCP clients:
 ```
-LibreChat → Chat Completions API (/v1) → AI Provider → Tool calls → MCP Tools → cBioPortal API
+MCP Client → /mcp (Streamable HTTP) → Navigator → cBioPortal API
 ```
 
-HTTP endpoints: `/mcp` (MCP protocol), `/v1/chat/completions` (Chat API), `/v1/models`, `/health`
+HTTP endpoints: `/mcp` (MCP protocol), `/health`
 
 ## Development
 
@@ -169,4 +131,3 @@ HTTP endpoints: `/mcp` (MCP protocol), `/v1/chat/completions` (Chat API), `/v1/m
 
 - [Model Context Protocol](https://modelcontextprotocol.io/)
 - [cBioPortal Documentation](https://docs.cbioportal.org/)
-- [LibreChat Documentation](https://www.librechat.ai/)

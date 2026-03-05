@@ -1,6 +1,6 @@
 # Project Context
 
-MCP server for AI-assisted cBioPortal navigation. Dual mode: MCP protocol (stdio/HTTP) for Claude Desktop and other MCP clients; OpenAI-compatible Chat Completions API for LibreChat.
+MCP server for AI-assisted cBioPortal navigation. Supports stdio mode for Claude Desktop and HTTP mode (Streamable HTTP transport) for remote MCP clients.
 
 ## Tools
 
@@ -17,17 +17,8 @@ MCP server for AI-assisted cBioPortal navigation. Dual mode: MCP protocol (stdio
 
 ```
 src/
-├── server/
-│   ├── index.ts              # Entry point: stdio/HTTP mode selection
-│   ├── mcp/
-│   │   ├── server.ts          # MCP server creation
-│   │   └── toolRegistry.ts    # Central tool registration
-│   └── chat/
-│       ├── handler.ts         # Chat Completions API (streaming & non-streaming)
-│       ├── auth.ts            # Multi-provider API key resolution
-│       ├── providerFactory.ts # AI SDK provider creation
-│       ├── mcpClient.ts       # Internal MCP client (tools sync)
-│       └── toolsLoader.ts     # MCP→Chat tool conversion
+├── index.ts              # Entry point: stdio/HTTP mode selection, MCP server creation
+├── toolRegistry.ts       # Central tool registration
 ├── tools/
 │   ├── resolveAndRoute.ts          # Study resolver (no targetPage — LLM chooses tools)
 │   ├── getStudyviewfilterOptions.ts
@@ -55,11 +46,7 @@ src/
 
 1. **Column-Store Integration** — `/api/studies/{id}` has `allSampleCount` bug (returns 1). Solution: transparent URL rewriting to `/api/column-store/` for whitelisted endpoints. `studyKeywords` uses getAllStudies (accurate counts); `studyIds` uses getById.
 
-2. **Multi-Provider API Key Resolution** — LibreChat sends one `apiKey` field. We ignore the Authorization header, detect provider from model name (`claude-*`/`gemini-*`/`gpt-*`), use corresponding env var.
-
-3. **MCP Server as Single Source of Truth** — Chat API connects to own MCP server internally. Tools defined once, used by both Claude Desktop and Chat API.
-
-4. **Two-Tier Filter Metadata** — Router returns only attribute IDs (~300 tokens). `get_studyviewfilter_options` provides details on-demand (clinical + generic assay). Avoids ~1,500 tokens per query when filters aren't needed.
+3. **Two-Tier Filter Metadata** — Router returns only attribute IDs (~300 tokens). `get_studyviewfilter_options` provides details on-demand (clinical + generic assay). Avoids ~1,500 tokens per query when filters aren't needed.
 
 5. **Tiered Study Metadata** — Keyword search: top 5 get full metadata (clinicalAttributes, molecularProfiles, treatments); rest get basic info. Direct studyIds: all get full metadata.
 
@@ -94,15 +81,14 @@ Key enums/types referenced by this project:
 
 - StudyView URL params not implemented: `sharedGroups`, `sharedCustomData`, `geneset_list`
 - Treatment tier data (AgentClass/AgentTarget) — identical to base data on public cBioPortal
-- LibreChat doesn't display tool call progress in UI
 - Generic assay profiles with >200 entities (e.g. methylation hm27/hm450) return `tooLarge: true` instead of entity list — AI should direct user to web UI for those
 
 ## Development
 
 - `npm run build` — compile TS + copy prompts to dist/
-- `npm run dev` — run with tsx (no build needed, entry: `src/server/index.ts`)
-- `npm start` — run compiled (`dist/server/index.js`)
+- `npm run dev` — run with tsx (no build needed, entry: `src/index.ts`)
+- `npm start` — run compiled (`dist/index.js`)
 
-**Adding tools:** Create in `src/tools/<name>.ts` → register in `src/server/mcp/toolRegistry.ts` → Chat API auto-syncs via MCP client.
+**Adding tools:** Create in `src/tools/<name>.ts` → register in `src/toolRegistry.ts`.
 
-**Claude Desktop config:** `~/Library/Application Support/Claude/claude_desktop_config.json` — use absolute path to `dist/server/index.js`, restart after changes.
+**Claude Desktop config:** `~/Library/Application Support/Claude/claude_desktop_config.json` — use absolute path to `dist/index.js`, restart after changes.
