@@ -42,102 +42,98 @@ import { getConfig } from './shared/config.js';
 import { loadPrompt } from './shared/promptLoader.js';
 
 /**
- * Tool definition for MCP registration
+ * Tool definition schema (without description, which is loaded at startup)
  */
-export const navigateToGroupComparisonTool = {
-    name: 'navigate_to_group_comparison',
-    title: 'Navigate to Group Comparison',
-    description: loadPrompt('navigate_to_group_comparison.md'),
-    inputSchema: {
-        studyIds: z
-            .array(z.string())
-            .min(1)
-            .describe(
-                'Array of validated study IDs (e.g., ["luad_tcga"] or ["luad_tcga", "lusc_tcga"] for cross-study). These should be pre-resolved by route_to_target_page tool.'
-            ),
-        groups: z
-            .array(
-                z.object({
-                    name: z
-                        .string()
-                        .min(1)
-                        .describe('Display name for this group'),
-                    studyViewFilter: z
-                        .record(z.string(), z.any())
-                        .describe(
-                            'StudyViewFilter defining which samples belong to this group. studyIds are auto-injected.'
-                        ),
-                })
-            )
-            .min(2)
-            .optional()
-            .describe(
-                'Custom filter-based groups. Each group provides a name and a StudyViewFilter. Use for merged attribute values (T1+T2 vs T3+T4), gene-based splits, or multi-cohort comparisons. Cannot be combined with clinicalAttributeId, clinicalAttributeValues, or includeNA. Can be combined with studyViewFilter for global pre-filtering. Minimum 2 groups required.'
-            ),
-        clinicalAttributeId: z
-            .string()
-            .min(1)
-            .optional()
-            .describe(
-                'Clinical attribute ID to auto-group by (e.g., "SEX", "PATH_T_STAGE"). Tool discovers all values and creates one group per value. Cannot be combined with groups.'
-            ),
-        clinicalAttributeValues: z
-            .array(z.string())
-            .optional()
-            .describe(
-                'Optional subset of attribute values to include in comparison (e.g., ["White", "Asian"] for RACE). Only with clinicalAttributeId, not groups. Only applies to categorical attributes.'
-            ),
-        studyViewFilter: z
-            .record(z.string(), z.any())
-            .optional()
-            .describe(
-                'Optional StudyViewFilter to pre-filter samples before grouping. Works with both clinicalAttributeId and groups (applied as global pre-filter intersected with each group). Same format as navigate_to_study_view filterJson.'
-            ),
-        includeNA: z
-            .boolean()
-            .optional()
-            .describe(
-                'Whether to include an NA group for samples without the attribute. Only with clinicalAttributeId, not groups. Default: true for categorical, false for numerical.'
-            ),
-        tab: z
-            .enum([
-                'overlap',
-                'survival',
-                'clinical',
-                'alterations',
-                'mutations',
-                'copy-number',
-                'mrna',
-                'protein',
-            ])
-            .optional()
-            .describe(
-                'Optional comparison page tab to navigate to (e.g., "survival", "clinical"). Default: overview page.'
-            ),
-    },
+const inputSchema = {
+    studyIds: z
+        .array(z.string())
+        .min(1)
+        .describe(
+            'Array of validated study IDs (e.g., ["luad_tcga"] or ["luad_tcga", "lusc_tcga"] for cross-study). These should be pre-resolved by route_to_target_page tool.'
+        ),
+    groups: z
+        .array(
+            z.object({
+                name: z.string().min(1).describe('Display name for this group'),
+                studyViewFilter: z
+                    .record(z.string(), z.any())
+                    .describe(
+                        'StudyViewFilter defining which samples belong to this group. studyIds are auto-injected.'
+                    ),
+            })
+        )
+        .min(2)
+        .optional()
+        .describe(
+            'Custom filter-based groups. Each group provides a name and a StudyViewFilter. Use for merged attribute values (T1+T2 vs T3+T4), gene-based splits, or multi-cohort comparisons. Cannot be combined with clinicalAttributeId, clinicalAttributeValues, or includeNA. Can be combined with studyViewFilter for global pre-filtering. Minimum 2 groups required.'
+        ),
+    clinicalAttributeId: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(
+            'Clinical attribute ID to auto-group by (e.g., "SEX", "PATH_T_STAGE"). Tool discovers all values and creates one group per value. Cannot be combined with groups.'
+        ),
+    clinicalAttributeValues: z
+        .array(z.string())
+        .optional()
+        .describe(
+            'Optional subset of attribute values to include in comparison (e.g., ["White", "Asian"] for RACE). Only with clinicalAttributeId, not groups. Only applies to categorical attributes.'
+        ),
+    studyViewFilter: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe(
+            'Optional StudyViewFilter to pre-filter samples before grouping. Works with both clinicalAttributeId and groups (applied as global pre-filter intersected with each group). Same format as navigate_to_study_view filterJson.'
+        ),
+    includeNA: z
+        .boolean()
+        .optional()
+        .describe(
+            'Whether to include an NA group for samples without the attribute. Only with clinicalAttributeId, not groups. Default: true for categorical, false for numerical.'
+        ),
+    tab: z
+        .enum([
+            'overlap',
+            'survival',
+            'clinical',
+            'alterations',
+            'mutations',
+            'copy-number',
+            'mrna',
+            'protein',
+        ])
+        .optional()
+        .describe(
+            'Optional comparison page tab to navigate to (e.g., "survival", "clinical"). Default: overview page.'
+        ),
 };
+
+/**
+ * Factory function for MCP registration (call after initPrompts)
+ */
+export function createNavigateToGroupComparisonTool() {
+    return {
+        name: 'navigate_to_group_comparison',
+        title: 'Navigate to Group Comparison',
+        description: loadPrompt('navigate_to_group_comparison.md'),
+        inputSchema,
+    };
+}
 
 /**
  * Input type inferred from schema
  */
 export type NavigateToGroupComparisonInput = {
-    studyIds: z.infer<
-        typeof navigateToGroupComparisonTool.inputSchema.studyIds
-    >;
-    groups?: z.infer<typeof navigateToGroupComparisonTool.inputSchema.groups>;
-    clinicalAttributeId?: z.infer<
-        typeof navigateToGroupComparisonTool.inputSchema.clinicalAttributeId
-    >;
+    studyIds: z.infer<typeof inputSchema.studyIds>;
+    groups?: z.infer<typeof inputSchema.groups>;
+    clinicalAttributeId?: z.infer<typeof inputSchema.clinicalAttributeId>;
     clinicalAttributeValues?: z.infer<
-        typeof navigateToGroupComparisonTool.inputSchema.clinicalAttributeValues
+        typeof inputSchema.clinicalAttributeValues
     >;
-    studyViewFilter?: z.infer<
-        typeof navigateToGroupComparisonTool.inputSchema.studyViewFilter
-    >;
-    includeNA?: z.infer<
-        typeof navigateToGroupComparisonTool.inputSchema.includeNA
-    >;
-    tab?: z.infer<typeof navigateToGroupComparisonTool.inputSchema.tab>;
+    studyViewFilter?: z.infer<typeof inputSchema.studyViewFilter>;
+    includeNA?: z.infer<typeof inputSchema.includeNA>;
+    tab?: z.infer<typeof inputSchema.tab>;
 };
 
 /**
