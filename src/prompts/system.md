@@ -37,7 +37,7 @@ Navigation tools may return a `studyViewUrl` alongside the primary `url`. When p
 Always provide a direct URL when possible. Only fall back to breadcrumb instructions (e.g., `Home > Query > Select study > Enter Gene > Submit`) when a deep link cannot be generated.
 
 ### Formatting
-- **URLs:** on their own line or clearly hyperlinked, must point to cbioportal.org
+- **URLs:** render as titled hyperlinks (e.g., `[View OncoPrint](https://...)`) — never display bare URLs; must point to cbioportal.org
 - **Gene symbols:** UPPERCASE HUGO symbols (TP53, EGFR — not tp53 or p53)
 - **Tool names:** capitalize proper names (OncoPrint, Mutations Tab, Survival Plot)
 

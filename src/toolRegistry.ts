@@ -4,32 +4,34 @@
  * Central registration point for all MCP tools in the cBioPortal Navigator.
  * This module imports all tool definitions and registers them with the MCP server.
  *
+ * Must be called after initPrompts() so that prompt content is available.
+ *
  * @packageDocumentation
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
-    resolveAndRouteTool,
+    createResolveAndRouteTool,
     handleResolveAndRoute,
 } from './tools/resolveAndRoute.js';
 import {
-    navigateToStudyViewTool,
+    createNavigateToStudyViewTool,
     handleNavigateToStudyView,
 } from './tools/navigateToStudyView.js';
 import {
-    navigateToPatientViewTool,
+    createNavigateToPatientViewTool,
     handleNavigateToPatientView,
 } from './tools/navigateToPatientView.js';
 import {
-    navigateToResultsViewTool,
+    createNavigateToResultsViewTool,
     handleNavigateToResultsView,
 } from './tools/navigateToResultsView.js';
 import {
-    getStudyviewfilterOptionsTool,
+    createGetStudyviewfilterOptionsTool,
     handleGetStudyviewfilterOptions,
 } from './tools/getStudyviewfilterOptions.js';
 import {
-    navigateToGroupComparisonTool,
+    createNavigateToGroupComparisonTool,
     handleNavigateToGroupComparison,
 } from './tools/navigateToGroupComparison.js';
 
@@ -39,63 +41,40 @@ import {
  * @param server - The MCP server instance
  */
 export function registerTools(server: McpServer): void {
-    server.registerTool(
-        resolveAndRouteTool.name,
+    const tools = [
+        { create: createResolveAndRouteTool, handler: handleResolveAndRoute },
         {
-            title: resolveAndRouteTool.title,
-            description: resolveAndRouteTool.description,
-            inputSchema: resolveAndRouteTool.inputSchema,
+            create: createNavigateToStudyViewTool,
+            handler: handleNavigateToStudyView,
         },
-        handleResolveAndRoute
-    );
+        {
+            create: createNavigateToPatientViewTool,
+            handler: handleNavigateToPatientView,
+        },
+        {
+            create: createNavigateToResultsViewTool,
+            handler: handleNavigateToResultsView,
+        },
+        {
+            create: createGetStudyviewfilterOptionsTool,
+            handler: handleGetStudyviewfilterOptions,
+        },
+        {
+            create: createNavigateToGroupComparisonTool,
+            handler: handleNavigateToGroupComparison,
+        },
+    ];
 
-    server.registerTool(
-        navigateToStudyViewTool.name,
-        {
-            title: navigateToStudyViewTool.title,
-            description: navigateToStudyViewTool.description,
-            inputSchema: navigateToStudyViewTool.inputSchema,
-        },
-        handleNavigateToStudyView
-    );
-
-    server.registerTool(
-        navigateToPatientViewTool.name,
-        {
-            title: navigateToPatientViewTool.title,
-            description: navigateToPatientViewTool.description,
-            inputSchema: navigateToPatientViewTool.inputSchema,
-        },
-        handleNavigateToPatientView
-    );
-
-    server.registerTool(
-        navigateToResultsViewTool.name,
-        {
-            title: navigateToResultsViewTool.title,
-            description: navigateToResultsViewTool.description,
-            inputSchema: navigateToResultsViewTool.inputSchema,
-        },
-        handleNavigateToResultsView
-    );
-
-    server.registerTool(
-        getStudyviewfilterOptionsTool.name,
-        {
-            title: getStudyviewfilterOptionsTool.title,
-            description: getStudyviewfilterOptionsTool.description,
-            inputSchema: getStudyviewfilterOptionsTool.inputSchema,
-        },
-        handleGetStudyviewfilterOptions
-    );
-
-    server.registerTool(
-        navigateToGroupComparisonTool.name,
-        {
-            title: navigateToGroupComparisonTool.title,
-            description: navigateToGroupComparisonTool.description,
-            inputSchema: navigateToGroupComparisonTool.inputSchema,
-        },
-        handleNavigateToGroupComparison
-    );
+    for (const { create, handler } of tools) {
+        const tool = create();
+        server.registerTool(
+            tool.name,
+            {
+                title: tool.title,
+                description: tool.description,
+                inputSchema: tool.inputSchema,
+            },
+            handler
+        );
+    }
 }

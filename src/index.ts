@@ -25,6 +25,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import express from 'express';
 
 import { setConfig } from './tools/shared/config.js';
+import { initPrompts } from './tools/shared/promptLoader.js';
 import { registerTools } from './toolRegistry.js';
 
 function createMcpServer(): McpServer {
@@ -120,6 +121,9 @@ async function startHttp() {
 }
 
 async function main() {
+    // Initialize prompts from Langfuse (falls back to local files)
+    await initPrompts();
+
     const mode = process.env.MCP_TRANSPORT || 'stdio';
     if (mode === 'http') {
         console.log('Starting in HTTP mode (Streamable HTTP transport)');

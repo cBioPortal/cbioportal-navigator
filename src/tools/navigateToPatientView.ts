@@ -38,53 +38,58 @@ import type { ToolResponse } from './shared/types.js';
 import { loadPrompt } from './shared/promptLoader.js';
 
 /**
- * Tool definition for MCP registration
+ * Tool definition schema (without description, which is loaded at startup)
  */
-export const navigateToPatientViewTool = {
-    name: 'navigate_to_patient_view',
-    title: 'Navigate to PatientView',
-    description: loadPrompt('navigate_to_patient_view.md'),
-    inputSchema: {
-        studyIds: z
-            .array(z.string())
-            .min(1)
-            .describe(
-                'Array of validated study IDs (e.g., ["luad_tcga"] or ["luad_tcga", "brca_tcga"]). These should be pre-resolved by route_to_target_page tool. A separate URL will be generated for each study.'
-            ),
-        patientId: z.string().optional().describe('Patient/case identifier'),
-        sampleId: z.string().optional().describe('Sample identifier'),
-        tab: z
-            .enum(['summary', 'clinicalData', 'pathways'])
-            .optional()
-            .describe('Specific tab to navigate to'),
-        navIds: z
-            .array(
-                z.object({
-                    patientId: z.string(),
-                    studyId: z.string(),
-                })
-            )
-            .optional()
-            .describe('Navigation IDs for cohort browsing'),
-        studyViewFilter: z
-            .record(z.string(), z.any())
-            .optional()
-            .describe(
-                'StudyViewFilter object to navigate a filtered patient cohort. When provided, fetches all matching patients and opens the first one with full cohort navigation (navCaseIds). patientId and sampleId are not required when this is provided. Same format as navigate_to_study_view filterJson.'
-            ),
-    },
+const inputSchema = {
+    studyIds: z
+        .array(z.string())
+        .min(1)
+        .describe(
+            'Array of validated study IDs (e.g., ["luad_tcga"] or ["luad_tcga", "brca_tcga"]). These should be pre-resolved by route_to_target_page tool. A separate URL will be generated for each study.'
+        ),
+    patientId: z.string().optional().describe('Patient/case identifier'),
+    sampleId: z.string().optional().describe('Sample identifier'),
+    tab: z
+        .enum(['summary', 'clinicalData', 'pathways'])
+        .optional()
+        .describe('Specific tab to navigate to'),
+    navIds: z
+        .array(
+            z.object({
+                patientId: z.string(),
+                studyId: z.string(),
+            })
+        )
+        .optional()
+        .describe('Navigation IDs for cohort browsing'),
+    studyViewFilter: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe(
+            'StudyViewFilter object to navigate a filtered patient cohort. When provided, fetches all matching patients and opens the first one with full cohort navigation (navCaseIds). patientId and sampleId are not required when this is provided. Same format as navigate_to_study_view filterJson.'
+        ),
 };
+
+/**
+ * Factory function for MCP registration (call after initPrompts)
+ */
+export function createNavigateToPatientViewTool() {
+    return {
+        name: 'navigate_to_patient_view',
+        title: 'Navigate to PatientView',
+        description: loadPrompt('navigate_to_patient_view.md'),
+        inputSchema,
+    };
+}
 
 // Infer type from Zod schema
 type NavigateToPatientViewInput = {
-    studyIds: z.infer<typeof navigateToPatientViewTool.inputSchema.studyIds>;
-    patientId?: z.infer<typeof navigateToPatientViewTool.inputSchema.patientId>;
-    sampleId?: z.infer<typeof navigateToPatientViewTool.inputSchema.sampleId>;
-    tab?: z.infer<typeof navigateToPatientViewTool.inputSchema.tab>;
-    navIds?: z.infer<typeof navigateToPatientViewTool.inputSchema.navIds>;
-    studyViewFilter?: z.infer<
-        typeof navigateToPatientViewTool.inputSchema.studyViewFilter
-    >;
+    studyIds: z.infer<typeof inputSchema.studyIds>;
+    patientId?: z.infer<typeof inputSchema.patientId>;
+    sampleId?: z.infer<typeof inputSchema.sampleId>;
+    tab?: z.infer<typeof inputSchema.tab>;
+    navIds?: z.infer<typeof inputSchema.navIds>;
+    studyViewFilter?: z.infer<typeof inputSchema.studyViewFilter>;
 };
 
 /**

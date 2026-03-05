@@ -19,37 +19,40 @@ import type { ToolResponse } from './shared/types.js';
 import { loadPrompt } from './shared/promptLoader.js';
 
 /**
- * Tool definition for MCP registration
+ * Tool definition schema (without description, which is loaded at startup)
  */
-export const getStudyviewfilterOptionsTool = {
-    name: 'get_studyviewfilter_options',
-    title: 'Get StudyView Filter Options',
-    description: loadPrompt('get_studyviewfilter_options.md'),
-    inputSchema: {
-        studyId: z.string().describe('Study identifier (e.g., "luad_tcga")'),
-        attributeIds: z
-            .array(z.string())
-            .optional()
-            .describe(
-                'Clinical attribute IDs to fetch values for (e.g., ["SEX", "TUMOR_GRADE"])'
-            ),
-        genericAssayProfileIds: z
-            .array(z.string())
-            .optional()
-            .describe(
-                'GENERIC_ASSAY molecular profile IDs from router genericAssayProfiles[].molecularProfileId'
-            ),
-    },
+const inputSchema = {
+    studyId: z.string().describe('Study identifier (e.g., "luad_tcga")'),
+    attributeIds: z
+        .array(z.string())
+        .optional()
+        .describe(
+            'Clinical attribute IDs to fetch values for (e.g., ["SEX", "TUMOR_GRADE"])'
+        ),
+    genericAssayProfileIds: z
+        .array(z.string())
+        .optional()
+        .describe(
+            'GENERIC_ASSAY molecular profile IDs from router genericAssayProfiles[].molecularProfileId'
+        ),
 };
 
+/**
+ * Factory function for MCP registration (call after initPrompts)
+ */
+export function createGetStudyviewfilterOptionsTool() {
+    return {
+        name: 'get_studyviewfilter_options',
+        title: 'Get StudyView Filter Options',
+        description: loadPrompt('get_studyviewfilter_options.md'),
+        inputSchema,
+    };
+}
+
 type ToolInput = {
-    studyId: z.infer<typeof getStudyviewfilterOptionsTool.inputSchema.studyId>;
-    attributeIds?: z.infer<
-        typeof getStudyviewfilterOptionsTool.inputSchema.attributeIds
-    >;
-    genericAssayProfileIds?: z.infer<
-        typeof getStudyviewfilterOptionsTool.inputSchema.genericAssayProfileIds
-    >;
+    studyId: z.infer<typeof inputSchema.studyId>;
+    attributeIds?: z.infer<typeof inputSchema.attributeIds>;
+    genericAssayProfileIds?: z.infer<typeof inputSchema.genericAssayProfileIds>;
 };
 
 /**

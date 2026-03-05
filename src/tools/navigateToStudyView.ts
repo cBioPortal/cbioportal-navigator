@@ -44,88 +44,85 @@ import {
 import { loadPrompt } from './shared/promptLoader.js';
 
 /**
- * Tool definition for MCP registration
+ * Tool definition schema (without description, which is loaded at startup)
  */
-export const navigateToStudyViewTool = {
-    name: 'navigate_to_study_view',
-    title: 'Navigate to StudyView',
-    description: loadPrompt('navigate_to_study_view.md'),
-    inputSchema: {
-        studyIds: z
-            .array(z.string())
-            .min(1)
-            .describe(
-                'Array of validated study IDs (e.g., ["luad_tcga"] or ["luad_tcga", "lusc_tcga"] for cross-study). These should be pre-resolved by route_to_target_page tool.'
-            ),
-        tab: z
-            .enum(['summary', 'clinicalData', 'cnSegments', 'plots'])
-            .optional()
-            .describe('Specific tab to navigate to'),
+const inputSchema = {
+    studyIds: z
+        .array(z.string())
+        .min(1)
+        .describe(
+            'Array of validated study IDs (e.g., ["luad_tcga"] or ["luad_tcga", "lusc_tcga"] for cross-study). These should be pre-resolved by route_to_target_page tool.'
+        ),
+    tab: z
+        .enum(['summary', 'clinicalData', 'cnSegments', 'plots'])
+        .optional()
+        .describe('Specific tab to navigate to'),
 
-        // Comprehensive filtering
-        filterJson: studyViewFilterSchema
-            .partial()
-            .optional()
-            .describe(
-                'Comprehensive StudyViewFilter object for complex multi-attribute filtering. Key types: clinicalDataFilters (by clinical attribute), geneFilters (gene mutation/CNA binary), mutationDataFilters (gene-specific mutation categorization: "MUTATED" vs "MUTATION_TYPE"), genomicDataFilters (gene-specific CNA discrete values or expression ranges), structuralVariantFilters (fusions). alterationFilter only needed for non-default settings (e.g., drivers-only, somatic-only). See tool description for profileType derivation and examples.'
-            ),
+    // Comprehensive filtering
+    filterJson: studyViewFilterSchema
+        .partial()
+        .optional()
+        .describe(
+            'Comprehensive StudyViewFilter object for complex multi-attribute filtering. Key types: clinicalDataFilters (by clinical attribute), geneFilters (gene mutation/CNA binary), mutationDataFilters (gene-specific mutation categorization: "MUTATED" vs "MUTATION_TYPE"), genomicDataFilters (gene-specific CNA discrete values or expression ranges), structuralVariantFilters (fusions). alterationFilter only needed for non-default settings (e.g., drivers-only, somatic-only). See tool description for profileType derivation and examples.'
+        ),
 
-        // Legacy simple filtering
-        filterAttributeId: z
-            .string()
-            .optional()
-            .describe(
-                'Clinical attribute ID for simple single-attribute filtering (e.g., "AGE", "CANCER_TYPE", "SEX"). Use with filterValues.'
-            ),
+    // Legacy simple filtering
+    filterAttributeId: z
+        .string()
+        .optional()
+        .describe(
+            'Clinical attribute ID for simple single-attribute filtering (e.g., "AGE", "CANCER_TYPE", "SEX"). Use with filterValues.'
+        ),
 
-        filterValues: z
-            .string()
-            .optional()
-            .describe(
-                'Comma-separated values or ranges for filterAttributeId. For numeric: "40-60,70-80". For categorical: "Female,Male".'
-            ),
+    filterValues: z
+        .string()
+        .optional()
+        .describe(
+            'Comma-separated values or ranges for filterAttributeId. For numeric: "40-60,70-80". For categorical: "Female,Male".'
+        ),
 
-        // Plots configuration
-        plotsHorzSelection: plotsSelectionParamSchema
-            .optional()
-            .describe(
-                'Horizontal axis configuration for plots tab. Fields: selectedGeneOption (number), dataType (string), selectedDataSourceOption (string), logScale ("true"/"false").'
-            ),
+    // Plots configuration
+    plotsHorzSelection: plotsSelectionParamSchema
+        .optional()
+        .describe(
+            'Horizontal axis configuration for plots tab. Fields: selectedGeneOption (number), dataType (string), selectedDataSourceOption (string), logScale ("true"/"false").'
+        ),
 
-        plotsVertSelection: plotsSelectionParamSchema
-            .optional()
-            .describe(
-                'Vertical axis configuration for plots tab. Same structure as plotsHorzSelection.'
-            ),
+    plotsVertSelection: plotsSelectionParamSchema
+        .optional()
+        .describe(
+            'Vertical axis configuration for plots tab. Same structure as plotsHorzSelection.'
+        ),
 
-        plotsColoringSelection: plotsColoringParamSchema
-            .optional()
-            .describe(
-                'Point coloring configuration for plots tab. Fields: selectedOption (string), colorByMutationType ("true"/"false"), colorByCopyNumber ("true"/"false").'
-            ),
-    },
+    plotsColoringSelection: plotsColoringParamSchema
+        .optional()
+        .describe(
+            'Point coloring configuration for plots tab. Fields: selectedOption (string), colorByMutationType ("true"/"false"), colorByCopyNumber ("true"/"false").'
+        ),
 };
+
+/**
+ * Factory function for MCP registration (call after initPrompts)
+ */
+export function createNavigateToStudyViewTool() {
+    return {
+        name: 'navigate_to_study_view',
+        title: 'Navigate to StudyView',
+        description: loadPrompt('navigate_to_study_view.md'),
+        inputSchema,
+    };
+}
 
 // Infer type from Zod schema
 type NavigateToStudyViewInput = {
-    studyIds: z.infer<typeof navigateToStudyViewTool.inputSchema.studyIds>;
-    tab?: z.infer<typeof navigateToStudyViewTool.inputSchema.tab>;
-    filterJson?: z.infer<typeof navigateToStudyViewTool.inputSchema.filterJson>;
-    filterAttributeId?: z.infer<
-        typeof navigateToStudyViewTool.inputSchema.filterAttributeId
-    >;
-    filterValues?: z.infer<
-        typeof navigateToStudyViewTool.inputSchema.filterValues
-    >;
-    plotsHorzSelection?: z.infer<
-        typeof navigateToStudyViewTool.inputSchema.plotsHorzSelection
-    >;
-    plotsVertSelection?: z.infer<
-        typeof navigateToStudyViewTool.inputSchema.plotsVertSelection
-    >;
-    plotsColoringSelection?: z.infer<
-        typeof navigateToStudyViewTool.inputSchema.plotsColoringSelection
-    >;
+    studyIds: z.infer<typeof inputSchema.studyIds>;
+    tab?: z.infer<typeof inputSchema.tab>;
+    filterJson?: z.infer<typeof inputSchema.filterJson>;
+    filterAttributeId?: z.infer<typeof inputSchema.filterAttributeId>;
+    filterValues?: z.infer<typeof inputSchema.filterValues>;
+    plotsHorzSelection?: z.infer<typeof inputSchema.plotsHorzSelection>;
+    plotsVertSelection?: z.infer<typeof inputSchema.plotsVertSelection>;
+    plotsColoringSelection?: z.infer<typeof inputSchema.plotsColoringSelection>;
 };
 
 /**

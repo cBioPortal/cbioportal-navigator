@@ -31,34 +31,39 @@ import type { ToolResponse } from './shared/types.js';
 import { loadPrompt } from './shared/promptLoader.js';
 
 /**
- * Tool definition for MCP registration
+ * Tool definition schema (without description, which is loaded at startup)
  */
-export const resolveAndRouteTool = {
-    name: 'resolve_and_route',
-    title: 'Resolve Studies and Route to Page',
-    description: loadPrompt('resolve_and_route.md'),
-    inputSchema: {
-        studyKeywords: z
-            .array(z.string())
-            .optional()
-            .describe(
-                'Keywords to search for studies (e.g., ["TCGA", "lung", "adenocarcinoma"])'
-            ),
-        studyIds: z
-            .array(z.string())
-            .optional()
-            .describe(
-                'Direct study IDs to validate (e.g., ["luad_tcga", "brca_tcga"]). Use this for cross-study queries.'
-            ),
-    },
+const inputSchema = {
+    studyKeywords: z
+        .array(z.string())
+        .optional()
+        .describe(
+            'Keywords to search for studies (e.g., ["TCGA", "lung", "adenocarcinoma"])'
+        ),
+    studyIds: z
+        .array(z.string())
+        .optional()
+        .describe(
+            'Direct study IDs to validate (e.g., ["luad_tcga", "brca_tcga"]). Use this for cross-study queries.'
+        ),
 };
+
+/**
+ * Factory function for MCP registration (call after initPrompts)
+ */
+export function createResolveAndRouteTool() {
+    return {
+        name: 'resolve_and_route',
+        title: 'Resolve Studies and Route to Page',
+        description: loadPrompt('resolve_and_route.md'),
+        inputSchema,
+    };
+}
 
 // Infer type from Zod schema
 type ToolInput = {
-    studyKeywords?: z.infer<
-        typeof resolveAndRouteTool.inputSchema.studyKeywords
-    >;
-    studyIds?: z.infer<typeof resolveAndRouteTool.inputSchema.studyIds>;
+    studyKeywords?: z.infer<typeof inputSchema.studyKeywords>;
+    studyIds?: z.infer<typeof inputSchema.studyIds>;
 };
 
 /**
