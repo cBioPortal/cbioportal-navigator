@@ -74,7 +74,21 @@ export function registerTools(server: McpServer): void {
                 description: tool.description,
                 inputSchema: tool.inputSchema,
             },
-            handler
+            async (input: any) => {
+                const start = Date.now();
+                try {
+                    const result = await handler(input);
+                    console.error(
+                        `[Tool] ${tool.name} (${Date.now() - start}ms)`
+                    );
+                    return result;
+                } catch (error) {
+                    console.error(
+                        `[Tool] ${tool.name} error (${Date.now() - start}ms)`
+                    );
+                    throw error;
+                }
+            }
         );
     }
 }

@@ -109,7 +109,7 @@ export function createNavigateToResultsViewTool() {
     return {
         name: 'navigate_to_results_view',
         title: 'Navigate to ResultsView',
-        description: loadPrompt('navigate_to_results_view.md'),
+        description: loadPrompt('navigator/navigate-to-results-view'),
         inputSchema,
     };
 }

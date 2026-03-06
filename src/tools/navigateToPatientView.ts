@@ -77,7 +77,7 @@ export function createNavigateToPatientViewTool() {
     return {
         name: 'navigate_to_patient_view',
         title: 'Navigate to PatientView',
-        description: loadPrompt('navigate_to_patient_view.md'),
+        description: loadPrompt('navigator/navigate-to-patient-view'),
         inputSchema,
     };
 }

@@ -55,7 +55,7 @@ export function createResolveAndRouteTool() {
     return {
         name: 'resolve_and_route',
         title: 'Resolve Studies and Route to Page',
-        description: loadPrompt('resolve_and_route.md'),
+        description: loadPrompt('navigator/resolve-and-route'),
         inputSchema,
     };
 }

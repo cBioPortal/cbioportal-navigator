@@ -44,7 +44,7 @@ export function createGetStudyviewfilterOptionsTool() {
     return {
         name: 'get_studyviewfilter_options',
         title: 'Get StudyView Filter Options',
-        description: loadPrompt('get_studyviewfilter_options.md'),
+        description: loadPrompt('navigator/get-studyviewfilter-options'),
         inputSchema,
     };
 }

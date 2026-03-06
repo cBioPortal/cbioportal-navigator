@@ -116,7 +116,7 @@ export function createNavigateToGroupComparisonTool() {
     return {
         name: 'navigate_to_group_comparison',
         title: 'Navigate to Group Comparison',
-        description: loadPrompt('navigate_to_group_comparison.md'),
+        description: loadPrompt('navigator/navigate-to-group-comparison'),
         inputSchema,
     };
 }

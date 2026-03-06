@@ -108,7 +108,7 @@ export function createNavigateToStudyViewTool() {
     return {
         name: 'navigate_to_study_view',
         title: 'Navigate to StudyView',
-        description: loadPrompt('navigate_to_study_view.md'),
+        description: loadPrompt('navigator/navigate-to-study-view'),
         inputSchema,
     };
 }

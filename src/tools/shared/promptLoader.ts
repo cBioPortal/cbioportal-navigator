@@ -19,18 +19,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 /**
- * Mapping from local filename to Langfuse prompt name.
- * Langfuse prompts are stored under the "navigator/" folder.
+ * Langfuse prompt names (stored under the "navigator/" folder).
+ * Local fallback filename is derived: "navigator/resolve-and-route" → "resolve_and_route.md"
  */
-const PROMPT_NAMES: Record<string, string> = {
-    'system.md': 'navigator/system',
-    'resolve_and_route.md': 'navigator/resolve-and-route',
-    'navigate_to_study_view.md': 'navigator/navigate-to-study-view',
-    'navigate_to_patient_view.md': 'navigator/navigate-to-patient-view',
-    'navigate_to_results_view.md': 'navigator/navigate-to-results-view',
-    'navigate_to_group_comparison.md': 'navigator/navigate-to-group-comparison',
-    'get_studyviewfilter_options.md': 'navigator/get-studyviewfilter-options',
-};
+const PROMPT_NAMES = [
+    'navigator/resolve-and-route',
+    'navigator/navigate-to-study-view',
+    'navigator/navigate-to-patient-view',
+    'navigator/navigate-to-results-view',
+    'navigator/navigate-to-group-comparison',
+    'navigator/get-studyviewfilter-options',
+];
+
+function toLocalFilename(langfuseName: string): string {
+    return langfuseName.replace('navigator/', '').replace(/-/g, '_') + '.md';
+}
 
 /**
  * Resolved prompts from initial fetch (used by synchronous loadPrompt).
@@ -48,19 +51,37 @@ function readLocalPrompt(filename: string): string {
 /**
  * Pre-fetch all prompts from Langfuse at startup.
  *
- * Uses the SDK's `fallback` parameter: if Langfuse is unreachable,
- * local .md file content is used automatically.
+ * If Langfuse env vars are not set, falls back to local .md files.
+ * Uses the SDK's built-in `fallback` parameter: Langfuse SDK logs errors
+ * to stderr automatically when a prompt cannot be fetched.
  */
 export async function initPrompts(): Promise<void> {
+    const hasLangfuse =
+        process.env.LANGFUSE_SECRET_KEY && process.env.LANGFUSE_PUBLIC_KEY;
+
+    if (!hasLangfuse) {
+        console.error('[Langfuse] Not configured — using local prompts');
+        for (const name of PROMPT_NAMES) {
+            resolvedPrompts.set(name, readLocalPrompt(toLocalFilename(name)));
+        }
+        return;
+    }
+
+    const baseUrl =
+        process.env.LANGFUSE_BASE_URL || 'https://cloud.langfuse.com';
+    console.error(`[Langfuse] Connecting to ${baseUrl}`);
+
     const langfuse = new LangfuseClient();
 
-    for (const [filename, langfuseName] of Object.entries(PROMPT_NAMES)) {
-        const localContent = readLocalPrompt(filename);
-        const prompt = await langfuse.prompt.get(langfuseName, {
+    for (const name of PROMPT_NAMES) {
+        const localContent = readLocalPrompt(toLocalFilename(name));
+        const prompt = await langfuse.prompt.get(name, {
             fallback: localContent,
         });
-        resolvedPrompts.set(filename, prompt.compile());
+        resolvedPrompts.set(name, prompt.compile());
     }
+
+    console.error(`[Langfuse] ${PROMPT_NAMES.length} prompts loaded`);
 
     await langfuse.shutdown();
 }

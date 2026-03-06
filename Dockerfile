@@ -1,5 +1,5 @@
 # Build stage
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM node:18-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -37,4 +37,4 @@ ENV MCP_TRANSPORT=http
 EXPOSE 8002
 
 # Start server in HTTP mode
-CMD ["node", "dist/server/index.js"]
+CMD ["node", "dist/index.js"]
