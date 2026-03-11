@@ -53,19 +53,35 @@ const inputSchema = {
         ),
     groups: z
         .array(
-            z.object({
-                name: z.string().min(1).describe('Display name for this group'),
-                studyViewFilter: z
-                    .record(z.string(), z.any())
-                    .describe(
-                        'StudyViewFilter defining which samples belong to this group. studyIds are auto-injected.'
-                    ),
-            })
+            z.union([
+                z.object({
+                    name: z
+                        .string()
+                        .min(1)
+                        .describe('Display name for this group'),
+                    studyViewFilter: z
+                        .record(z.string(), z.any())
+                        .describe(
+                            'StudyViewFilter defining which samples belong to this group. studyIds are auto-injected.'
+                        ),
+                }),
+                z.object({
+                    name: z
+                        .string()
+                        .min(1)
+                        .describe('Display name for this group'),
+                    isUnselected: z
+                        .literal(true)
+                        .describe(
+                            'If true, this group contains all samples in the cohort NOT matched by any other group. Exactly one group may have isUnselected: true. Cannot be combined with studyViewFilter.'
+                        ),
+                }),
+            ])
         )
         .min(2)
         .optional()
         .describe(
-            'Custom filter-based groups. Each group provides a name and a StudyViewFilter. Use for merged attribute values (T1+T2 vs T3+T4), gene-based splits, or multi-cohort comparisons. Cannot be combined with clinicalAttributeId, clinicalAttributeValues, or includeNA. Can be combined with studyViewFilter for global pre-filtering. Minimum 2 groups required.'
+            'Custom filter-based groups. Each group provides either a studyViewFilter or isUnselected: true (complement of all other groups). Use for merged attribute values (T1+T2 vs T3+T4), gene-based splits, wildtype/unaltered comparisons, or multi-cohort comparisons. Cannot be combined with clinicalAttributeId, clinicalAttributeValues, or includeNA. Can be combined with studyViewFilter for global pre-filtering. Minimum 2 groups required, at most one may be isUnselected.'
         ),
     clinicalAttributeId: z
         .string()
@@ -124,9 +140,21 @@ export function createNavigateToGroupComparisonTool() {
 /**
  * Input type inferred from schema
  */
+export type FilterGroup = {
+    name: string;
+    studyViewFilter: Record<string, any>;
+};
+
+export type UnselectedGroup = {
+    name: string;
+    isUnselected: true;
+};
+
+export type GroupDefinition = FilterGroup | UnselectedGroup;
+
 export type NavigateToGroupComparisonInput = {
     studyIds: z.infer<typeof inputSchema.studyIds>;
-    groups?: z.infer<typeof inputSchema.groups>;
+    groups?: GroupDefinition[];
     clinicalAttributeId?: z.infer<typeof inputSchema.clinicalAttributeId>;
     clinicalAttributeValues?: z.infer<
         typeof inputSchema.clinicalAttributeValues
@@ -573,24 +601,36 @@ export async function navigateToGroupComparison(
  */
 async function navigateToGroupComparisonByFilters(
     studyIds: string[],
-    filterGroups: Array<{ name: string; studyViewFilter: Record<string, any> }>,
+    filterGroups: GroupDefinition[],
     globalFilter?: Record<string, any>,
     tab?: ComparisonTab
 ): Promise<GroupComparisonResult> {
-    // Fetch samples for each group in parallel
-    // If a global studyViewFilter is provided, merge it into each group's filter
+    // Validate: at most one unselected group
+    const unselectedGroups = filterGroups.filter(
+        (g): g is UnselectedGroup => 'isUnselected' in g && g.isUnselected
+    );
+    if (unselectedGroups.length > 1) {
+        throw new Error('At most one group may have isUnselected: true');
+    }
+    const unselectedGroup = unselectedGroups[0] ?? null;
+
+    const selectedFilterGroups = filterGroups.filter(
+        (g): g is FilterGroup => !('isUnselected' in g)
+    );
+
+    // Fetch samples for each filter-based group in parallel
     const groupSamples = await Promise.all(
-        filterGroups.map(async ({ name, studyViewFilter }) => {
+        selectedFilterGroups.map(async ({ name, studyViewFilter }) => {
             const filter = globalFilter
                 ? mergeStudyViewFilters(globalFilter, studyViewFilter, studyIds)
                 : { ...studyViewFilter, studyIds };
             const samples: Sample[] =
                 await apiClient.fetchFilteredSamples(filter);
-            return { name, samples };
+            return { name, samples, studyViewFilter };
         })
     );
 
-    // Validate all groups have samples
+    // Validate all filter-based groups have samples
     for (const { name, samples } of groupSamples) {
         if (samples.length === 0) {
             throw new Error(
@@ -599,16 +639,57 @@ async function navigateToGroupComparisonByFilters(
         }
     }
 
-    // Build session groups
-    const sessionGroups: SessionGroupData[] = groupSamples.map(
-        ({ name, samples }) => {
-            const sampleIdentifiers = samples.map((s) => ({
-                studyId: s.studyId,
-                sampleId: s.sampleId,
-            }));
-            return createGroup(name, sampleIdentifiers, studyIds);
+    // Compute unselected group if requested:
+    // fetch full cohort, subtract all filter-based groups' samples
+    let unselectedSamples: Sample[] = [];
+    if (unselectedGroup) {
+        const cohortFilter = globalFilter
+            ? { ...globalFilter, studyIds }
+            : { studyIds };
+        const cohortSamples: Sample[] =
+            await apiClient.fetchFilteredSamples(cohortFilter);
+
+        const selectedKeys = new Set(
+            groupSamples.flatMap(({ samples }) =>
+                samples.map((s) => `${s.studyId}_${s.sampleId}`)
+            )
+        );
+        unselectedSamples = cohortSamples.filter(
+            (s) => !selectedKeys.has(`${s.studyId}_${s.sampleId}`)
+        );
+
+        if (unselectedSamples.length === 0) {
+            throw new Error(
+                `No samples remain for unselected group "${unselectedGroup.name}" — all cohort samples are covered by other groups`
+            );
         }
-    );
+    }
+
+    // Build session groups (filter-based first, then unselected)
+    const sessionGroups: SessionGroupData[] = [
+        ...groupSamples.map(({ name, samples }) =>
+            createGroup(
+                name,
+                samples.map((s) => ({
+                    studyId: s.studyId,
+                    sampleId: s.sampleId,
+                })),
+                studyIds
+            )
+        ),
+        ...(unselectedGroup
+            ? [
+                  createGroup(
+                      unselectedGroup.name,
+                      unselectedSamples.map((s) => ({
+                          studyId: s.studyId,
+                          sampleId: s.sampleId,
+                      })),
+                      studyIds
+                  ),
+              ]
+            : []),
+    ];
 
     // Create comparison session
     const config = getConfig();
@@ -629,8 +710,8 @@ async function navigateToGroupComparisonByFilters(
     }));
 
     // Per-group StudyView URLs (always generated in filter mode)
-    const groupUrls: GroupUrl[] = filterGroups.map(
-        ({ name, studyViewFilter }) => {
+    const groupUrls: GroupUrl[] = [
+        ...groupSamples.map(({ name, studyViewFilter }) => {
             const combinedFilter = globalFilter
                 ? mergeStudyViewFilters(globalFilter, studyViewFilter, studyIds)
                 : studyViewFilter;
@@ -643,8 +724,9 @@ async function navigateToGroupComparisonByFilters(
                         : undefined,
                 }),
             };
-        }
-    );
+        }),
+        // Unselected group: no simple StudyView filter to express it, omit
+    ];
 
     const studyViewUrl = buildStudyUrl({
         studyIds,
@@ -657,7 +739,7 @@ async function navigateToGroupComparisonByFilters(
         url,
         studyViewUrl,
         groupInfo,
-        groupUrls,
+        groupUrls: groupUrls.length > 0 ? groupUrls : undefined,
     };
 }
 

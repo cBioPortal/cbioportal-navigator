@@ -23,7 +23,11 @@ Array of study IDs from router response. Cross-study supported, but the clinical
 Clinical attribute ID to group by (e.g., `"SEX"`, `"PATH_T_STAGE"`). Tool discovers all values and creates one group per value automatically. **Cannot be used together with `groups`.**
 
 ### groups
-Array of custom groups (≥ 2), each with `name` and `studyViewFilter`. Use when grouping logic cannot be expressed as a single attribute (merged values, gene-based splits, multi-cohort). `studyIds` are auto-injected into each group's filter. **Cannot be used together with `clinicalAttributeId`, `clinicalAttributeValues`, or `includeNA`.** Can be combined with `studyViewFilter` for global pre-filtering.
+Array of custom groups (≥ 2). Two group types:
+- **Filter group:** `{ name, studyViewFilter }` — samples matching the filter. `studyIds` are auto-injected.
+- **Unselected group:** `{ name, isUnselected: true }` — samples in the cohort NOT matched by any other group (complement). At most one group may be unselected.
+
+Use when grouping logic cannot be expressed as a single attribute: merged values (T1+T2 vs T3+T4), gene-based splits, wildtype/unaltered comparisons, multi-cohort. **Cannot be used together with `clinicalAttributeId`, `clinicalAttributeValues`, or `includeNA`.** Can be combined with `studyViewFilter` for global pre-filtering.
 
 ### studyViewFilter
 Pre-filter samples before grouping. Works with both `clinicalAttributeId` and `groups` — when used with `groups`, it is intersected with each group's filter. Same format as `navigate_to_study_view` filterJson. `studyIds` are auto-injected — don't include them inside.
@@ -127,31 +131,29 @@ When presenting results, include group names and sample counts. Always offer bot
 }
 ```
 
-### Custom groups — altered vs unaltered (within a sub-cohort)
+### Custom groups — mutated vs wildtype using isUnselected
 ```json
 {
   "studyIds": ["luad_tcga_pan_can_atlas_2018"],
-  "studyViewFilter": {
-    "clinicalDataFilters": [{"attributeId": "PATH_T_STAGE", "values": [{"value": "T3"}, {"value": "T4"}]}]
-  },
   "groups": [
     {
-      "name": "PTEN Altered",
+      "name": "EGFR Mutant",
       "studyViewFilter": {
-        "mutationDataFilters": [{"hugoGeneSymbol": "PTEN", "profileType": "mutations", "categorization": "MUTATED", "values": [[{"value": "MUTATED"}]]}]
+        "geneFilters": [{
+          "molecularProfileIds": ["luad_tcga_pan_can_atlas_2018_mutations"],
+          "geneQueries": [[{"hugoGeneSymbol": "EGFR", "alterations": ["MUT"]}]]
+        }]
       }
     },
     {
-      "name": "PTEN Unaltered",
-      "studyViewFilter": {
-        "mutationDataFilters": [{"hugoGeneSymbol": "PTEN", "profileType": "mutations", "categorization": "MUTATED", "values": [[{"value": "NOT_MUTATED"}]]}]
-      }
+      "name": "EGFR Wildtype",
+      "isUnselected": true
     }
   ],
   "tab": "survival"
 }
 ```
-→ Global `studyViewFilter` (Stage T3+T4) is intersected with each group's filter.
+→ "EGFR Wildtype" = all study samples NOT in the EGFR Mutant group. Use `isUnselected` whenever the second group is the complement of the first (wildtype, unaltered, negative). Combine with `studyViewFilter` to restrict the cohort first.
 
 ### Custom groups — multi-cohort split
 ```json
@@ -184,3 +186,5 @@ When presenting results, include group names and sample counts. Always offer bot
 | Attribute not found | Invalid clinicalAttributeId | Check router `clinicalAttributeIds` |
 | < 2 groups | All samples same value | Choose different attribute |
 | Incompatible params | `groups` used with `clinicalAttributeId`, `clinicalAttributeValues`, or `includeNA` | Use one approach or the other |
+| No unselected samples | All cohort samples covered by other groups | Check filter logic |
+| Multiple unselected | More than one group with `isUnselected: true` | Only one complement group allowed |

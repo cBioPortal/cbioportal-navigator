@@ -67,6 +67,8 @@ src/
 
 12. **Langfuse Prompt Management** — Prompts are managed in Langfuse under the `navigator/` folder (e.g. `navigator/resolve-and-route`). `promptLoader.ts` pre-fetches all prompts at startup via `initPrompts()` with local `.md` files as `fallback` parameter. Tool files use factory functions (`createXxxTool()`) instead of module-level constants so that `loadPrompt()` runs after `initPrompts()`. SDK: `@langfuse/client` (`LangfuseClient`). Env vars: `LANGFUSE_SECRET_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_BASE_URL`.
 
+13. **Unselected Group (Wildtype/Complement)** — In `navigate_to_group_comparison` `groups` mode, one group may use `{ name, isUnselected: true }` instead of a `studyViewFilter`. This group receives all cohort samples NOT matched by any other group (complement). Implemented in `navigateToGroupComparisonByFilters`: fetches full cohort (with global `studyViewFilter` if provided), subtracts union of all filter-group samples. At most one unselected group allowed. No `groupUrl` is generated for the unselected group (no simple StudyView filter can express a complement).
+
 ## Frontend Reference (cbioportal-frontend)
 
 Key enums/types referenced by this project:
