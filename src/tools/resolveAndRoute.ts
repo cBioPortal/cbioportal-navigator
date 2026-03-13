@@ -233,6 +233,11 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
                 .map((p) => p.molecularProfileId)
                 .sort();
 
+            const availableComparisonTabs = computeAvailableComparisonTabs(
+                molecularProfiles,
+                clinicalAttributes.map((attr) => attr.clinicalAttributeId)
+            );
+
             return {
                 studyId: study.studyId,
                 name: study.name,
@@ -245,6 +250,7 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
                     ...(genericAssayProfileIds.length > 0 && {
                         genericAssayProfiles: genericAssayProfileIds,
                     }),
+                    availableComparisonTabs,
                     treatments: treatments,
                 },
             };
@@ -283,4 +289,92 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
         studiesWithMetadata,
         ...(otherStudies.length > 0 && { otherStudies }),
     });
+}
+
+/**
+ * Compute which Group Comparison tabs are available for a study based on its
+ * molecular profiles and clinical attributes.
+ *
+ * Tab availability mirrors the frontend ComparisonStore logic:
+ * - overlap / clinical: always available
+ * - survival: requires paired {PREFIX}_STATUS + {PREFIX}_MONTHS clinical attributes
+ * - alterations: requires MUTATION_EXTENDED or COPY_NUMBER_ALTERATION (DISCRETE)
+ * - mutations: requires MUTATION_EXTENDED
+ * - mrna: requires MRNA_EXPRESSION (single-study only — enforced by frontend)
+ * - protein: requires PROTEIN_LEVEL (single-study only)
+ * - dna_methylation: requires METHYLATION (single-study only)
+ * - generic_assay_{type}: one entry per unique genericAssayType (single-study only)
+ */
+function computeAvailableComparisonTabs(
+    molecularProfiles: Array<{
+        molecularAlterationType: string;
+        datatype?: string;
+        genericAssayType?: string;
+    }>,
+    clinicalAttributeIds: string[]
+): string[] {
+    const tabs: string[] = ['overlap', 'clinical'];
+
+    // Survival: need at least one paired PREFIX_STATUS + PREFIX_MONTHS
+    const statusPrefixes = new Set(
+        clinicalAttributeIds
+            .filter((id) => id.endsWith('_STATUS'))
+            .map((id) => id.slice(0, -'_STATUS'.length))
+    );
+    if (
+        clinicalAttributeIds.some(
+            (id) =>
+                id.endsWith('_MONTHS') &&
+                statusPrefixes.has(id.slice(0, -'_MONTHS'.length))
+        )
+    ) {
+        tabs.push('survival');
+    }
+
+    const hasMutation = molecularProfiles.some(
+        (p) => p.molecularAlterationType === 'MUTATION_EXTENDED'
+    );
+    const hasCNA = molecularProfiles.some(
+        (p) =>
+            p.molecularAlterationType === 'COPY_NUMBER_ALTERATION' &&
+            p.datatype === 'DISCRETE'
+    );
+
+    if (hasMutation || hasCNA) tabs.push('alterations');
+    if (hasMutation) tabs.push('mutations');
+
+    if (
+        molecularProfiles.some(
+            (p) => p.molecularAlterationType === 'MRNA_EXPRESSION'
+        )
+    )
+        tabs.push('mrna');
+    if (
+        molecularProfiles.some(
+            (p) => p.molecularAlterationType === 'PROTEIN_LEVEL'
+        )
+    )
+        tabs.push('protein');
+    if (
+        molecularProfiles.some(
+            (p) => p.molecularAlterationType === 'METHYLATION'
+        )
+    )
+        tabs.push('dna_methylation');
+
+    // Generic assay: one tab per unique genericAssayType
+    const genericAssayTypes = new Set(
+        molecularProfiles
+            .filter(
+                (p) =>
+                    p.molecularAlterationType === 'GENERIC_ASSAY' &&
+                    p.genericAssayType
+            )
+            .map((p) => p.genericAssayType!)
+    );
+    for (const type of genericAssayTypes) {
+        tabs.push(`generic_assay_${type.toLowerCase()}`);
+    }
+
+    return tabs;
 }

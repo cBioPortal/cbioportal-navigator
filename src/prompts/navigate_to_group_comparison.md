@@ -39,7 +39,19 @@ Subset of values to compare (categorical only). Reduces noise when attribute has
 Include "NA" group for samples missing the attribute. Default: `true` (categorical), `false` (numerical).
 
 ### tab
-`"overlap"`, `"survival"`, `"clinical"`, `"alterations"`, `"mutations"`, `"copy-number"`, `"mrna"`, `"protein"`
+Use a value from `availableComparisonTabs` in the resolver metadata for the study. Omit to land on `overlap` (default).
+
+| tab | Shows | Available when |
+|---|---|---|
+| `overlap` | Sample overlap Venn diagram between groups | Always |
+| `clinical` | Clinical attribute differences between groups | Always |
+| `survival` | Kaplan-Meier survival curves | Study has survival clinical attributes (`_STATUS`+`_MONTHS` pair) |
+| `alterations` | Enriched mutations and CNA between groups | Study has mutation or CNA profiles |
+| `mutations` | Detailed mutation comparison (lollipop plot) | Study has mutation profiles; **exactly 2 groups required** |
+| `mrna` | mRNA expression enrichment | Study has mRNA profiles; single study only |
+| `protein` | Protein/phosphoprotein expression enrichment (RPPA) | Study has protein profiles; single study only |
+| `dna_methylation` | DNA methylation enrichment | Study has methylation profiles; single study only |
+| `generic_assay_{type}` | Custom assay enrichment (e.g. `generic_assay_treatment_response`) | Study has generic assay profiles; single study only |
 
 ---
 

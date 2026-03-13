@@ -109,19 +109,10 @@ const inputSchema = {
             'Whether to include an NA group for samples without the attribute. Only with clinicalAttributeId, not groups. Default: true for categorical, false for numerical.'
         ),
     tab: z
-        .enum([
-            'overlap',
-            'survival',
-            'clinical',
-            'alterations',
-            'mutations',
-            'copy-number',
-            'mrna',
-            'protein',
-        ])
+        .string()
         .optional()
         .describe(
-            'Optional comparison page tab to navigate to (e.g., "survival", "clinical"). Default: overview page.'
+            'Optional comparison page tab. Pick from availableComparisonTabs in resolver metadata. Always available: overlap, clinical. Conditional (study must have relevant data): survival, alterations, mutations, mrna, protein, dna_methylation, generic_assay_{type} (e.g. "generic_assay_treatment_response"). mrna/protein/dna_methylation/generic_assay_* require single-study comparison.'
         ),
 };
 
@@ -161,7 +152,7 @@ export type NavigateToGroupComparisonInput = {
     >;
     studyViewFilter?: z.infer<typeof inputSchema.studyViewFilter>;
     includeNA?: z.infer<typeof inputSchema.includeNA>;
-    tab?: z.infer<typeof inputSchema.tab>;
+    tab?: string;
 };
 
 /**
@@ -316,7 +307,7 @@ export async function navigateToGroupComparison(
             studyIds,
             filterGroups,
             studyViewFilter,
-            tab
+            tab as ComparisonTab | undefined
         );
     }
 
@@ -497,7 +488,7 @@ export async function navigateToGroupComparison(
     });
 
     // Step 8: Build comparison URL with optional tab
-    const url = buildComparisonUrl(sessionId, tab);
+    const url = buildComparisonUrl(sessionId, tab as ComparisonTab | undefined);
 
     // Step 9: Prepare group metadata
     const groupInfo: GroupInfo[] = groups.map((group) => ({
@@ -699,7 +690,7 @@ async function navigateToGroupComparisonByFilters(
         origin: studyIds,
     });
 
-    const url = buildComparisonUrl(sessionId, tab);
+    const url = buildComparisonUrl(sessionId, tab as ComparisonTab | undefined);
 
     const groupInfo: GroupInfo[] = sessionGroups.map((group) => ({
         name: group.name,

@@ -15,7 +15,9 @@ import {
 } from '../shared/cbioportalUrlBuilder.js';
 
 /**
- * Available tabs in the comparison page
+ * Available tabs in the comparison page.
+ * Mirrors GroupComparisonTab enum in cbioportal-frontend.
+ * generic_assay_* tabs are dynamic (one per genericAssayType, lowercase).
  */
 export type ComparisonTab =
     | 'overlap'
@@ -23,9 +25,10 @@ export type ComparisonTab =
     | 'clinical'
     | 'alterations'
     | 'mutations'
-    | 'copy-number'
     | 'mrna'
-    | 'protein';
+    | 'protein'
+    | 'dna_methylation'
+    | `generic_assay_${string}`;
 
 /**
  * Build comparison page URL from session ID.

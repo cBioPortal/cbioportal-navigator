@@ -43,6 +43,7 @@ import {
 import type { ToolResponse } from './shared/types.js';
 import { loadPrompt } from './shared/promptLoader.js';
 import { buildStudyUrl } from './studyView/buildStudyUrl.js';
+import { validateTabAvailability } from './studyView/validateStudyViewTab.js';
 
 /**
  * Tool definition schema (without description, which is loaded at startup)
@@ -187,6 +188,31 @@ async function navigateToResultsView(
         console.warn(
             `Some genes were invalid and skipped: ${invalidGenes.join(', ')}`
         );
+    }
+
+    // Validate cnSegments tab availability (requires actual segment data)
+    if (params.tab === 'cnSegments') {
+        const validationResults = await Promise.all(
+            studyIds.map(async (id) => ({
+                studyId: id,
+                validation: await validateTabAvailability(id, 'cnSegments'),
+            }))
+        );
+        const unavailable = validationResults.filter(
+            (r) => !r.validation.available
+        );
+        if (unavailable.length > 0) {
+            return createErrorResponse(
+                `Tab "cnSegments" is not available for some studies`,
+                {
+                    unavailableStudies: unavailable.map((s) => ({
+                        studyId: s.studyId,
+                        reason: s.validation.reason,
+                    })),
+                    suggestion: 'This study has no copy number segment data',
+                }
+            );
+        }
     }
 
     // Get study details and profiles (used in both paths)

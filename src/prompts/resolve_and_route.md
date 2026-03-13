@@ -135,6 +135,7 @@ The router returns `studiesWithMetadata` containing:
 - **clinicalAttributeIds** — available clinical attributes (e.g., `AGE`, `SEX`, `TUMOR_STAGE`). Call `get_studyviewfilter_options` to get datatype + valid values before filtering.
 - **molecularProfileIds** — non-generic-assay profiles (e.g., `luad_tcga_mutations`, `luad_tcga_gistic`). Mutation profiles end in `_mutations`; CNA profiles in `_gistic` or `_cna`.
 - **genericAssayProfiles** _(optional)_ — generic assay profile IDs (e.g., genetic ancestry, mutational signatures). Call `get_studyviewfilter_options` with `genericAssayProfileIds` to get entity stableIds and values.
+- **availableComparisonTabs** — which comparison tabs this study supports (e.g., `["overlap","clinical","survival","alterations","mutations","mrna"]`). Use when selecting `tab` for `navigate_to_group_comparison` or `comparison/{subtab}` for `navigate_to_results_view`.
 - **treatments** — drug/agent names (e.g., `CARBOPLATIN`, `PEMBROLIZUMAB`). Use in `patientTreatmentFilters` (no timing) or `sampleTreatmentFilters` (requires `time: "Pre"` or `"Post"`).
 
 ### Filter Construction
