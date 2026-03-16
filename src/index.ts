@@ -121,8 +121,7 @@ async function startHttp() {
 }
 
 async function main() {
-    // Initialize prompts from Langfuse (falls back to local files)
-    await initPrompts();
+    initPrompts();
 
     const mode = process.env.MCP_TRANSPORT || 'stdio';
     if (mode === 'http') {
