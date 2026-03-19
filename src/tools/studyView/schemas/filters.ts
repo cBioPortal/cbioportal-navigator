@@ -95,16 +95,11 @@ export const dataFilterSchema = z.object({
 
 export const geneFilterQuerySchema = z.object({
     alterations: z
-        .array(
-            z.union([
-                z.literal('AMP'),
-                z.literal('GAIN'),
-                z.literal('DIPLOID'),
-                z.literal('HETLOSS'),
-                z.literal('HOMDEL'),
-            ])
-        )
-        .optional(),
+        .array(z.union([z.literal('AMP'), z.literal('HOMDEL')]))
+        .optional()
+        .describe(
+            'CNA types for geneFilters. Only AMP and HOMDEL are supported. For GAIN, HETLOSS, or DIPLOID, use genomicDataFilters instead.'
+        ),
     entrezGeneId: z.number().optional(),
     hugoGeneSymbol: z.string().optional(),
     includeDriver: z.boolean().optional(),

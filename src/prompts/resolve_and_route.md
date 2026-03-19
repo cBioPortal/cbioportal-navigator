@@ -1,6 +1,6 @@
 # Study Resolver — Resolve Studies & Provide Metadata
 
-Resolves study identifiers (keywords → studyIds), handles ambiguity (up to 5 matches), and returns study metadata for navigation tool selection.
+Resolves study identifiers (keywords → studyIds), handles ambiguity, and returns study metadata for navigation tool selection.
 
 ## Parameters
 
@@ -35,11 +35,11 @@ Provide 1-3 SPECIFIC keywords. Use AND logic across studyId, name, description, 
 
 ### Result Ranking
 
-Top 5 studies ranked by: keyword match count (primary) → sample count (secondary).
+All matching studies are returned, ranked by: keyword match count (primary) → sample count (secondary). Top 5 receive full metadata (clinicalAttributes, molecularProfiles, treatments); the rest receive basic info only (studyId, name, sampleCount).
 
 ### Study Selection
 
-- **Multiple TCGA versions exist** for many cancer types. When intent is unclear, prefer the **PanCancer Atlas** version (e.g., `luad_tcga_pan_can_atlas_2018`).
+- **When multiple studies match, pick one and proceed immediately.** Do not ask the user to choose first. Prefer **TCGA studies** over others; within TCGA, prefer the **PanCancer Atlas** version (e.g., `luad_tcga_pan_can_atlas_2018`). Generate the URL with the selected study, then list the other matching studies as alternatives.
 - **Broad disease terms → prefer pan-disease studies.** When the user queries a general disease category (e.g., "glioma", "sarcoma", "lymphoma"), prefer studies that cover the full disease spectrum over subtype-specific studies. For example, "glioma" encompasses both low-grade glioma (LGG) and glioblastoma (GBM), so `lgggbm_tcga_pub` (LGG+GBM combined) is more appropriate than `gbm_tcga` (GBM only). Similarly, prefer combined/pan-disease studies when the query does not specify a particular subtype.
 - **Pan-cancer studies** (e.g., MSK-CHORD) may match disease-specific queries — consider whether the user wants a disease-specific or cross-cancer study.
 - **No matches →** guide user to browse at https://www.cbioportal.org (studies from TCGA, ICGC, TARGET, institutional studies, cell line data)
@@ -53,12 +53,13 @@ After resolving studies, use these rules to choose the right navigation tool(s).
 Evaluate in order. **First match wins.**
 
 ### Rule 1 → `navigate_to_patient_view`
-**Patient or Sample ID explicitly mentioned.**
-View a patient's complete profile, clinical timeline, genomic alterations, or compare samples from the same patient.
+**Patient or Sample ID explicitly mentioned, OR user wants to browse individual patients from a filtered cohort.**
+View a patient's complete profile, clinical timeline, genomic alterations, or compare samples from the same patient. Also use when user wants to page through a filtered set of patients one by one.
 
 - "Show me patient TCGA-001 details"
 - "What mutations does patient ID 12345 have?"
 - "Show me all the patients in DLBCL TCGA PanCan Atlas who are Hispanic or Latino"
+- "Browse female patients with TP53 mutations"
 
 ### Rule 2 → `navigate_to_group_comparison`
 **User wants to compare/split a cohort into symmetric groups.**
@@ -98,6 +99,8 @@ Covers two sub-scenarios:
 **Gene-in-disease pattern — call BOTH study view and results view:**
 When the user asks about a specific gene in a disease or study context (e.g., "tell me about IDH1 mutations in glioma", "TP53 in lung cancer", "BRCA1 alterations in breast cancer"), call **both** `navigate_to_study_view` (with the gene as a mutation/CNA filter) **and** `navigate_to_results_view` in parallel. Present the **study view link first** — it gives the cohort overview with the gene filter applied (demographics, clinical distributions, sample counts). Present the **results view link second** — it provides the detailed gene analysis (mutation table, OncoPrint, cancer type summary). This gives the user a complete picture: cohort context first, then gene-level detail.
 
+**When in doubt, call both.** If a gene query could reasonably map to multiple views (e.g., "expression vs copy number change in EGFR in lung cancer" could be `plots` tab in results view or a gene-filtered cohort in study view), call both tools rather than committing to one. Use the most relevant tab for results view (e.g., `plots` for expression/CNA correlation queries).
+
 **Key signal — "alteration":** The word "alteration" means mutation + CNA combined. StudyView filters treat these separately (mutationDataFilters vs cnaGeneFilters), making it hard to express. ResultsView handles alteration as a unified concept — altered vs unaltered grouping is built in. When the user says "alteration", strongly prefer `navigate_to_results_view`.
 
 **Key distinction — "vs" semantics:**
@@ -122,7 +125,6 @@ When the user asks about a specific gene in a disease or study context (e.g., "t
 - "Show me HER2 positive cases in the breast pancan atlas cohort"
 - "Show me samples with EGFR amplification and mutation in TCGA GBM"
 - "How many cases are profiled for mutations in TCGA DLBCL study?"
-- "I want to see expression vs copy number change in EGFR in lung cancer"
 - "Show me a graph of mutation count vs cancer type in MSK IMPACT 2017"
 
 ---
@@ -131,7 +133,6 @@ When the user asks about a specific gene in a disease or study context (e.g., "t
 
 The router returns `studiesWithMetadata` containing:
 
-- **needsStudySelection** — `true` if multiple studies found (AI should infer or ask user to choose). Study preview URL: `https://www.cbioportal.org/study?id={studyId}`
 - **clinicalAttributeIds** — available clinical attributes (e.g., `AGE`, `SEX`, `TUMOR_STAGE`). Call `get_studyviewfilter_options` to get datatype + valid values before filtering.
 - **molecularProfileIds** — non-generic-assay profiles (e.g., `luad_tcga_mutations`, `luad_tcga_gistic`). Mutation profiles end in `_mutations`; CNA profiles in `_gistic` or `_cna`.
 - **genericAssayProfiles** _(optional)_ — generic assay profile IDs (e.g., genetic ancestry, mutational signatures). Call `get_studyviewfilter_options` with `genericAssayProfileIds` to get entity stableIds and values.

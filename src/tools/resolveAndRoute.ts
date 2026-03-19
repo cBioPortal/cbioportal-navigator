@@ -267,23 +267,19 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
         };
     });
 
-    // 5. Build response based on number of studies
-    const needsStudySelection = resolvedStudyIds.length > 1;
+    // 5. Build response
     const totalCount = resolvedStudyIds.length;
 
-    let message: string;
-    if (needsStudySelection) {
-        const detailMessage =
-            otherStudies.length > 0
-                ? ` (showing top ${metadataLimit} with detailed metadata)`
-                : '';
-        message = `Found ${totalCount} matching studies${detailMessage}. Review the user's original query to determine if it clearly matches one study. If yes, use that study's metadata to call the appropriate navigation tool(s). If ambiguous, ask the user to choose.`;
-    } else {
-        message = `Found 1 study. Use the study metadata to call the appropriate navigation tool(s).`;
-    }
+    const detailMessage =
+        otherStudies.length > 0
+            ? ` (top ${metadataLimit} with full metadata, rest with basic info)`
+            : '';
+    const message =
+        totalCount === 1
+            ? `Found 1 study. Use the metadata to call the appropriate navigation tool(s).`
+            : `Found ${totalCount} matching studies${detailMessage}. Pick the best match (prefer TCGA → prefer PanCancer Atlas), use its metadata to call the appropriate navigation tool(s) and generate URLs immediately. Present other studies as alternatives.`;
 
     return createDataResponse(message, {
-        needsStudySelection,
         totalCount,
         resolvedStudyIds,
         studiesWithMetadata,

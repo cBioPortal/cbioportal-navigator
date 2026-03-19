@@ -46,7 +46,7 @@ Array of study IDs from router response. Single or cross-study: `["luad_tcga_pan
 
 ## Filtering — Gene (Mutation / CNA / Structural Variant)
 
-All use `geneFilters`. The molecular profile ID determines alteration type.
+Use `geneFilters` for standard mutation/CNA/SV filtering. Use `mutationDataFilters` or `genomicDataFilters` (Gene Specific section) when you need NOT_MUTATED, specific mutation types, GAIN/HETLOSS/DIPLOID, or continuous expression values.
 
 ### Profile type identification
 
@@ -76,7 +76,7 @@ Use exact profile IDs from router metadata.
 
 ### CNA `alterations` field
 
-For CNA profiles, specify copy number types. Valid: `"AMP"`, `"GAIN"`, `"DIPLOID"`, `"HETLOSS"`, `"HOMDEL"`. Omit or `[]` for all types.
+`geneFilters` supports only `"AMP"` and `"HOMDEL"` for CNA. For `"GAIN"`, `"HETLOSS"`, or `"DIPLOID"`, use `genomicDataFilters` instead (see Gene Specific section below).
 
 ```json
 {"hugoGeneSymbol": "MYC", "alterations": ["AMP"]}
@@ -107,6 +107,13 @@ Different alteration types require separate `geneFilters` entries:
 
 These correspond to "Gene Specific" charts in StudyView (add chart → search gene → select profile).
 
+Use when:
+- Mutation: need `NOT_MUTATED` or specific mutation types → `mutationDataFilters`
+- CNA: need `GAIN`, `HETLOSS`, or `DIPLOID` → `genomicDataFilters`
+- Expression/protein: continuous value ranges → `genomicDataFilters`
+
+Multiple entries in `mutationDataFilters` or `genomicDataFilters` combine with AND logic. Both can be used alongside `geneFilters` in the same filter.
+
 ### profileType derivation
 
 Strip `{studyId}_` prefix from molecularProfileId:
@@ -126,7 +133,10 @@ Values: `"MUTATED"` or `"NOT_MUTATED"`
 {"hugoGeneSymbol": "TP53", "profileType": "mutations", "categorization": "MUTATION_TYPE", "values": [[{"value": "Missense_Mutation"}]]}
 ```
 Common types: `"Missense_Mutation"`, `"Nonsense_Mutation"`, `"Frame_Shift_Del"`, `"Frame_Shift_Ins"`, `"In_Frame_Del"`, `"In_Frame_Ins"`, `"Splice_Site"`.
-Multiple types (OR): `[[{"value": "Missense_Mutation"}], [{"value": "Nonsense_Mutation"}]]`
+
+`values` is a 2D array: **outer = OR, inner = AND**. For mutation types, use outer OR (each type in its own inner array):
+- OR: `[[{"value": "Missense_Mutation"}], [{"value": "Nonsense_Mutation"}]]`
+- AND (rare): `[[{"value": "Missense_Mutation"}, {"value": "Nonsense_Mutation"}]]`
 
 ### genomicDataFilters — CNA or expression profiles
 
@@ -146,7 +156,7 @@ Values: `"2"` = Amp, `"1"` = Gain, `"0"` = Diploid, `"-1"` = Shallow del, `"-2"`
 Only include when user explicitly requests:
 - Drivers only: `{"includeDriver": true, "includeVUS": false, "includeUnknownOncogenicity": false}`
 - Somatic only: `{"includeGermline": false, "includeSomatic": true, "includeUnknownStatus": false}`
-- Specific CNA: `{"copyNumberAlterationEventTypes": {"AMP": true, "HOMDEL": false}}` — only `AMP` and `HOMDEL` are supported here; for `GAIN`, `HETLOSS`, or `DIPLOID`, use `geneFilters` with `alterations` instead
+- Specific CNA: `{"copyNumberAlterationEventTypes": {"AMP": true, "HOMDEL": false}}` — only `AMP` and `HOMDEL` are supported here; for `GAIN`, `HETLOSS`, or `DIPLOID`, use `genomicDataFilters` instead
 
 ---
 

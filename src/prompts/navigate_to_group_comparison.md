@@ -3,6 +3,7 @@
 Creates group comparison sessions and generates URL to cBioPortal's Group Comparison page.
 
 **→ See router tool for universal guidelines (no guessing IDs, exact values, Link First principle).**
+**→ `studyViewFilter` format (geneFilters, mutationDataFilters, genomicDataFilters, etc.) follows the same rules as `navigate_to_study_view`. `profileType` = molecularProfileId with `{studyId}_` prefix stripped.**
 
 ## What Group Comparison Shows
 
@@ -143,6 +144,29 @@ When presenting results, include group names and sample counts. Always offer bot
 }
 ```
 
+### Custom groups — with global pre-filter
+```json
+{
+  "studyIds": ["luad_tcga_pan_can_atlas_2018"],
+  "studyViewFilter": {
+    "clinicalDataFilters": [{"attributeId": "SEX", "values": [{"value": "Female"}]}]
+  },
+  "groups": [
+    {
+      "name": "EGFR Mutant",
+      "studyViewFilter": {
+        "geneFilters": [{
+          "molecularProfileIds": ["luad_tcga_pan_can_atlas_2018_mutations"],
+          "geneQueries": [[{"hugoGeneSymbol": "EGFR"}]]
+        }]
+      }
+    },
+    { "name": "EGFR Wildtype", "isUnselected": true }
+  ]
+}
+```
+→ The global `studyViewFilter` is merged with each group's filter. Groups contain only Female patients.
+
 ### Custom groups — mutated vs wildtype using isUnselected
 ```json
 {
@@ -153,7 +177,7 @@ When presenting results, include group names and sample counts. Always offer bot
       "studyViewFilter": {
         "geneFilters": [{
           "molecularProfileIds": ["luad_tcga_pan_can_atlas_2018_mutations"],
-          "geneQueries": [[{"hugoGeneSymbol": "EGFR", "alterations": ["MUT"]}]]
+          "geneQueries": [[{"hugoGeneSymbol": "EGFR"}]]
         }]
       }
     },
