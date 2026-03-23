@@ -24,7 +24,7 @@
  */
 
 import { z } from 'zod';
-import { studyResolver, type ResolvedStudy } from './router/studyResolver.js';
+import { studyResolver, type ResolvedStudy } from './shared/studyResolver.js';
 import { studyViewDataClient } from './studyView/studyViewDataClient.js';
 import { createDataResponse, createErrorResponse } from './shared/responses.js';
 import type { ToolResponse } from './shared/types.js';

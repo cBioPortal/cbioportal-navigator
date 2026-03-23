@@ -1,10 +1,9 @@
 /**
- * Gene symbol validation resolver.
+ * Gene symbol validation and resolution.
  *
- * This module validates gene symbols (Hugo gene symbols or Entrez IDs) against
- * the cBioPortal API. It supports both single gene validation and batch
- * validation with automatic filtering of invalid genes, ensuring that only
- * valid gene symbols are used in URL construction.
+ * Validates gene symbols (Hugo gene symbols or Entrez IDs) against the
+ * cBioPortal API. Supports single validation, batch validation, and
+ * resolving Hugo symbols to Entrez Gene IDs for URL construction.
  *
  * @remarks
  * Key exports:
@@ -15,19 +14,17 @@
  * - `validate(geneSymbol)`: Check if a single gene symbol is valid
  * - `validateBatch(geneSymbols)`: Validate multiple genes, return only valid ones
  * - `getGeneInfo(geneSymbol)`: Retrieve detailed gene information
+ * - `resolveToEntrezId(symbolOrId)`: Resolve Hugo symbol to Entrez ID string
+ * - `resolvePlotsGene(selection)`: Resolve selectedGeneOption in a plots selection object
  *
  * Normalization:
  * All gene symbols are automatically normalized to uppercase for consistency
  * with cBioPortal conventions.
  *
- * Batch validation:
- * Rather than failing on invalid genes, validateBatch filters them out and
- * returns only valid ones, allowing requests to proceed with partial matches.
- *
  * @packageDocumentation
  */
 
-import { apiClient } from '../shared/cbioportalClient.js';
+import { apiClient } from './cbioportalClient.js';
 
 export class GeneResolver {
     /**
@@ -66,6 +63,32 @@ export class GeneResolver {
     async getGeneInfo(geneSymbol: string) {
         const normalized = geneSymbol.toUpperCase();
         return await apiClient.getGene(normalized);
+    }
+
+    /**
+     * Resolve a gene symbol or numeric string to an Entrez Gene ID string.
+     * If input is already numeric (e.g. "3417"), returns it unchanged.
+     * Otherwise looks up the symbol and returns entrezGeneId as a string.
+     */
+    async resolveToEntrezId(symbolOrId: string): Promise<string> {
+        if (/^\d+$/.test(symbolOrId)) return symbolOrId;
+        const gene = await this.getGeneInfo(symbolOrId);
+        return String(gene.entrezGeneId);
+    }
+
+    /**
+     * If a plots selection has a non-numeric selectedGeneOption (i.e. a Hugo symbol),
+     * resolve it to an Entrez Gene ID string before building the URL.
+     */
+    async resolvePlotsGene<T extends { selectedGeneOption?: string }>(
+        selection: T | undefined
+    ): Promise<T | undefined> {
+        if (!selection?.selectedGeneOption) return selection;
+        if (/^\d+$/.test(selection.selectedGeneOption)) return selection;
+        const entrezId = await this.resolveToEntrezId(
+            selection.selectedGeneOption
+        );
+        return { ...selection, selectedGeneOption: entrezId };
     }
 }
 

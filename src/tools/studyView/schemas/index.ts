@@ -8,11 +8,11 @@
  * @packageDocumentation
  */
 
-// URL Parameter Schemas
+// URL Parameter Schemas (shared with ResultsView)
 export {
     plotsSelectionParamSchema,
     plotsColoringParamSchema,
-} from './urlParams.js';
+} from '../../shared/plotsSchemas.js';
 
 // Filter API Schemas
 export {

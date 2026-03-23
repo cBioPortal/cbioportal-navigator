@@ -28,9 +28,9 @@
  */
 
 import { z } from 'zod';
-import { studyResolver } from './router/studyResolver.js';
-import { geneResolver } from './router/geneResolver.js';
-import { profileResolver } from './router/profileResolver.js';
+import { studyResolver } from './shared/studyResolver.js';
+import { geneResolver } from './shared/geneResolver.js';
+import { plotsSelectionParamSchema } from './shared/plotsSchemas.js';
 import { buildResultsUrl } from './resultsView/buildResultsUrl.js';
 import { MainSessionClient } from './resultsView/mainSessionClient.js';
 import { apiClient } from './shared/cbioportalClient.js';
@@ -101,6 +101,16 @@ const inputSchema = {
         .describe(
             'StudyViewFilter object to restrict analysis to a filtered sample subset. When provided, fetches matching samples and creates a session-based URL (?session_id=...). Same format as navigate_to_study_view filterJson.'
         ),
+    plotsHorzSelection: plotsSelectionParamSchema
+        .optional()
+        .describe(
+            'Horizontal axis configuration for the plots tab. Set selectedGeneOption to a Hugo gene symbol (e.g. "IDH1") — it will be resolved to an Entrez ID automatically.'
+        ),
+    plotsVertSelection: plotsSelectionParamSchema
+        .optional()
+        .describe(
+            'Vertical axis configuration for the plots tab. Same structure as plotsHorzSelection.'
+        ),
 };
 
 /**
@@ -124,6 +134,8 @@ type NavigateToResultsViewInput = {
     zScoreThreshold?: z.infer<typeof inputSchema.zScoreThreshold>;
     rppaScoreThreshold?: z.infer<typeof inputSchema.rppaScoreThreshold>;
     studyViewFilter?: z.infer<typeof inputSchema.studyViewFilter>;
+    plotsHorzSelection?: z.infer<typeof inputSchema.plotsHorzSelection>;
+    plotsVertSelection?: z.infer<typeof inputSchema.plotsVertSelection>;
 };
 
 /**
@@ -215,13 +227,9 @@ async function navigateToResultsView(
         }
     }
 
-    // Get study details and profiles (used in both paths)
-    const [studyDetails, profiles] = await Promise.all([
-        Promise.all(studyIds.map((id) => studyResolver.getById(id))),
-        Promise.all(
-            studyIds.map((id) => profileResolver.getForStudy(id, 'mutation'))
-        ),
-    ]);
+    const studyDetails = await Promise.all(
+        studyIds.map((id) => studyResolver.getById(id))
+    );
 
     // 2a. Filter path: fetch samples → create session → session_id URL
     if (params.studyViewFilter) {
@@ -277,9 +285,6 @@ async function navigateToResultsView(
             filteredSampleCount: samples.length,
             caseSetId: '-1',
             sessionId,
-            molecularProfiles: profiles
-                .filter((p) => p)
-                .map((p) => p!.molecularProfileId),
             studyViewUrl,
         });
     }
@@ -294,6 +299,12 @@ async function navigateToResultsView(
         caseSetId = 'all';
     }
 
+    // Resolve gene symbols in plots selections to Entrez IDs
+    const [plotsHorzSelection, plotsVertSelection] = await Promise.all([
+        geneResolver.resolvePlotsGene(params.plotsHorzSelection),
+        geneResolver.resolvePlotsGene(params.plotsVertSelection),
+    ]);
+
     // 3. Build URL (supports multiple studies)
     const url = buildResultsUrl({
         studies: studyIds,
@@ -303,6 +314,10 @@ async function navigateToResultsView(
             caseSetId,
         },
         tab: params.tab,
+        options: {
+            ...(plotsHorzSelection && { plotsHorzSelection }),
+            ...(plotsVertSelection && { plotsVertSelection }),
+        },
     });
 
     return createNavigationResponse(url, {
@@ -314,8 +329,5 @@ async function navigateToResultsView(
         })),
         genes: validGenes,
         caseSetId,
-        molecularProfiles: profiles
-            .filter((p) => p)
-            .map((p) => p!.molecularProfileId),
     });
 }

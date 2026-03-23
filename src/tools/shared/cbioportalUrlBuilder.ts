@@ -117,11 +117,9 @@ export function buildCBioPortalPageUrl(
         const hashPairs = Object.entries(params.hashParams)
             .filter(([_, v]) => v !== undefined && v !== null)
             .map(([k, v]) => {
-                // JSON.stringify for objects, no encodeURIComponent needed
-                // Browser handles URL encoding automatically for hash fragments
                 const value =
                     typeof v === 'object' ? JSON.stringify(v) : String(v);
-                return `${k}=${value}`;
+                return `${k}=${encodeURIComponent(value)}`;
             });
         if (hashPairs.length > 0) {
             url += '#' + hashPairs.join('&');

@@ -28,7 +28,8 @@
  */
 
 import { z } from 'zod';
-import { studyResolver } from './router/studyResolver.js';
+import { studyResolver } from './shared/studyResolver.js';
+import { geneResolver } from './shared/geneResolver.js';
 import { buildStudyUrl } from './studyView/buildStudyUrl.js';
 import { validateTabAvailability } from './studyView/validateStudyViewTab.js';
 import {
@@ -36,11 +37,8 @@ import {
     createErrorResponse,
 } from './shared/responses.js';
 import type { ToolResponse } from './shared/types.js';
-import {
-    studyViewFilterSchema,
-    plotsSelectionParamSchema,
-    plotsColoringParamSchema,
-} from './studyView/schemas/index.js';
+import { studyViewFilterSchema } from './studyView/schemas/index.js';
+import { plotsSelectionParamSchema } from './shared/plotsSchemas.js';
 import { loadPrompt } from './shared/promptLoader.js';
 
 /**
@@ -85,19 +83,13 @@ const inputSchema = {
     plotsHorzSelection: plotsSelectionParamSchema
         .optional()
         .describe(
-            'Horizontal axis configuration for plots tab. Fields: selectedGeneOption (number), dataType (string), selectedDataSourceOption (string), logScale ("true"/"false").'
+            'Horizontal axis configuration for plots tab. Set selectedGeneOption to a Hugo gene symbol (e.g. "IDH1") — it will be resolved to an Entrez ID automatically.'
         ),
 
     plotsVertSelection: plotsSelectionParamSchema
         .optional()
         .describe(
             'Vertical axis configuration for plots tab. Same structure as plotsHorzSelection.'
-        ),
-
-    plotsColoringSelection: plotsColoringParamSchema
-        .optional()
-        .describe(
-            'Point coloring configuration for plots tab. Fields: selectedOption (string), colorByMutationType ("true"/"false"), colorByCopyNumber ("true"/"false").'
         ),
 };
 
@@ -122,7 +114,6 @@ type NavigateToStudyViewInput = {
     filterValues?: z.infer<typeof inputSchema.filterValues>;
     plotsHorzSelection?: z.infer<typeof inputSchema.plotsHorzSelection>;
     plotsVertSelection?: z.infer<typeof inputSchema.plotsVertSelection>;
-    plotsColoringSelection?: z.infer<typeof inputSchema.plotsColoringSelection>;
 };
 
 /**
@@ -196,6 +187,12 @@ async function navigateToStudyView(
         }
     }
 
+    // Resolve gene symbols in plots selections to Entrez IDs
+    const [plotsHorzSelection, plotsVertSelection] = await Promise.all([
+        geneResolver.resolvePlotsGene(params.plotsHorzSelection),
+        geneResolver.resolvePlotsGene(params.plotsVertSelection),
+    ]);
+
     // Build URL with all parameters (supports multiple studies)
     const url = buildStudyUrl({
         studyIds: studyIds,
@@ -203,9 +200,8 @@ async function navigateToStudyView(
         filterJson: params.filterJson,
         filterAttributeId: params.filterAttributeId,
         filterValues: params.filterValues,
-        plotsHorzSelection: params.plotsHorzSelection,
-        plotsVertSelection: params.plotsVertSelection,
-        plotsColoringSelection: params.plotsColoringSelection,
+        plotsHorzSelection,
+        plotsVertSelection,
     });
 
     // Get study details for metadata
@@ -223,9 +219,7 @@ async function navigateToStudyView(
         tab: params.tab,
         hasFilters: !!(params.filterJson || params.filterAttributeId),
         hasPlotsConfig: !!(
-            params.plotsHorzSelection ||
-            params.plotsVertSelection ||
-            params.plotsColoringSelection
+            params.plotsHorzSelection || params.plotsVertSelection
         ),
     });
 }

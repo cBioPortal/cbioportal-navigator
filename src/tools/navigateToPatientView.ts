@@ -26,7 +26,7 @@
  */
 
 import { z } from 'zod';
-import { studyResolver } from './router/studyResolver.js';
+import { studyResolver } from './shared/studyResolver.js';
 import { buildPatientUrl } from './patientView/buildPatientUrl.js';
 import { apiClient } from './shared/cbioportalClient.js';
 import { buildStudyUrl } from './studyView/buildStudyUrl.js';

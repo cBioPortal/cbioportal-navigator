@@ -85,6 +85,10 @@ Key enums/types referenced by this project:
 - **navCaseIds** (`PatientViewUrlWrapper.ts`, `handleLongUrls.ts`): hashed URL param for cohort navigation; `handleLongUrls()` moves to `window.navCaseIdsCache` when >60000 chars
 - **Column-store** (`proxyColumnStore.ts`): rewrites `$domain` to `/api/column-store` for whitelisted endpoints (ClinicalDataCounts, FilteredSamples, etc.)
 
+## URL Safety
+
+Hash params (`filterJson`) are URL-encoded via `encodeURIComponent` in `cbioportalUrlBuilder.ts` to ensure URLs are safe for embedding in markdown links. The LLM is instructed in `system.md` to always use the exact `url` field from tool responses verbatim.
+
 ## Known Limitations
 
 - StudyView URL params not implemented: `sharedGroups`, `sharedCustomData`, `geneset_list`

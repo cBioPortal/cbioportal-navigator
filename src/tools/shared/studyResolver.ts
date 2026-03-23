@@ -24,7 +24,7 @@
  * @packageDocumentation
  */
 
-import { apiClient } from '../shared/cbioportalClient.js';
+import { apiClient } from './cbioportalClient.js';
 
 export interface ResolvedStudy {
     studyId: string;

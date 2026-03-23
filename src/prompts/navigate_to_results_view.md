@@ -82,6 +82,42 @@ When `studyViewFilter` is provided, the response includes a `studyViewUrl` along
 
 ---
 
+## Plots Configuration
+
+Use `tab: "plots"` with `plotsHorzSelection` / `plotsVertSelection` to pre-configure axes. Set `selectedGeneOption` to the **Hugo gene symbol** (e.g. `"IDH1"`) — it is resolved to an Entrez ID automatically.
+
+| Field | Value |
+|---|---|
+| `selectedGeneOption` | Hugo symbol, e.g. `"IDH1"` |
+| `dataType` | `"MRNA_EXPRESSION"`, `"MUTATION_EXTENDED"`, `"COPY_NUMBER_ALTERATION"`, `"METHYLATION"`, `"PROTEIN_LEVEL"`, `"CLINICAL"` |
+| `selectedDataSourceOption` | Molecular profile ID from router metadata (e.g. `"lgggbm_tcga_pub_mrna_median_zscores"`) |
+| `mutationCountBy` | `"MutationType"` (default), `"MutatedVsWildType"` — only for `MUTATION_EXTENDED` axis |
+| `logScale` | `"true"` or `"false"` |
+
+**"IDH1 expression by mutation status in LGG"**
+```json
+{
+  "studyIds": ["lgggbm_tcga_pub"],
+  "genes": ["IDH1"],
+  "tab": "plots",
+  "plotsHorzSelection": {
+    "selectedGeneOption": "IDH1",
+    "dataType": "MUTATION_EXTENDED",
+    "selectedDataSourceOption": "lgggbm_tcga_pub_mutations",
+    "mutationCountBy": "MutatedVsWildType"
+  },
+  "plotsVertSelection": {
+    "selectedGeneOption": "IDH1",
+    "dataType": "MRNA_EXPRESSION",
+    "selectedDataSourceOption": "lgggbm_tcga_pub_mrna_median_zscores"
+  }
+}
+```
+
+Use profile IDs from router metadata. Only include `plotsHorzSelection`/`plotsVertSelection` when the user asks for a specific plot configuration.
+
+---
+
 ## Examples
 
 **User:** "Analyze EGFR, KRAS, and TP53 in lung cancer, show survival tab"
