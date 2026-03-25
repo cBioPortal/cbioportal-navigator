@@ -111,6 +111,12 @@ const inputSchema = {
         .describe(
             'Vertical axis configuration for the plots tab. Same structure as plotsHorzSelection.'
         ),
+    comparisonSelectedGroups: z
+        .array(z.string())
+        .optional()
+        .describe(
+            'Pre-select groups in the comparison tab. Two types of groups exist: aggregate ("Altered group" / "Unaltered group") and per-gene (one per queried gene, named after the gene symbol when using default OQL). Pass gene symbols to compare gene-specific altered groups, e.g. ["IDH1", "EGFR"]. Omit to use the default (Altered vs Unaltered).'
+        ),
 };
 
 /**
@@ -136,6 +142,9 @@ type NavigateToResultsViewInput = {
     studyViewFilter?: z.infer<typeof inputSchema.studyViewFilter>;
     plotsHorzSelection?: z.infer<typeof inputSchema.plotsHorzSelection>;
     plotsVertSelection?: z.infer<typeof inputSchema.plotsVertSelection>;
+    comparisonSelectedGroups?: z.infer<
+        typeof inputSchema.comparisonSelectedGroups
+    >;
 };
 
 /**
@@ -317,6 +326,9 @@ async function navigateToResultsView(
         options: {
             ...(plotsHorzSelection && { plotsHorzSelection }),
             ...(plotsVertSelection && { plotsVertSelection }),
+            ...(params.comparisonSelectedGroups && {
+                comparisonSelectedGroups: params.comparisonSelectedGroups,
+            }),
         },
     });
 

@@ -54,7 +54,15 @@ The comparison tab has subtabs accessible via `"comparison/{subtab}"`. Use `avai
 | `"comparison/dna_methylation"` | DNA methylation enrichment | Study has methylation profiles; single study only |
 | `"comparison/generic_assay_{type}"` | Custom assay enrichment (e.g. treatment response) | Study has generic assay profiles; single study only |
 
-**Best for:** Queries asking about a gene's alteration effect on a molecular readout — "PTEN alteration vs pAKT protein", "TP53 mutation and survival", "BRCA1 deletion vs mRNA expression". The comparison tab automatically splits samples into altered vs unaltered groups for the queried gene(s).
+**Comparison groups** — two types are always available:
+- **Aggregate:** `"Altered group"` (any queried gene altered) / `"Unaltered group"` — default selection
+- **Per-gene:** one group per queried gene, named after the gene symbol (e.g. `"IDH1"`, `"EGFR"`) when using default OQL
+
+**`comparisonSelectedGroups`:** overrides the default group selection. Omit for Altered vs Unaltered. Pass gene symbols to compare gene-specific groups.
+
+**Best for:**
+- One gene's alteration effect on outcomes — "TP53 mutation and survival" → omit `comparisonSelectedGroups` (default Altered vs Unaltered)
+- Gene A altered vs gene B altered — "how do IDH1 altered vs EGFR altered patients differ?" → `comparisonSelectedGroups: ["IDH1", "EGFR"]`, `tab: "comparison/survival"` (or `comparison/clinical`)
 
 ---
 
@@ -137,6 +145,17 @@ Use profile IDs from router metadata. Only include `plotsHorzSelection`/`plotsVe
   "studyIds": ["lusc_tcga_pan_can_atlas_2018"],
   "genes": ["PTEN"],
   "tab": "comparison/protein"
+}
+```
+
+**User:** "How do outcomes differ for IDH1 altered vs EGFR altered patients?"
+
+```json
+{
+  "studyIds": ["lgggbm_tcga_pub"],
+  "genes": ["IDH1", "EGFR"],
+  "tab": "comparison/survival",
+  "comparisonSelectedGroups": ["IDH1", "EGFR"]
 }
 ```
 

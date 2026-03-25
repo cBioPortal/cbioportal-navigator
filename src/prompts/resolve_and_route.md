@@ -103,6 +103,8 @@ When the user asks about a specific gene in a disease or study context (e.g., "t
 
 **Key signal — "alteration":** The word "alteration" means mutation + CNA combined. StudyView filters treat these separately (mutationDataFilters vs cnaGeneFilters), making it hard to express. ResultsView handles alteration as a unified concept — altered vs unaltered grouping is built in. When the user says "alteration", strongly prefer `navigate_to_results_view`.
 
+**Gene A altered vs gene B altered:** When the user asks how two gene-altered groups differ in outcomes (e.g., "how do IDH1 altered vs EGFR altered patients differ?"), use `navigate_to_results_view` with both genes, `tab: "comparison/survival"` (or other outcome subtab), and `comparisonSelectedGroups: ["IDH1", "EGFR"]`. Do NOT use `navigate_to_group_comparison` for this pattern — group comparison filters cannot express "mutation + CNA" combined.
+
 **Key distinction — "vs" semantics:**
 - **Symmetric groups** (two cohort subsets) → Rule 2: "male vs female", "stage I vs stage II"
 - **Asymmetric** (gene alteration → molecular readout) → Rule 3b: "PTEN alteration vs pAKT", "TP53 mutation vs survival"

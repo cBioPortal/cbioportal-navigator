@@ -57,6 +57,8 @@ export interface ResultsUrlOptions {
         plotsHorzSelection?: Record<string, any>;
         plotsVertSelection?: Record<string, any>;
         plotsColoringSelection?: Record<string, any>;
+        // Comparison options
+        comparisonSelectedGroups?: string[];
         // Generic
         genericAssayGroups?: string;
         genesetList?: string;
@@ -123,6 +125,11 @@ export function buildResultsUrl(options: ResultsUrlOptions): string {
         if (urlOptions.plotsColoringSelection) {
             query.plots_coloring_selection = urlOptions.plotsColoringSelection;
         }
+        if (urlOptions.comparisonSelectedGroups) {
+            query.comparison_selectedGroups = JSON.stringify(
+                urlOptions.comparisonSelectedGroups
+            );
+        }
         if (urlOptions.genericAssayGroups) {
             query.generic_assay_groups = urlOptions.genericAssayGroups;
         }
@@ -148,6 +155,7 @@ export function buildResultsUrl(options: ResultsUrlOptions): string {
                     'plotsHorzSelection',
                     'plotsVertSelection',
                     'plotsColoringSelection',
+                    'comparisonSelectedGroups',
                     'genericAssayGroups',
                     'genesetList',
                 ].includes(key)
