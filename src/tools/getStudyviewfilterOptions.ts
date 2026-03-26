@@ -35,6 +35,12 @@ const inputSchema = {
         .describe(
             'GENERIC_ASSAY molecular profile IDs from router genericAssayProfiles[].molecularProfileId'
         ),
+    entitySearch: z
+        .string()
+        .optional()
+        .describe(
+            'Keyword to search generic assay entities (case-insensitive match against stableId and NAME). Pass the gene symbol (e.g. "EGFR") or probe ID (e.g. "cg03860890") from the user query. Required when querying methylation profiles.'
+        ),
 };
 
 /**
@@ -53,6 +59,7 @@ type ToolInput = {
     studyId: z.infer<typeof inputSchema.studyId>;
     attributeIds?: z.infer<typeof inputSchema.attributeIds>;
     genericAssayProfileIds?: z.infer<typeof inputSchema.genericAssayProfileIds>;
+    entitySearch?: z.infer<typeof inputSchema.entitySearch>;
 };
 
 /**
@@ -93,7 +100,8 @@ export async function handleGetStudyviewfilterOptions(
 async function getStudyviewfilterOptions(
     params: ToolInput
 ): Promise<ToolResponse> {
-    const { studyId, attributeIds, genericAssayProfileIds } = params;
+    const { studyId, attributeIds, genericAssayProfileIds, entitySearch } =
+        params;
 
     if (!attributeIds?.length && !genericAssayProfileIds?.length) {
         return createErrorResponse(
@@ -107,7 +115,11 @@ async function getStudyviewfilterOptions(
             ? resolveClinicalAttributes(studyId, attributeIds)
             : Promise.resolve(null),
         genericAssayProfileIds?.length
-            ? resolveGenericAssayProfiles(studyId, genericAssayProfileIds)
+            ? resolveGenericAssayProfiles(
+                  studyId,
+                  genericAssayProfileIds,
+                  entitySearch
+              )
             : Promise.resolve(null),
     ]);
 
@@ -187,22 +199,10 @@ async function resolveClinicalAttributes(
 // Generic assay profiles
 // ---------------------------------------------------------------------------
 
-/**
- * Maximum number of generic assay entities to enumerate in the response.
- *
- * Profiles like methylation arrays (hm27: ~27K, hm450: ~450K) have far too
- * many entities to be useful in an LLM context window. Returning a partial
- * list would be misleading — the AI would treat it as complete. Instead, when
- * a profile exceeds this limit we skip entity enumeration entirely and return
- * a `tooLarge` flag so the AI can direct the user to the cBioPortal web UI.
- *
- * 200 entities ≈ 3,000 tokens — acceptable for a tool response.
- */
-const GENERIC_ASSAY_ENTITY_LIMIT = 200;
-
 async function resolveGenericAssayProfiles(
     studyId: string,
-    profileIds: string[]
+    profileIds: string[],
+    entitySearch?: string
 ): Promise<unknown[]> {
     // Fetch all profiles to get datatype for each requested profile
     const allProfiles = await studyViewDataClient.getMolecularProfiles([
@@ -219,29 +219,29 @@ async function resolveGenericAssayProfiles(
             const profileType = profileId.replace(`${studyId}_`, '');
             const isContinuous = datatype === 'LIMIT-VALUE';
 
-            // Lightweight count check using ID projection (~6x smaller than SUMMARY).
-            // If the profile has too many entities, skip full metadata fetch entirely
-            // rather than returning a misleading partial list.
-            const entityCount =
-                await studyViewDataClient.getGenericAssayEntityCount([
-                    profileId,
-                ]);
-
-            if (entityCount > GENERIC_ASSAY_ENTITY_LIMIT) {
-                return {
-                    molecularProfileId: profileId,
-                    profileType,
-                    datatype,
-                    entityCount,
-                    tooLarge: true,
-                    note: `Profile has ${entityCount} entities — too many to enumerate here. Direct the user to the cBioPortal web UI: StudyView → Add Chart → select this profile → search for the entity of interest.`,
-                };
-            }
-
-            // Within limit: fetch full metadata (SUMMARY projection)
-            const metaList = await studyViewDataClient.getGenericAssayMeta([
+            // Fetch full metadata (SUMMARY projection)
+            const allMeta = await studyViewDataClient.getGenericAssayMeta([
                 profileId,
             ]);
+
+            // Filter by entitySearch keyword if provided (case-insensitive match
+            // against stableId or NAME property — same logic as cBioPortal frontend)
+            const metaList = entitySearch
+                ? (() => {
+                      const regex = new RegExp(entitySearch, 'i');
+                      return allMeta.filter((meta) => {
+                          const props =
+                              meta.genericEntityMetaProperties as Record<
+                                  string,
+                                  string
+                              >;
+                          return (
+                              regex.test(meta.stableId) ||
+                              regex.test(props?.NAME ?? '')
+                          );
+                      });
+                  })()
+                : allMeta;
 
             let valuesMap = new Map<string, string[]>();
             if (!isContinuous && metaList.length > 0) {
@@ -274,6 +274,7 @@ async function resolveGenericAssayProfiles(
                 profileType,
                 datatype,
                 entities,
+                ...(entitySearch && { matchedCount: entities.length }),
             };
         })
     );

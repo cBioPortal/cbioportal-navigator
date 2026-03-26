@@ -26,12 +26,12 @@ src/
 │   ├── navigateToGroupComparison.ts
 │   ├── navigateToResultsView.ts
 │   ├── navigateToPatientView.ts
-│   ├── router/                # Study/gene/profile resolvers
 │   ├── studyView/             # URL builder, tab validator, schemas, data client
 │   ├── groupComparison/       # Group builder, numerical binning, session client
 │   ├── resultsView/           # URL builder, main session client
 │   ├── patientView/           # URL builder
 │   └── shared/                # Config, types, responses, validators, API client, URL builder, promptLoader
+│                              #   + geneResolver.ts, studyResolver.ts, plotsSchemas.ts
 └── prompts/                   # Local prompt .md files
     ├── system.md
     ├── resolve_and_route.md
@@ -67,6 +67,10 @@ src/
 
 10. **Prompt Loading** — Prompts are stored as local `.md` files under `src/prompts/` and loaded synchronously at startup via `initPrompts()`. Tool files use factory functions (`createXxxTool()`) instead of module-level constants so that `loadPrompt()` runs after `initPrompts()`.
 
+12. **ResultsView Per-Gene Comparison Groups** — `navigate_to_results_view` accepts `comparisonSelectedGroups: string[]` to pre-select which groups appear in the comparison tab. With default OQL (no custom OQL), each queried gene gets its own group named after the gene symbol. Passing `["IDH1", "EGFR"]` compares IDH1-altered vs EGFR-altered samples (true altered = mutation + CNA + SV via OQL). Omit for default Altered vs Unaltered aggregate groups. Group name = gene symbol; `comparison_selectedGroups` is JSON-stringified in the URL.
+
+13. **Plots Pre-Configuration** — Both `navigate_to_study_view` and `navigate_to_results_view` accept `plotsHorzSelection` / `plotsVertSelection` (tab must be `"plots"`). `selectedGeneOption` accepts Hugo symbol — resolved to Entrez ID automatically via `geneResolver.resolvePlotsGene()`. `selectedDataSourceOption` = molecular profile ID from router metadata. Default OQL coloring applied by frontend; `plotsColoringSelection` not exposed.
+
 11. **Unselected Group (Wildtype/Complement)** — In `navigate_to_group_comparison` `groups` mode, one group may use `{ name, isUnselected: true }` instead of a `studyViewFilter`. This group receives all cohort samples NOT matched by any other group (complement). Implemented in `navigateToGroupComparisonByFilters`: fetches full cohort (with global `studyViewFilter` if provided), subtracts union of all filter-group samples. At most one unselected group allowed. No `groupUrl` is generated for the unselected group (no simple StudyView filter can express a complement).
 
 ## Frontend Reference (cbioportal-frontend)
@@ -80,6 +84,7 @@ Key enums/types referenced by this project:
   - `structuralVariants`: inferred from profile IDs (look for `_sv`/`_fusion`/`_structural_variants`)
   - `coexpression`: inferred from profile IDs (look for `_mrna`/`_rna_seq`/`_rppa`); single study only
 - **ResultsViewComparisonSubTab** (`ResultsViewPageHelpers.tsx`): `overlap`, `survival`, `clinical`, `mrna`, `protein`, `dna_methylation`, `alterations`, `generic_assay` (prefix). URL pattern: `/results/comparison/{subtab}`. Our tool supports these via composite tab values like `comparison/protein`.
+- **ResultsView comparison groups** (`ResultsViewComparisonUtils.ts`, `ResultsViewPageStore.ts`): two types — (1) aggregate `"Altered group"` / `"Unaltered group"` (default selection); (2) per-OQL-track groups, one per queried gene named after the gene symbol when using default OQL (e.g. `"IDH1"`, `"EGFR"`). Selected via `comparison_selectedGroups` URL param (JSON array of group names). Default OQL covers mutation + CNA + SV — per-gene groups therefore represent true "altered" for each gene. Our tool exposes this as `comparisonSelectedGroups: string[]`.
 - **GroupComparisonTab** (`GroupComparisonTabs.ts`, `ComparisonStore.ts`, `EnrichmentsUtil.tsx`): Tab availability computed from molecular profiles + clinical attributes in `resolveAndRoute` → `availableComparisonTabs`. Always: `overlap`, `clinical`. Conditional: `survival` (paired `_STATUS`+`_MONTHS` attrs), `alterations` (`MUTATION_EXTENDED` or `COPY_NUMBER_ALTERATION`+`DISCRETE`), `mutations` (`MUTATION_EXTENDED`). Single-study only: `mrna` (`MRNA_EXPRESSION`), `protein` (`PROTEIN_LEVEL`), `dna_methylation` (`METHYLATION`), `generic_assay_{type_lowercase}` (one per `genericAssayType`). Default tab when none specified: `overlap` (frontend fallback in `GroupComparisonURLWrapper`).
 - **ALTERATION_FILTER_DEFAULTS** (`StudyViewUtils.tsx`): `copyNumberAlterationEventTypes` only supports `AMP`/`HOMDEL`; for `GAIN`/`HETLOSS`/`DIPLOID` use `geneFilters`
 - **navCaseIds** (`PatientViewUrlWrapper.ts`, `handleLongUrls.ts`): hashed URL param for cohort navigation; `handleLongUrls()` moves to `window.navCaseIdsCache` when >60000 chars
@@ -93,7 +98,7 @@ Hash params (`filterJson`) are URL-encoded via `encodeURIComponent` in `cbioport
 
 - StudyView URL params not implemented: `sharedGroups`, `sharedCustomData`, `geneset_list`
 - Treatment tier data (AgentClass/AgentTarget) — identical to base data on public cBioPortal
-- Generic assay profiles with >200 entities (e.g. methylation hm27/hm450) return `tooLarge: true` instead of entity list — AI should direct user to web UI for those
+- Methylation profiles (hm27/hm450) have tens of thousands of probes — use `entitySearch` in `get_studyviewfilter_options` to filter by gene symbol or probe ID before returning results
 
 ## Development
 

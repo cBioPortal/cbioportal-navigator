@@ -25,6 +25,9 @@ Array of clinical attribute IDs.
 Array of molecular profile IDs from `router.metadata.genericAssayProfiles[].molecularProfileId`.
 - At least one of `attributeIds` or `genericAssayProfileIds` is required
 
+### entitySearch _(optional)_
+Keyword to filter generic assay entities by stableId or NAME (case-insensitive regex). Use when the profile contains many entities — in particular, **methylation profiles (hm27/hm450) have tens of thousands of probes and require `entitySearch` to be useful**. Pass a gene symbol (e.g. `"EGFR"`) or a probe ID (e.g. `"cg03860890"`).
+
 ---
 
 ## Output
@@ -102,3 +105,13 @@ Use the returned `profileType` and `stableId` directly in the filter:
 4. **Call** `navigate_to_study_view` with `genericAssayDataFilters` using exact stableIds
 
 Both `attributeIds` and `genericAssayProfileIds` can be requested in a single call.
+
+**Methylation:** Methylation profiles (profile ID contains `methylation`) have tens of thousands of probes. Always pass `entitySearch` with a gene symbol or probe ID — otherwise the response will be very large and unusable.
+
+```json
+{
+  "studyId": "lgggbm_tcga_pub",
+  "genericAssayProfileIds": ["lgggbm_tcga_pub_methylation_hm27"],
+  "entitySearch": "EGFR"
+}
+```

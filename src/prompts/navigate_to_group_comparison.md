@@ -54,6 +54,8 @@ Use a value from `availableComparisonTabs` in the resolver metadata for the stud
 | `dna_methylation` | DNA methylation enrichment | Study has methylation profiles; single study only |
 | `generic_assay_{type}` | Custom assay enrichment (e.g. `generic_assay_treatment_response`) | Study has generic assay profiles; single study only |
 
+**Arm-level CNA:** When the user asks about chromosome arm deletions/gains (e.g., "19q deletion", "1p loss", "chr8 gain"), use `generic_assay_armlevel_cna` if present in `availableComparisonTabs` — it directly shows arm-level CNA enrichment per group. Prefer this over `alterations` for arm-level questions.
+
 ---
 
 ## Grouping Behavior (clinicalAttributeId)
