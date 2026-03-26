@@ -72,7 +72,17 @@ Use exact profile IDs from router metadata.
 ### Union vs Intersection
 
 - **Union** (ANY gene): `"geneQueries": [[{"hugoGeneSymbol": "TP53"}, {"hugoGeneSymbol": "KRAS"}]]`
-- **Intersection** (ALL genes): `"geneQueries": [[{"hugoGeneSymbol": "TP53"}], [{"hugoGeneSymbol": "KRAS"}]]`
+- **Intersection** (ALL genes — same profile): `"geneQueries": [[{"hugoGeneSymbol": "TP53"}], [{"hugoGeneSymbol": "KRAS"}]]`
+
+**IDH1 AND TP53 mutant (same profile):**
+```json
+{
+  "geneFilters": [{
+    "molecularProfileIds": ["lgg_tcga_pan_can_atlas_2018_mutations"],
+    "geneQueries": [[{"hugoGeneSymbol": "IDH1"}], [{"hugoGeneSymbol": "TP53"}]]
+  }]
+}
+```
 
 ### CNA `alterations` field
 
