@@ -92,9 +92,9 @@ Use exact profile IDs from router metadata.
 {"hugoGeneSymbol": "MYC", "alterations": ["AMP"]}
 ```
 
-### Cross-type intersection
+### Cross-type intersection (AND)
 
-Different alteration types require separate `geneFilters` entries:
+To require samples with both a mutation AND a CNA (different profiles), use separate `geneFilters` entries:
 
 ```json
 {
@@ -110,6 +110,16 @@ Different alteration types require separate `geneFilters` entries:
   ]
 }
 ```
+
+### Cross-type OR — provide separate URLs
+
+**Same alteration type OR** (e.g., TP53 mutant OR KRAS mutant): use `geneQueries` union within a single `geneFilters` entry — `filterJson` handles this natively.
+
+**Cross alteration type OR** (e.g., TP53 mutant OR EGFR AMP — different profiles): StudyView does not support this natively. Call `navigate_to_study_view` **once per filter** (exception to the one-call rule) to generate a separate URL for each, then instruct the user:
+
+> "StudyView doesn't support OR across different alteration types directly. Here are the two filtered views:
+> 1. Open the first link → click **Custom Selection** (top right) → click **currently selected** to populate the text box with those sample IDs → copy the list
+> 2. Open the second link → click **Custom Selection** → click **currently selected** → paste in the copied IDs to add them to the list → click **Filter to listed samples**"
 
 ---
 
