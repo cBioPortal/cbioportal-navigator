@@ -82,41 +82,50 @@ Two approaches:
 - "LUAD vs LUSC mutation comparison"
 
 ### Rule 3 → `navigate_to_results_view`
-**Gene(s) mentioned AND query asks about the gene's alteration pattern or its downstream molecular effects.**
+**Gene(s) mentioned as the subject of analysis** (not just as a patient filter). Ask: what is the user trying to learn about this gene?
 
-Covers two sub-scenarios:
+**3a. How often / in what form is this gene altered?**
+Mutation frequency, co-occurrence, mutual exclusivity, OncoPrint, structural variants, alteration frequencies by cancer type.
+- "Show me TP53 mutations in lung cancer" → `oncoprint` or `mutations`
+- "Compare EGFR and KRAS alterations" → `oncoprint`
+- "What structural variants exist in ALK?" → `structuralVariants`
+- "EGFR alteration frequencies across cancer types" → `cancerTypesSummary`
 
-**3a. Gene alteration pattern** — mutation frequency, co-occurrence, mutual exclusivity, OncoPrint, functional impact, structural variants, cancer type summary.
-- "Show me TP53 mutations in lung cancer"
-- "Compare EGFR and KRAS alterations"
-- "What structural variants exist in ALK?"
+Note: `cancerTypesSummary` shows how often a gene is mutated/amplified across cancer types — it is an alteration frequency view, not expression levels.
 
-**3b. Gene alteration vs downstream molecular data** — how a gene's alteration status affects protein, mRNA, methylation, or survival. Use the comparison tab with the appropriate subtab (`comparison/protein`, `comparison/mrna`, `comparison/survival`, etc.).
-- "PTEN alteration vs pAKT protein in lung squamous" → tab: `comparison/protein`
-- "TP53 mutation vs CDKN1A expression" → tab: `comparison/mrna`
-- "BRCA1 deletion and survival" → tab: `comparison/survival`
+**3b. What are the expression/protein levels of this gene?**
+User wants continuous molecular values (mRNA, protein), not binary alteration status. Signal words: "expression", "mRNA", "RNA levels", "z-scores", "protein levels" without accompanying alteration language.
 
-**Gene-in-disease pattern — call BOTH study view and results view:**
-When the user asks about a specific gene in a disease or study context (e.g., "tell me about IDH1 mutations in glioma", "TP53 in lung cancer", "BRCA1 alterations in breast cancer"), call **both** `navigate_to_study_view` (with the gene as a mutation/CNA filter) **and** `navigate_to_results_view` in parallel. Present the **study view link first** — it gives the cohort overview with the gene filter applied (demographics, clinical distributions, sample counts). Present the **results view link second** — it provides the detailed gene analysis (mutation table, OncoPrint, cancer type summary). This gives the user a complete picture: cohort context first, then gene-level detail.
+Route to `tab: "plots"` — the Plots tab takes two variables as axes. Expression queries map naturally: continuous value on one axis, grouping variable on the other.
+- "EGFR expression across cancer types" → horz: `clinical_attribute`/`CANCER_TYPE_DETAILED`, vert: `MRNA_EXPRESSION`
+- "EGFR expression vs copy number" → horz: `COPY_NUMBER_ALTERATION`, vert: `MRNA_EXPRESSION`
+- "TP53 mRNA levels in breast cancer" → vert: `MRNA_EXPRESSION`
+- "EGFR protein expression by cancer type" → horz: `clinical_attribute`/`CANCER_TYPE_DETAILED`, vert: `PROTEIN_LEVEL`
 
-**When in doubt, call both.** If a gene query could reasonably map to multiple views (e.g., "expression vs copy number change in EGFR in lung cancer" could be `plots` tab in results view or a gene-filtered cohort in study view), call both tools rather than committing to one. Use the most relevant tab for results view (e.g., `plots` for expression/CNA correlation queries).
+**3c. How does this gene's alteration affect downstream outcomes?**
+Alteration status (mutated vs wildtype) is the grouping variable; the outcome is molecular (mRNA, protein, methylation) or clinical (survival). Use `comparison/{subtab}`.
+- "TP53 mutation vs CDKN1A expression" → `comparison/mrna`
+- "PTEN alteration vs pAKT protein" → `comparison/protein`
+- "BRCA1 deletion and survival" → `comparison/survival`
+- "Compare EGFR mRNA in TP53 mutant vs wildtype" → `comparison/mrna`
 
-**Key signal — "alteration":** The word "alteration" means mutation + CNA combined. StudyView filters treat these separately (mutationDataFilters vs cnaGeneFilters), making it hard to express. ResultsView handles alteration as a unified concept — altered vs unaltered grouping is built in. When the user says "alteration", strongly prefer `navigate_to_results_view`.
+Distinction from 3b: in 3c, alteration is the cause/grouping; in 3b, there is no alteration grouping — just raw expression values.
 
-**Gene A altered vs gene B altered:** When the user asks how two gene-altered groups differ in outcomes (e.g., "how do IDH1 altered vs EGFR altered patients differ?"), use `navigate_to_results_view` with both genes, `tab: "comparison/survival"` (or other outcome subtab), and `comparisonSelectedGroups: ["IDH1", "EGFR"]`. Do NOT use `navigate_to_group_comparison` for this pattern — group comparison filters cannot express "mutation + CNA" combined.
+**Special cases:**
 
-**Key distinction — "vs" semantics:**
-- **Symmetric groups** (two cohort subsets) → Rule 2: "male vs female", "stage I vs stage II"
-- **Asymmetric** (gene alteration → molecular readout) → Rule 3b: "PTEN alteration vs pAKT", "TP53 mutation vs survival"
-- **Gene vs gene** (alteration comparison) → Rule 3a: "EGFR vs KRAS alterations"
+_Gene-in-disease (broad query):_ "Tell me about IDH1 mutations in glioma", "TP53 in lung cancer" — call **both** `navigate_to_study_view` (gene as mutation filter, cohort overview) and `navigate_to_results_view` (OncoPrint, mutation table) in parallel. Present study view first.
 
-**Key distinction — gene as subject vs filter:**
+_Gene A altered vs gene B altered:_ "How do IDH1-altered vs EGFR-altered patients differ?" — `navigate_to_results_view` with both genes, `tab: "comparison/survival"`, `comparisonSelectedGroups: ["IDH1", "EGFR"]`. Do not use `navigate_to_group_comparison` — it cannot express mutation + CNA combined.
 
-| Pattern | Tool |
-|---|---|
-| Gene alteration pattern (mutations, co-occurrence) | `results` (oncoprint/mutations) |
-| Gene alteration → downstream effect (protein, mRNA, survival) | `results` (comparison/{subtab}) |
-| Gene as patient filter (clinical features of X-mutated patients) | `study` (Rule 4) |
+_"alteration" keyword:_ means mutation + CNA combined. StudyView cannot express this natively; strongly prefer `navigate_to_results_view`.
+
+_"vs" semantics:_
+- Symmetric cohort split ("male vs female", "stage I vs stage II") → Rule 2
+- Gene alteration → outcome ("TP53 mutation vs survival") → Rule 3c
+- Gene vs gene alteration ("EGFR vs KRAS") → Rule 3a
+- Two continuous variables ("expression vs copy number") → Rule 3b
+
+_When in doubt, call both_ `navigate_to_study_view` and `navigate_to_results_view`. Use `tab: "plots"` for expression/CNA correlation queries.
 
 ### Rule 4 → `navigate_to_study_view` (default)
 **Everything else:** cohort overview, discovery questions, gene used only as a patient filter.

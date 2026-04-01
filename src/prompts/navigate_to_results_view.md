@@ -4,16 +4,6 @@ Generates direct URL to cBioPortal ResultsView — gene alteration analysis and 
 
 **→ See router tool for universal guidelines (no guessing IDs, exact values, Link First principle).**
 
-## What ResultsView Shows
-
-- **OncoPrint:** visual matrix of gene alterations across samples
-- **Mutation details:** amino acid changes, functional impact, frequencies
-- **Co-occurrence analysis:** mutually exclusive or co-occurring alterations
-- **Comparison:** altered vs unaltered groups — survival, protein, mRNA, clinical differences
-- **Survival analysis, plots, pathway diagrams**
-
----
-
 ## Required Inputs
 
 ### studyIds (required)
@@ -21,6 +11,8 @@ Array of study IDs from router response. Supports cross-study analysis.
 
 ### genes (required)
 Array of UPPERCASE HUGO gene symbols: `["TP53"]`, `["TP53", "KRAS", "EGFR"]`
+
+For `tab: "plots"`, the gene dropdown on each axis is populated only from this list. Include every gene referenced in either axis — not just the primary gene of interest. E.g. "EGFR mRNA by TP53 mutation status" requires `genes: ["TP53", "EGFR"]`.
 
 ### tab (optional)
 | Tab | Available when |
@@ -97,10 +89,29 @@ Use `tab: "plots"` with `plotsHorzSelection` / `plotsVertSelection` to pre-confi
 | Field | Value |
 |---|---|
 | `selectedGeneOption` | Hugo symbol, e.g. `"IDH1"` |
-| `dataType` | `"MRNA_EXPRESSION"`, `"MUTATION_EXTENDED"`, `"COPY_NUMBER_ALTERATION"`, `"METHYLATION"`, `"PROTEIN_LEVEL"`, `"CLINICAL"` |
-| `selectedDataSourceOption` | Molecular profile ID from router metadata (e.g. `"lgggbm_tcga_pub_mrna_median_zscores"`) |
+| `dataType` | `"MRNA_EXPRESSION"`, `"MUTATION_EXTENDED"`, `"COPY_NUMBER_ALTERATION"`, `"METHYLATION"`, `"PROTEIN_LEVEL"`, `"STRUCTURAL_VARIANT"`, `"clinical_attribute"` |
+| `selectedDataSourceOption` | **Molecular types:** profile suffix — strip `{studyId}_` prefix from the molecular profile ID (e.g. `"lgggbm_tcga_pub_mrna_median_zscores"` → `"mrna_median_zscores"`). Same rule as `profileType` in `mutationDataFilters`/`genomicDataFilters`. Using suffixes enables cross-study matching. **`clinical_attribute`:** clinical attribute ID from router `clinicalAttributeIds` (e.g. `"CANCER_TYPE_DETAILED"`, `"CANCER_TYPE"`) |
 | `mutationCountBy` | `"MutationType"` (default), `"MutatedVsWildType"` — only for `MUTATION_EXTENDED` axis |
 | `logScale` | `"true"` or `"false"` |
+
+**"EGFR expression across cancer types"**
+```json
+{
+  "studyIds": ["luad_tcga_pan_can_atlas_2018"],
+  "genes": ["EGFR"],
+  "tab": "plots",
+  "plotsHorzSelection": {
+    "dataType": "clinical_attribute",
+    "selectedDataSourceOption": "CANCER_TYPE_DETAILED"
+  },
+  "plotsVertSelection": {
+    "selectedGeneOption": "EGFR",
+    "dataType": "MRNA_EXPRESSION",
+    "selectedDataSourceOption": "rna_seq_v2_mrna_median_all_sample_Zscores",
+    "logScale": "true"
+  }
+}
+```
 
 **"IDH1 expression by mutation status in LGG"**
 ```json
@@ -111,13 +122,13 @@ Use `tab: "plots"` with `plotsHorzSelection` / `plotsVertSelection` to pre-confi
   "plotsHorzSelection": {
     "selectedGeneOption": "IDH1",
     "dataType": "MUTATION_EXTENDED",
-    "selectedDataSourceOption": "lgggbm_tcga_pub_mutations",
+    "selectedDataSourceOption": "mutations",
     "mutationCountBy": "MutatedVsWildType"
   },
   "plotsVertSelection": {
     "selectedGeneOption": "IDH1",
     "dataType": "MRNA_EXPRESSION",
-    "selectedDataSourceOption": "lgggbm_tcga_pub_mrna_median_zscores"
+    "selectedDataSourceOption": "mrna_median_zscores"
   }
 }
 ```

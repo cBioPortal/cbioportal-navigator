@@ -58,7 +58,9 @@ const inputSchema = {
     genes: z
         .array(z.string())
         .min(1)
-        .describe('Gene symbols (required, at least 1)'),
+        .describe(
+            'Gene symbols (required, at least 1). All genes that appear in any axis or analysis must be included — the frontend populates gene dropdowns only from this list.'
+        ),
     caseSetId: z
         .string()
         .optional()

@@ -4,15 +4,6 @@ Generates direct URL to cBioPortal StudyView — cohort overview and analysis.
 
 **→ See router tool for universal guidelines (no guessing IDs, exact values, Link First principle).**
 
-## What StudyView Shows
-
-- Cohort statistics and patient demographics
-- Genomic overview (mutations, CNV, fusions)
-- Survival analysis curves
-- Custom charts and plots
-
----
-
 ## Required Inputs
 
 ### studyIds (required)
@@ -247,8 +238,8 @@ Use `tab: "plots"` with `plotsHorzSelection` / `plotsVertSelection` to pre-confi
 | Field | Value |
 |---|---|
 | `selectedGeneOption` | Hugo symbol, e.g. `"IDH1"` |
-| `dataType` | `"MRNA_EXPRESSION"`, `"MUTATION_EXTENDED"`, `"COPY_NUMBER_ALTERATION"`, `"METHYLATION"`, `"PROTEIN_LEVEL"`, `"CLINICAL"` |
-| `selectedDataSourceOption` | Molecular profile ID from router metadata (e.g. `"lgggbm_tcga_pub_mrna_median_zscores"`) |
+| `dataType` | `"MRNA_EXPRESSION"`, `"MUTATION_EXTENDED"`, `"COPY_NUMBER_ALTERATION"`, `"METHYLATION"`, `"PROTEIN_LEVEL"`, `"STRUCTURAL_VARIANT"`, `"clinical_attribute"` |
+| `selectedDataSourceOption` | **Molecular types:** profile suffix — strip `{studyId}_` prefix from the molecular profile ID (e.g. `"lgggbm_tcga_pub_mrna_median_zscores"` → `"mrna_median_zscores"`). Same rule as `profileType` in `mutationDataFilters`/`genomicDataFilters`. **`clinical_attribute`:** clinical attribute ID from router `clinicalAttributeIds` (e.g. `"CANCER_TYPE_DETAILED"`, `"CANCER_TYPE"`) |
 | `mutationCountBy` | `"MutationType"` (default), `"MutatedVsWildType"` — only for `MUTATION_EXTENDED` axis |
 | `logScale` | `"true"` or `"false"` |
 
@@ -260,13 +251,13 @@ Use `tab: "plots"` with `plotsHorzSelection` / `plotsVertSelection` to pre-confi
   "plotsHorzSelection": {
     "selectedGeneOption": "IDH1",
     "dataType": "MUTATION_EXTENDED",
-    "selectedDataSourceOption": "lgggbm_tcga_pub_mutations",
+    "selectedDataSourceOption": "mutations",
     "mutationCountBy": "MutatedVsWildType"
   },
   "plotsVertSelection": {
     "selectedGeneOption": "IDH1",
     "dataType": "MRNA_EXPRESSION",
-    "selectedDataSourceOption": "lgggbm_tcga_pub_mrna_median_zscores"
+    "selectedDataSourceOption": "mrna_median_zscores"
   }
 }
 ```
