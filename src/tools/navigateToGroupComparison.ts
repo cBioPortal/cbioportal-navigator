@@ -40,6 +40,7 @@ import {
 } from './shared/responses.js';
 import { getConfig } from './shared/config.js';
 import { loadPrompt } from './shared/promptLoader.js';
+import { getGroupComparisonPageDescription } from './shared/pageDescriptions.js';
 
 /**
  * Tool definition schema (without description, which is loaded at startup)
@@ -192,6 +193,11 @@ export async function handleNavigateToGroupComparison(
         // Add per-group URLs when available (pre-filter or value subset)
         if (result.groupUrls) {
             responseData.groupUrls = result.groupUrls;
+        }
+
+        const pageDescription = getGroupComparisonPageDescription(input.tab);
+        if (pageDescription) {
+            responseData.pageDescription = pageDescription;
         }
 
         const response = createNavigationResponse(result.url, responseData);

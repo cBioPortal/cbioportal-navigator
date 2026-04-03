@@ -2,45 +2,7 @@
 
 MCP server for AI-assisted cBioPortal navigation. Supports stdio mode for Claude Desktop and HTTP mode (Streamable HTTP transport) for remote MCP clients.
 
-## Tools
-
-| Tool | Description |
-|------|-------------|
-| `resolve_and_route` | Study resolver — resolves studies, returns metadata; LLM decides which navigation tool(s) to call |
-| `get_studyviewfilter_options` | On-demand filter metadata (clinical attributes + generic assay entities) |
-| `navigate_to_study_view` | StudyView URL with filters, plots, tabs, treatment filters |
-| `navigate_to_group_comparison` | Group Comparison — categorical/numerical grouping, tabs, per-group StudyView URLs |
-| `navigate_to_results_view` | ResultsView — filter-to-results via session (`mainSessionClient.ts`) |
-| `navigate_to_patient_view` | PatientView — filter-to-patient with cohort navigation (`navCaseIds`) |
-
-## Architecture
-
-```
-src/
-├── index.ts              # Entry point: stdio/HTTP mode selection, MCP server creation
-├── toolRegistry.ts       # Central tool registration
-├── tools/
-│   ├── resolveAndRoute.ts          # Study resolver (no targetPage — LLM chooses tools)
-│   ├── getStudyviewfilterOptions.ts
-│   ├── navigateToStudyView.ts
-│   ├── navigateToGroupComparison.ts
-│   ├── navigateToResultsView.ts
-│   ├── navigateToPatientView.ts
-│   ├── studyView/             # URL builder, tab validator, schemas, data client
-│   ├── groupComparison/       # Group builder, numerical binning, session client
-│   ├── resultsView/           # URL builder, main session client
-│   ├── patientView/           # URL builder
-│   └── shared/                # Config, types, responses, validators, API client, URL builder, promptLoader
-│                              #   + geneResolver.ts, studyResolver.ts, plotsSchemas.ts
-└── prompts/                   # Local prompt .md files
-    ├── system.md
-    ├── resolve_and_route.md
-    ├── get_studyviewfilter_options.md
-    ├── navigate_to_study_view.md
-    ├── navigate_to_group_comparison.md
-    ├── navigate_to_results_view.md
-    └── navigate_to_patient_view.md
-```
+Six tools: `resolve_and_route`, `get_studyviewfilter_options`, `navigate_to_study_view`, `navigate_to_group_comparison`, `navigate_to_results_view`, `navigate_to_patient_view`. Prompts loaded from `src/prompts/*.md` at startup. Tool files use factory functions (`createXxxTool()`) so `loadPrompt()` runs after `initPrompts()`.
 
 ## Key Design Decisions
 
@@ -65,13 +27,13 @@ src/
 
 9. **No targetPage Constraint** — `resolve_and_route` only resolves studies and returns metadata. The LLM decides which navigation tool(s) to call based on the selection guide in the tool description. This allows multi-tool calls and flexible routing in multi-turn conversations.
 
-10. **Prompt Loading** — Prompts are stored as local `.md` files under `src/prompts/` and loaded synchronously at startup via `initPrompts()`. Tool files use factory functions (`createXxxTool()`) instead of module-level constants so that `loadPrompt()` runs after `initPrompts()`.
+10. **Unselected Group (Wildtype/Complement)** — In `navigate_to_group_comparison` `groups` mode, one group may use `{ name, isUnselected: true }` instead of a `studyViewFilter`. This group receives all cohort samples NOT matched by any other group (complement). Implemented in `navigateToGroupComparisonByFilters`: fetches full cohort (with global `studyViewFilter` if provided), subtracts union of all filter-group samples. At most one unselected group allowed. No `groupUrl` is generated for the unselected group (no simple StudyView filter can express a complement).
 
-12. **ResultsView Per-Gene Comparison Groups** — `navigate_to_results_view` accepts `comparisonSelectedGroups: string[]` to pre-select which groups appear in the comparison tab. With default OQL (no custom OQL), each queried gene gets its own group named after the gene symbol. Passing `["IDH1", "EGFR"]` compares IDH1-altered vs EGFR-altered samples (true altered = mutation + CNA + SV via OQL). Omit for default Altered vs Unaltered aggregate groups. Group name = gene symbol; `comparison_selectedGroups` is JSON-stringified in the URL.
+11. **ResultsView Per-Gene Comparison Groups** — `navigate_to_results_view` accepts `comparisonSelectedGroups: string[]` to pre-select which groups appear in the comparison tab. With default OQL (no custom OQL), each queried gene gets its own group named after the gene symbol. Passing `["IDH1", "EGFR"]` compares IDH1-altered vs EGFR-altered samples (true altered = mutation + CNA + SV via OQL). Omit for default Altered vs Unaltered aggregate groups. Group name = gene symbol; `comparison_selectedGroups` is JSON-stringified in the URL.
 
-13. **Plots Pre-Configuration** — Both `navigate_to_study_view` and `navigate_to_results_view` accept `plotsHorzSelection` / `plotsVertSelection` (tab must be `"plots"`). `selectedGeneOption` accepts Hugo symbol — resolved to Entrez ID automatically via `geneResolver.resolvePlotsGene()`. `selectedDataSourceOption` = molecular profile ID from router metadata. Default OQL coloring applied by frontend; `plotsColoringSelection` not exposed.
+12. **Plots Pre-Configuration** — Both `navigate_to_study_view` and `navigate_to_results_view` accept `plotsHorzSelection` / `plotsVertSelection` (tab must be `"plots"`). `selectedGeneOption` accepts Hugo symbol — resolved to Entrez ID automatically via `geneResolver.resolvePlotsGene()`. `selectedDataSourceOption` = profile suffix (strip `{studyId}_` prefix from molecular profile ID — e.g. `luad_tcga_pan_can_atlas_2018_rna_seq_v2_mrna` → `rna_seq_v2_mrna`); frontend matches by suffix across studies. For `dataType: "clinical_attribute"`, `selectedDataSourceOption` = clinical attribute ID (e.g. `CANCER_TYPE_DETAILED`). Valid `dataType` values: `MRNA_EXPRESSION`, `MUTATION_EXTENDED`, `COPY_NUMBER_ALTERATION`, `METHYLATION`, `PROTEIN_LEVEL`, `STRUCTURAL_VARIANT`, `clinical_attribute`. Default OQL coloring applied by frontend; `plotsColoringSelection` not exposed. For ResultsView plots, all genes referenced in either axis must be included in `genes` (frontend populates gene dropdowns only from queried genes).
 
-11. **Unselected Group (Wildtype/Complement)** — In `navigate_to_group_comparison` `groups` mode, one group may use `{ name, isUnselected: true }` instead of a `studyViewFilter`. This group receives all cohort samples NOT matched by any other group (complement). Implemented in `navigateToGroupComparisonByFilters`: fetches full cohort (with global `studyViewFilter` if provided), subtracts union of all filter-group samples. At most one unselected group allowed. No `groupUrl` is generated for the unselected group (no simple StudyView filter can express a complement).
+13. **Tab-Level Page Descriptions** — All four navigation tools return a `pageDescription` field when a `tab` is specified. Descriptions are curated strings sourced from the cBioPortal frontend (not LLM-generated), stored in `src/tools/shared/pageDescriptions.ts`. Coverage: PatientView (`summary`, `clinicalData`, `pathways`), StudyView (`summary`, `clinicalData`, `cnSegments`, `plots`), ResultsView (19 tabs including comparison subtabs), GroupComparison (9 tabs including `generic_assay_*`). The LLM is instructed in `system.md` to use this field verbatim and not supplement it — the sanctioned way to describe what a page shows without hallucinating UI features.
 
 ## Frontend Reference (cbioportal-frontend)
 
@@ -99,13 +61,3 @@ Hash params (`filterJson`) are URL-encoded via `encodeURIComponent` in `cbioport
 - StudyView URL params not implemented: `sharedGroups`, `sharedCustomData`, `geneset_list`
 - Treatment tier data (AgentClass/AgentTarget) — identical to base data on public cBioPortal
 - Methylation profiles (hm27/hm450) have tens of thousands of probes — use `entitySearch` in `get_studyviewfilter_options` to filter by gene symbol or probe ID before returning results
-
-## Development
-
-- `npm run build` — compile TS + copy prompts to dist/
-- `npm run dev` — run with tsx (no build needed, entry: `src/index.ts`)
-- `npm start` — run compiled (`dist/index.js`)
-
-**Adding tools:** Create in `src/tools/<name>.ts` (export `createXxxTool()` factory + handler) → register in `src/toolRegistry.ts` → add prompt name to `promptLoader.ts` `PROMPT_NAMES` → create local `.md` file in `src/prompts/`.
-
-**Claude Desktop config:** `~/Library/Application Support/Claude/claude_desktop_config.json` — use absolute path to `dist/index.js`, restart after changes.

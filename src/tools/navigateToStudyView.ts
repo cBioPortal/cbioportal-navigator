@@ -40,6 +40,7 @@ import type { ToolResponse } from './shared/types.js';
 import { studyViewFilterSchema } from './studyView/schemas/index.js';
 import { plotsSelectionParamSchema } from './shared/plotsSchemas.js';
 import { loadPrompt } from './shared/promptLoader.js';
+import { getStudyViewPageDescription } from './shared/pageDescriptions.js';
 
 /**
  * Tool definition schema (without description, which is loaded at startup)
@@ -221,5 +222,8 @@ async function navigateToStudyView(
         hasPlotsConfig: !!(
             params.plotsHorzSelection || params.plotsVertSelection
         ),
+        ...(getStudyViewPageDescription(params.tab) && {
+            pageDescription: getStudyViewPageDescription(params.tab),
+        }),
     });
 }

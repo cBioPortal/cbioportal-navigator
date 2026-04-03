@@ -36,6 +36,7 @@ import {
 } from './shared/responses.js';
 import type { ToolResponse } from './shared/types.js';
 import { loadPrompt } from './shared/promptLoader.js';
+import { getPatientViewPageDescription } from './shared/pageDescriptions.js';
 
 /**
  * Tool definition schema (without description, which is loaded at startup)
@@ -200,6 +201,9 @@ async function navigateToPatientView(
             firstPatientId: first.patientId,
             firstStudyId: first.studyId,
             tab: params.tab,
+            ...(getPatientViewPageDescription(params.tab) && {
+                pageDescription: getPatientViewPageDescription(params.tab),
+            }),
         });
     }
 
@@ -236,5 +240,8 @@ async function navigateToPatientView(
         sampleId: params.sampleId,
         tab: params.tab,
         hasMultipleUrls: studyIds.length > 1,
+        ...(getPatientViewPageDescription(params.tab) && {
+            pageDescription: getPatientViewPageDescription(params.tab),
+        }),
     });
 }

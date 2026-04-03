@@ -44,6 +44,7 @@ import type { ToolResponse } from './shared/types.js';
 import { loadPrompt } from './shared/promptLoader.js';
 import { buildStudyUrl } from './studyView/buildStudyUrl.js';
 import { validateTabAvailability } from './studyView/validateStudyViewTab.js';
+import { getResultsViewPageDescription } from './shared/pageDescriptions.js';
 
 /**
  * Tool definition schema (without description, which is loaded at startup)
@@ -297,6 +298,9 @@ async function navigateToResultsView(
             caseSetId: '-1',
             sessionId,
             studyViewUrl,
+            ...(getResultsViewPageDescription(params.tab) && {
+                pageDescription: getResultsViewPageDescription(params.tab),
+            }),
         });
     }
 
@@ -343,5 +347,8 @@ async function navigateToResultsView(
         })),
         genes: validGenes,
         caseSetId,
+        ...(getResultsViewPageDescription(params.tab) && {
+            pageDescription: getResultsViewPageDescription(params.tab),
+        }),
     });
 }
