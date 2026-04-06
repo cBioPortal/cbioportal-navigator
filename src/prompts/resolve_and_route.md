@@ -115,7 +115,11 @@ Distinction from 3b: in 3c, alteration is the cause/grouping; in 3b, there is no
 
 _Gene-in-disease (broad query):_ "Tell me about IDH1 mutations in glioma", "TP53 in lung cancer" — call **both** `navigate_to_study_view` (gene as mutation filter, cohort overview) and `navigate_to_results_view` (OncoPrint, mutation table) in parallel. Present study view first.
 
-_Gene A altered vs gene B altered:_ "How do IDH1-altered vs EGFR-altered patients differ?" — `navigate_to_results_view` with both genes, `tab: "comparison/survival"`, `comparisonSelectedGroups: ["IDH1", "EGFR"]`. Do not use `navigate_to_group_comparison` — it cannot express mutation + CNA combined.
+_Gene A altered vs gene B altered (all alteration types):_ "How do IDH1-altered vs EGFR-altered patients differ?" — `navigate_to_results_view` with both genes, `tab: "comparison/survival"`, `comparisonSelectedGroups: ["IDH1", "EGFR"]`. Do not use `navigate_to_group_comparison` — it cannot express mutation + CNA combined.
+
+_Gene A mutant vs gene B mutant (mutation-specific):_ "ATRX mutant vs CIC mutant outcomes" — use `navigate_to_group_comparison` with custom groups, each group's `studyViewFilter` using `geneFilters` pointing to the mutations profile (`molecularProfileId` ending in `_mutations`). This creates mutation-only groups, not all-alteration groups.
+
+_Gene A mutant vs gene B amp (mixed alteration types):_ "IDH1 mutant vs EGFR amp" — use `navigate_to_group_comparison` with custom groups: the mutation group uses `geneFilters` with the `_mutations` profile; the AMP group uses `geneFilters` with the `_gistic` profile and `copyNumberAlterationEventTypes: ["AMP"]`.
 
 _"alteration" keyword:_ means mutation + CNA combined. StudyView cannot express this natively; strongly prefer `navigate_to_results_view`.
 

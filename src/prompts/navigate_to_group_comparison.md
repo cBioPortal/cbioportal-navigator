@@ -193,6 +193,66 @@ When presenting results, include group names and sample counts. Always offer bot
 ```
 → "EGFR Wildtype" = all study samples NOT in the EGFR Mutant group. Use `isUnselected` whenever the second group is the complement of the first (wildtype, unaltered, negative). Combine with `studyViewFilter` to restrict the cohort first.
 
+### Custom groups — gene A mutant vs gene B mutant (mutation-specific comparison)
+Use when the user says "mutant vs mutant" — each group filtered to that gene's mutations only, not all alterations.
+```json
+{
+  "studyIds": ["lgg_tcga_pan_can_atlas_2018"],
+  "groups": [
+    {
+      "name": "ATRX Mutant",
+      "studyViewFilter": {
+        "geneFilters": [{
+          "molecularProfileIds": ["lgg_tcga_pan_can_atlas_2018_mutations"],
+          "geneQueries": [[{"hugoGeneSymbol": "ATRX"}]]
+        }]
+      }
+    },
+    {
+      "name": "CIC Mutant",
+      "studyViewFilter": {
+        "geneFilters": [{
+          "molecularProfileIds": ["lgg_tcga_pan_can_atlas_2018_mutations"],
+          "geneQueries": [[{"hugoGeneSymbol": "CIC"}]]
+        }]
+      }
+    }
+  ],
+  "tab": "survival"
+}
+```
+→ Groups are mutation-only. Contrast with `navigate_to_results_view` `comparisonSelectedGroups`, which captures all alteration types (mutation + CNA + SV).
+
+### Custom groups — mutant vs amp (mixed alteration types)
+Use when comparing a mutation group against a CNA group.
+```json
+{
+  "studyIds": ["lgg_tcga_pan_can_atlas_2018"],
+  "groups": [
+    {
+      "name": "IDH1 Mutant",
+      "studyViewFilter": {
+        "geneFilters": [{
+          "molecularProfileIds": ["lgg_tcga_pan_can_atlas_2018_mutations"],
+          "geneQueries": [[{"hugoGeneSymbol": "IDH1"}]]
+        }]
+      }
+    },
+    {
+      "name": "EGFR Amp",
+      "studyViewFilter": {
+        "geneFilters": [{
+          "molecularProfileIds": ["lgg_tcga_pan_can_atlas_2018_gistic"],
+          "geneQueries": [[{"hugoGeneSymbol": "EGFR"}]],
+          "copyNumberAlterationEventTypes": ["AMP"]
+        }]
+      }
+    }
+  ],
+  "tab": "survival"
+}
+```
+
 ### Custom groups — multi-cohort split
 ```json
 {
