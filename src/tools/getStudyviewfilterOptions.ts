@@ -260,6 +260,9 @@ async function resolveGenericAssayProfiles(
                 const entry: Record<string, unknown> = {
                     stableId: meta.stableId,
                     name: props?.NAME ?? meta.stableId,
+                    ...(props?.DESCRIPTION && {
+                        description: props.DESCRIPTION,
+                    }),
                 };
                 if (isContinuous) {
                     entry.continuous = true;

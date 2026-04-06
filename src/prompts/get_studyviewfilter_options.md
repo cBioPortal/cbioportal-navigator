@@ -5,7 +5,7 @@ Fetches exact valid values for building `filterJson` in StudyView — covers bot
 ## What This Tool Does
 
 - **Clinical attributes:** returns datatype + exact values (e.g., `["Male", "Female"]` for SEX)
-- **Generic assay entities:** returns entity list (stableId + name) and values (categorical) or a `"continuous": true` flag (LIMIT-VALUE)
+- **Generic assay entities:** returns entity list (stableId + name + description when available) and values (categorical) or a `"continuous": true` flag (LIMIT-VALUE)
 
 **🚫 NEVER guess or invent filter values.** Always use exact values from this tool's response.
 
@@ -115,3 +115,5 @@ Both `attributeIds` and `genericAssayProfileIds` can be requested in a single ca
   "entitySearch": "EGFR"
 }
 ```
+
+When displaying methylation probes, always include the `description` (genomic region) alongside the probe ID and gene name — e.g. `cg12434587 — MGMT, TSS1500`. When auto-selecting a probe for filtering, state which probe was chosen and why, then list all alternatives with their annotations so the user can switch if needed.
