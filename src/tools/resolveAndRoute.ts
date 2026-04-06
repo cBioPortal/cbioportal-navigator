@@ -29,6 +29,7 @@ import { studyViewDataClient } from './studyView/studyViewDataClient.js';
 import { createDataResponse, createErrorResponse } from './shared/responses.js';
 import type { ToolResponse } from './shared/types.js';
 import { loadPrompt } from './shared/promptLoader.js';
+import { buildCBioPortalPageUrl } from './shared/cbioportalUrlBuilder.js';
 
 /**
  * Tool definition schema (without description, which is loaded at startup)
@@ -242,6 +243,10 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
                 studyId: study.studyId,
                 name: study.name,
                 sampleCount: study.allSampleCount,
+                studyViewUrl: buildCBioPortalPageUrl({
+                    pathname: '/study',
+                    query: { id: study.studyId },
+                }),
                 metadata: {
                     clinicalAttributeIds: clinicalAttributes.map(
                         (attr) => attr.clinicalAttributeId
@@ -264,6 +269,10 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
             studyId: study.studyId,
             name: study.name,
             sampleCount: study.allSampleCount,
+            studyViewUrl: buildCBioPortalPageUrl({
+                pathname: '/study',
+                query: { id: study.studyId },
+            }),
         };
     });
 

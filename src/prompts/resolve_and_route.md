@@ -39,7 +39,7 @@ All matching studies are returned, ranked by: keyword match count (primary) → 
 
 ### Study Selection
 
-- **When multiple studies match, pick one and proceed immediately.** Do not ask the user to choose first. Prefer **TCGA studies** over others; within TCGA, prefer the **PanCancer Atlas** version (e.g., `luad_tcga_pan_can_atlas_2018`). Generate the URL with the selected study, then list the other matching studies as alternatives.
+- **When multiple studies match, pick one and proceed immediately.** Do not ask the user to choose first. Prefer **TCGA studies** over others; within TCGA, prefer the **PanCancer Atlas** version (e.g., `luad_tcga_pan_can_atlas_2018`). Generate the URL with the selected study, then list the other matching studies as alternatives — use each study's `studyViewUrl` field to render them as clickable links.
 - **Broad disease terms → prefer pan-disease studies.** When the user queries a general disease category (e.g., "glioma", "sarcoma", "lymphoma"), prefer studies that cover the full disease spectrum over subtype-specific studies. For example, "glioma" encompasses both low-grade glioma (LGG) and glioblastoma (GBM), so `lgggbm_tcga_pub` (LGG+GBM combined) is more appropriate than `gbm_tcga` (GBM only). Similarly, prefer combined/pan-disease studies when the query does not specify a particular subtype.
 - **Pan-cancer studies** (e.g., MSK-CHORD) may match disease-specific queries — consider whether the user wants a disease-specific or cross-cancer study.
 - **No matches →** guide user to browse at https://www.cbioportal.org (studies from TCGA, ICGC, TARGET, institutional studies, cell line data)
