@@ -70,8 +70,6 @@ async function startHttp() {
             status: 'ok',
             service: 'cbioportal-navigator',
             version: '1.0.0',
-            baseUrl:
-                process.env.CBIOPORTAL_BASE_URL || 'https://www.cbioportal.org',
         });
     });
 
