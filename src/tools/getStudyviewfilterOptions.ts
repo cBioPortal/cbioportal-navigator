@@ -228,7 +228,11 @@ async function resolveGenericAssayProfiles(
             // against stableId or NAME property — same logic as cBioPortal frontend)
             const metaList = entitySearch
                 ? (() => {
-                      const regex = new RegExp(entitySearch, 'i');
+                      const escaped = entitySearch.replace(
+                          /[.*+?^${}()|[\]\\]/g,
+                          '\\$&',
+                      );
+                      const regex = new RegExp(escaped, 'i');
                       return allMeta.filter((meta) => {
                           const props =
                               meta.genericEntityMetaProperties as Record<
