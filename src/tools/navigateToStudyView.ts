@@ -55,6 +55,7 @@ const inputSchema = {
     tab: z
         .enum(['summary', 'clinicalData', 'cnSegments', 'plots'])
         .optional()
+        .default('summary')
         .describe('Specific tab to navigate to'),
 
     // Comprehensive filtering

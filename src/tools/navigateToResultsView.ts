@@ -89,6 +89,7 @@ const inputSchema = {
             'download',
         ])
         .optional()
+        .default('oncoprint')
         .describe('Tab (or tab/subtab) to navigate to'),
     zScoreThreshold: z
         .number()

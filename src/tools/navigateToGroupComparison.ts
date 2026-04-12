@@ -112,6 +112,7 @@ const inputSchema = {
     tab: z
         .string()
         .optional()
+        .default('overlap')
         .describe(
             'Optional comparison page tab. Pick from availableComparisonTabs in resolver metadata. Always available: overlap, clinical. Conditional (study must have relevant data): survival, alterations, mutations, mrna, protein, dna_methylation, generic_assay_{type} (e.g. "generic_assay_treatment_response"). mrna/protein/dna_methylation/generic_assay_* require single-study comparison.'
         ),

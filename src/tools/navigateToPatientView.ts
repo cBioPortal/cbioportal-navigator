@@ -53,6 +53,7 @@ const inputSchema = {
     tab: z
         .enum(['summary', 'clinicalData', 'pathways'])
         .optional()
+        .default('summary')
         .describe('Specific tab to navigate to'),
     navIds: z
         .array(
