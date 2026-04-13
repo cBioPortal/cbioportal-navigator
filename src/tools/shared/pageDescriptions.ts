@@ -85,6 +85,23 @@ const STUDY_VIEW_DESCRIPTIONS: Record<string, string> = {
 const GENERIC_ASSAY_DESCRIPTION =
     'Generic assay enrichment — entities ranked by differential values across groups.';
 
+const GENERIC_ASSAY_TYPE_DESCRIPTIONS: Record<string, string> = {
+    armlevel_cna:
+        'Chromosome arm-level CNA enrichment — arms ranked by differential gain/loss frequency across groups.',
+    methylation:
+        'DNA methylation enrichment (HM27/HM450) — probes ranked by differential methylation beta values across groups.',
+    genetic_ancestry:
+        'Genetic ancestry enrichment — ancestry components (e.g., European, African, East Asian fractions) compared across groups.',
+    mutational_signature:
+        'Mutational signature enrichment — COSMIC signature exposures ranked by differential activity across groups.',
+    phosphoproteome:
+        'Phosphoproteomic enrichment — phosphopeptides ranked by differential phosphorylation across groups.',
+    phosphosite_quantification:
+        'Phosphosite enrichment — specific phosphorylation sites ranked by differential quantification across groups.',
+    acetylproteome:
+        'Acetylproteomic enrichment — acetylated proteins/peptides ranked by differential acetylation across groups.',
+};
+
 export function getPatientViewPageDescription(
     tab: string | undefined
 ): string | undefined {
@@ -110,6 +127,11 @@ export function getGroupComparisonPageDescription(
     tab: string | undefined
 ): string | undefined {
     if (!tab) return undefined;
-    if (tab.startsWith('generic_assay_')) return GENERIC_ASSAY_DESCRIPTION;
+    if (tab.startsWith('generic_assay_')) {
+        const type = tab.slice('generic_assay_'.length);
+        return (
+            GENERIC_ASSAY_TYPE_DESCRIPTIONS[type] ?? GENERIC_ASSAY_DESCRIPTION
+        );
+    }
     return GROUP_COMPARISON_DESCRIPTIONS[tab];
 }
