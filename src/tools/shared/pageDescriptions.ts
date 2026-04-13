@@ -8,78 +8,70 @@
  */
 
 const RESULTS_VIEW_DESCRIPTIONS: Record<string, string> = {
-    oncoprint:
-        'OncoPrint — matrix heatmap showing mutations, CNAs, and structural variants across samples for queried genes.',
+    oncoprint: 'Visual summary of alterations in queried genes across samples.',
     mutations:
-        'Lollipop diagram showing protein-level mutation positions, types, and frequencies across samples for queried genes.',
+        'Detailed mutation table with lollipop plot showing mutation positions, types, and frequencies for queried genes.',
     structuralVariants: 'Structural variant (fusion) table for queried genes.',
     cancerTypesSummary:
-        'Alteration frequencies for queried genes broken down by cancer type.',
+        'Alteration frequencies for queried genes by cancer type.',
     mutualExclusivity:
         'Co-occurrence and mutual exclusivity statistics for all queried gene pairs.',
-    plots: 'Scatter and box plots comparing two data dimensions — gene vs gene, expression vs CNA, gene vs clinical attribute, etc.',
+    plots: 'Scatter/box plots comparing any two data elements.',
     survival:
-        'Kaplan-Meier survival curves comparing altered vs unaltered sample groups.',
+        'Kaplan-Meier survival curves comparing groups defined by query genes.',
     coexpression:
-        'Correlation scatter plots between queried genes and all other genes in the study.',
+        'Correlation between expression of each queried gene vs all other genes.',
     comparison:
-        'Group comparison (Altered vs Unaltered, or per-gene groups) with clinical, enrichment, and survival subtabs.',
+        'Compare groups of samples defined by query genes across data modalities including clinical, genomic, and survival.',
     'comparison/overlap':
-        'Venn diagram showing sample overlap between Altered and Unaltered groups.',
+        'Diagram showing sample and patient overlap between groups defined by query genes.',
     'comparison/survival':
-        'Kaplan-Meier survival analysis comparing Altered vs Unaltered groups.',
+        'Kaplan-Meier survival analysis comparing groups defined by query genes.',
     'comparison/clinical':
-        'Clinical attribute distributions compared between Altered and Unaltered groups.',
+        'Clinical attribute distributions compared across groups defined by query genes.',
     'comparison/mrna':
-        'mRNA expression enrichment — genes ranked by differential expression (log ratio, q-value) between Altered and Unaltered groups.',
+        'mRNA expression for all genes compared across groups defined by query genes.',
     'comparison/protein':
-        'Protein expression enrichment (RPPA) between Altered and Unaltered groups.',
+        'Protein expression for all genes compared across groups defined by query genes.',
     'comparison/dna_methylation':
-        'DNA methylation enrichment — probes ranked by differential methylation between Altered and Unaltered groups.',
+        'DNA methylation levels compared across groups defined by query genes.',
     'comparison/alterations':
-        'Mutation and CNA enrichment ranked by q-value between Altered and Unaltered groups.',
-    cnSegments:
-        'Copy number segment plots across chromosomes (IGV-style) for queried genes.',
+        'Comparison of rate of genomic alterations (mutations, CNA, structural variants) in all genes compared across groups defined by query genes.',
+    cnSegments: 'Copy number segment plots for queried genes.',
     pathways:
-        'Pathway mapper showing alteration frequencies for queried genes in pathway context.',
-    download:
-        'Data export — alteration, clinical, and expression data in tabular format.',
+        'Pathway enrichment (via PathwayMapper or NDEx) showing alteration frequencies for queried genes.',
+    download: 'Download query-associated data in a variety of tabular formats.',
 };
 
 const GROUP_COMPARISON_DESCRIPTIONS: Record<string, string> = {
-    overlap: 'Venn diagram showing sample and patient overlap between groups.',
-    survival:
-        'Kaplan-Meier survival curves (OS, PFS, DFS) with log-rank p-values comparing outcomes across groups.',
-    clinical:
-        'Clinical attribute distributions compared across groups — bar charts, box plots, and statistical tests.',
+    overlap: 'Diagram showing sample and patient overlap between groups.',
+    survival: 'Kaplan-Meier survival analysis comparing groups.',
+    clinical: 'Clinical attribute distributions compared across groups.',
     alterations:
-        'Mutation and copy number alteration enrichment — genes ranked by q-value, with alteration frequencies per group.',
+        'Comparison of rate of genomic alterations (mutations, CNA, structural variants) in all genes compared across groups.',
     mutations:
-        'Mutation lollipop diagrams comparing protein-level mutation positions and frequencies across groups.',
-    mrna: 'mRNA expression enrichment — genes ranked by differential expression (log ratio, q-value) between groups.',
-    protein:
-        'Protein expression enrichment (RPPA) — same structure as mRNA but for protein-level data.',
-    dna_methylation:
-        'DNA methylation enrichment — probes ranked by differential methylation across groups.',
+        'Comparison of specific mutation (protein change) frequency between two groups.',
+    mrna: 'mRNA expression for all genes compared across groups.',
+    protein: 'Protein expression for all genes compared across groups.',
+    dna_methylation: 'DNA methylation levels compared across groups.',
 };
 
 const PATIENT_VIEW_DESCRIPTIONS: Record<string, string> = {
     summary:
-        'Patient overview — clinical event timeline, genomic overview tracks (mutations and CNAs across samples), mutation table, structural variant table, and copy number table.',
+        'Patient overview including patient history timeline (if available) and tables of mutations, structural variants, and copy number alterations.',
     clinicalData:
-        'Clinical attribute tables for the patient and their samples, plus a timeline events table.',
+        'Clinical attribute tables for the patient and each associated sample.',
     pathways:
-        "Pathway mapper showing the patient's mutations and CNAs overlaid on pathway diagrams.",
+        "PathwayMapper showing the patient's genomic alterations overlaid on pathway diagrams.",
 };
 
 const STUDY_VIEW_DESCRIPTIONS: Record<string, string> = {
     summary:
-        'Configurable grid of interactive charts (bar, pie, scatter, survival) for clinical and genomic attributes. Each chart doubles as a filter — clicking selects a sample subset.',
-    clinicalData:
-        'Paginated table of clinical attribute values per sample. Searchable and sortable; displays up to 500 rows.',
+        'Overview of all study data displayed as interactive charts summarizing available clinical and genomic data. Click within a chart to filter. Additional charts may be available in the Charts menu.',
+    clinicalData: 'Table of clinical attributes per sample.',
     cnSegments:
-        'IGV-style copy number segment viewer for the selected samples (disabled above 20,000 samples).',
-    plots: 'Scatter and box plots comparing two data dimensions — clinical attribute vs clinical attribute, gene vs clinical attribute, etc.',
+        'Genome-wide copy number segments visualized in IGV for the selected samples (disabled above 20,000 samples).',
+    plots: 'Scatter/box plots comparing any two data elements.',
 };
 
 const GENERIC_ASSAY_DESCRIPTION =
