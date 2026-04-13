@@ -8,8 +8,7 @@
  */
 
 const RESULTS_VIEW_DESCRIPTIONS: Record<string, string> = {
-    oncoprint:
-        'Visual summary of alterations in queried genes across samples.',
+    oncoprint: 'Visual summary of alterations in queried genes across samples.',
     mutations:
         'Detailed mutation table with lollipop plot showing mutation positions, types, and frequencies for queried genes.',
     structuralVariants: 'Structural variant (fusion) table for queried genes.',
@@ -38,29 +37,23 @@ const RESULTS_VIEW_DESCRIPTIONS: Record<string, string> = {
         'DNA methylation levels compared across groups defined by query genes.',
     'comparison/alterations':
         'Comparison of rate of genomic alterations (mutations, CNA, structural variants) in all genes compared across groups defined by query genes.',
-    cnSegments:
-        'Copy number segment plots for queried genes.',
+    cnSegments: 'Copy number segment plots for queried genes.',
     pathways:
         'Pathway enrichment (via PathwayMapper or NDEx) showing alteration frequencies for queried genes.',
-    download:
-        'Download query-associated data in a variety of tabular formats.',
+    download: 'Download query-associated data in a variety of tabular formats.',
 };
 
 const GROUP_COMPARISON_DESCRIPTIONS: Record<string, string> = {
     overlap: 'Diagram showing sample and patient overlap between groups.',
-    survival:
-        'Kaplan-Meier survival analysis comparing groups.',
-    clinical:
-        'Clinical attribute distributions compared across groups.',
+    survival: 'Kaplan-Meier survival analysis comparing groups.',
+    clinical: 'Clinical attribute distributions compared across groups.',
     alterations:
         'Comparison of rate of genomic alterations (mutations, CNA, structural variants) in all genes compared across groups.',
     mutations:
         'Comparison of specific mutation (protein change) frequency between two groups.',
     mrna: 'mRNA expression for all genes compared across groups.',
-    protein:
-        'Protein expression for all genes compared across groups.',
-    dna_methylation:
-        'DNA methylation levels compared across groups.',
+    protein: 'Protein expression for all genes compared across groups.',
+    dna_methylation: 'DNA methylation levels compared across groups.',
 };
 
 const PATIENT_VIEW_DESCRIPTIONS: Record<string, string> = {
@@ -69,14 +62,13 @@ const PATIENT_VIEW_DESCRIPTIONS: Record<string, string> = {
     clinicalData:
         'Clinical attribute tables for the patient and each associated sample.',
     pathways:
-        "PathwayMapper showing the patient's genonic alterations overlaid on pathway diagrams.",
+        "PathwayMapper showing the patient's genomic alterations overlaid on pathway diagrams.",
 };
 
 const STUDY_VIEW_DESCRIPTIONS: Record<string, string> = {
     summary:
         'Overview of all study data displayed as interactive charts summarizing available clinical and genomic data. Click within a chart to filter. Additional charts may be available in the Charts menu.',
-    clinicalData:
-        'Table of clinical attributes per sample.',
+    clinicalData: 'Table of clinical attributes per sample.',
     cnSegments:
         'Genome-wide copy number segments visualized in IGV for the selected samples (disabled above 20,000 samples).',
     plots: 'Scatter/box plots comparing any two data elements.',
