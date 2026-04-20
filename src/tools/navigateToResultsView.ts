@@ -92,6 +92,12 @@ const inputSchema = {
         .optional()
         .default('oncoprint')
         .describe('Tab (or tab/subtab) to navigate to'),
+    profileFilter: z
+        .string()
+        .optional()
+        .describe(
+            'Comma-separated molecular profile suffixes to activate. Required when OQL contains EXP or PROT — must include ALL desired profiles (suffix mode overrides defaults). Suffix = molecularProfileId.replace(studyId + "_", ""). See prompt for construction rules.'
+        ),
     zScoreThreshold: z
         .number()
         .optional()
@@ -145,6 +151,7 @@ type NavigateToResultsViewInput = {
     zScoreThreshold?: z.infer<typeof inputSchema.zScoreThreshold>;
     rppaScoreThreshold?: z.infer<typeof inputSchema.rppaScoreThreshold>;
     studyViewFilter?: z.infer<typeof inputSchema.studyViewFilter>;
+    profileFilter?: z.infer<typeof inputSchema.profileFilter>;
     plotsHorzSelection?: z.infer<typeof inputSchema.plotsHorzSelection>;
     plotsVertSelection?: z.infer<typeof inputSchema.plotsVertSelection>;
     comparisonSelectedGroups?: z.infer<
@@ -372,6 +379,15 @@ async function navigateToResultsView(
         },
         tab: params.tab,
         options: {
+            ...(params.profileFilter && {
+                profileFilter: params.profileFilter,
+            }),
+            ...(params.zScoreThreshold !== undefined && {
+                zScoreThreshold: params.zScoreThreshold,
+            }),
+            ...(params.rppaScoreThreshold !== undefined && {
+                rppaScoreThreshold: params.rppaScoreThreshold,
+            }),
             ...(plotsHorzSelection && { plotsHorzSelection }),
             ...(plotsVertSelection && { plotsVertSelection }),
             ...(params.comparisonSelectedGroups && {

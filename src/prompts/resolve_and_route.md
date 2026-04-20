@@ -85,16 +85,18 @@ Two approaches:
 **Gene(s) mentioned as the subject of analysis** (not just as a patient filter). Ask: what is the user trying to learn about this gene?
 
 **3a. How often / in what form is this gene altered?**
-Mutation frequency, co-occurrence, mutual exclusivity, OncoPrint, structural variants, alteration frequencies by cancer type.
+Mutation frequency, co-occurrence, mutual exclusivity, OncoPrint, structural variants, alteration frequencies by cancer type. Includes queries with magnitude qualifiers on expression or protein level ("high", "low", "overexpressed", "underexpressed").
 - "Show me TP53 mutations in lung cancer" → `oncoprint` or `mutations`
 - "Compare EGFR and KRAS alterations" → `oncoprint`
 - "What structural variants exist in ALK?" → `structuralVariants`
 - "EGFR alteration frequencies across cancer types" → `cancerTypesSummary`
+- "High MYC protein expression in lymphoma" → `MYC: PROT > 2`, `oncoprint`, with `profileFilter`
+- "VEGFA overexpression in kidney cancer" → `VEGFA: EXP > 2`, `oncoprint`, with `profileFilter`
 
 Note: `cancerTypesSummary` shows how often a gene is mutated/amplified across cancer types — it is an alteration frequency view, not expression levels.
 
 **3b. What are the expression/protein levels of this gene?**
-User wants continuous molecular values (mRNA, protein), not binary alteration status. Signal words: "expression", "mRNA", "RNA levels", "z-scores", "protein levels" without accompanying alteration language.
+User wants continuous molecular values (mRNA, protein), not binary alteration status. Signal words: "expression", "mRNA", "RNA levels", "z-scores", "protein levels" without accompanying alteration language or magnitude qualifiers ("high", "low", "over-", "under-").
 
 Route to `tab: "plots"` — the Plots tab takes two variables as axes. Expression queries map naturally: continuous value on one axis, grouping variable on the other.
 - "EGFR expression across cancer types" → horz: `clinical_attribute`/`CANCER_TYPE_DETAILED`, vert: `MRNA_EXPRESSION`

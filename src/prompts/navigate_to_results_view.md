@@ -46,6 +46,7 @@ For `tab: "plots"`, the gene dropdown on each axis is populated only from this l
 - `EXP > 2` / `EXP < -2` / `EXP >= 1.5` / `EXP <= -1.5` — mRNA expression (SDs from mean)
 - `PROT > 1.5` / `PROT < -1.5` — protein/phosphoprotein level
 - Phosphoprotein: use gene symbol with site, e.g. `EGFR_PY992: PROT > 2`
+- **When using `EXP` or `PROT`, you must also set `profileFilter`** — see profileFilter section below.
 
 **Fusions**
 - `FUSION` — all fusions
@@ -136,6 +137,36 @@ The comparison tab has subtabs accessible via `"comparison/{subtab}"`. Use `avai
 - **zScoreThreshold:** mRNA expression z-score threshold. Default: 2.0
 - **rppaScoreThreshold:** Protein expression threshold. Default: 2.0
 - **studyViewFilter:** Filter object to restrict analysis to a filtered sample subset. When provided, fetches matching samples and returns a session-based URL (`?session_id=...`). Use the same filterJson format as `navigate_to_study_view`.
+
+### profileFilter — expression profile selection
+
+**Required when OQL contains `EXP` or `PROT`.** Without it, OncoPrint finds no matching data and shows 0% altered.
+
+**How it works:** `profileFilter` is a comma-separated list of molecular profile suffixes. Suffix = `molecularProfileId` with `{studyId}_` stripped. Example: `luad_tcga_rna_seq_v2_mrna_median_Zscores` → suffix `rna_seq_v2_mrna_median_Zscores`.
+
+**Critical:** suffix mode overrides all defaults — you must include every profile type you want active, not just the expression profile.
+
+**Construction rules:**
+1. Identify base profiles from router `molecularProfileIds`:
+   - Mutations: ends with `_mutations`
+   - CNA: ends with `_gistic` (prefer) or `_cna`
+   - SV: ends with `_structural_variants` — include only if present
+2. Add the expression profile suffix:
+   - **mRNA (`EXP`):** prefer suffix containing `all_sample` and `Zscores`; fall back to any `_median_Zscores` profile
+   - **Protein (`PROT`):** prefer suffix containing `quantification_zscores`; fall back to `rppa_Zscores`
+3. Join with commas, no spaces
+
+**Example — `luad_tcga_pan_can_atlas_2018` with `EXP > 2`:**
+```
+profileFilter: "mutations,gistic,structural_variants,rna_seq_v2_mrna_median_all_sample_Zscores"
+```
+
+**Example — `brca_tcga_pan_can_atlas_2018` with `PROT > 1.5`:**
+```
+profileFilter: "mutations,gistic,structural_variants,protein_quantification_zscores"
+```
+
+**Restriction:** `EXP`/`PROT` OQL only works for single-study queries. Do not use with multiple `studyIds`.
 
 ---
 
