@@ -45,6 +45,7 @@ import { loadPrompt } from './shared/promptLoader.js';
 import { buildStudyUrl } from './studyView/buildStudyUrl.js';
 import { validateTabAvailability } from './studyView/validateStudyViewTab.js';
 import { getResultsViewPageDescription } from './shared/pageDescriptions.js';
+import * as oqlParser from './resultsView/oql-parser.js';
 
 /**
  * Tool definition schema (without description, which is loaded at startup)
@@ -198,17 +199,57 @@ async function navigateToResultsView(
         return createErrorResponse('At least one gene must be provided');
     }
 
-    const validGenes = await geneResolver.validateBatch(params.genes);
+    // 1a. Parse OQL — validate syntax and extract gene symbols from AST
+    const oqlQuery = params.genes.join('\n');
+    let parsedOql: ReturnType<typeof oqlParser.parse>;
+    try {
+        parsedOql = oqlParser.parse(oqlQuery.toUpperCase());
+    } catch (e: any) {
+        return createErrorResponse('Invalid OQL syntax in genes', {
+            error: e.message,
+            location: e.location,
+        });
+    }
 
-    if (validGenes.length === 0) {
+    // Extract gene symbols from AST — handles plain genes, OQL statements,
+    // merged tracks, and skips DATATYPES pseudo-gene
+    const geneSymbols = (parsedOql ?? [])
+        .flatMap((entry: any) => {
+            if (entry.list) {
+                // MergedGeneQuery: ["label" GENE1 GENE2]
+                return entry.list.map((q: any) => q.gene);
+            }
+            return [entry.gene];
+        })
+        .filter((g: string) => g.toUpperCase() !== 'DATATYPES');
+
+    const validSymbols = await geneResolver.validateBatch(geneSymbols);
+
+    if (validSymbols.length === 0) {
         return createErrorResponse('No valid genes found', {
             providedGenes: params.genes,
         });
     }
 
-    if (validGenes.length < params.genes.length) {
+    // Rebuild gene entries: drop entries whose extracted symbol is entirely invalid
+    const validSymbolSet = new Set(validSymbols.map((s) => s.toUpperCase()));
+    const validGeneEntries = params.genes.filter((g) => {
+        const parsed = oqlParser.parse(g.toUpperCase()) ?? [];
+        return parsed.some((entry: any) => {
+            const genes = entry.list
+                ? entry.list.map((q: any) => q.gene)
+                : [entry.gene];
+            return genes.some(
+                (sym: string) =>
+                    sym.toUpperCase() !== 'DATATYPES' &&
+                    validSymbolSet.has(sym.toUpperCase())
+            );
+        });
+    });
+
+    if (validGeneEntries.length < params.genes.length) {
         const invalidGenes = params.genes.filter(
-            (g) => !validGenes.includes(g)
+            (g) => !validGeneEntries.includes(g)
         );
         console.warn(
             `Some genes were invalid and skipped: ${invalidGenes.join(', ')}`
@@ -263,7 +304,7 @@ async function navigateToResultsView(
         const sessionClient = new MainSessionClient(config.baseUrl);
         const { id: sessionId } = await sessionClient.createSession({
             cancer_study_list: studyIds.join(','),
-            gene_list: validGenes.join(' '),
+            gene_list: validGeneEntries.join('\n'),
             case_set_id: '-1',
             case_ids: caseIds,
             tab_index: 'tab_visualize',
@@ -294,7 +335,7 @@ async function navigateToResultsView(
                 name: s.name,
                 sampleCount: s.allSampleCount,
             })),
-            genes: validGenes,
+            genes: validSymbols,
             filteredSampleCount: samples.length,
             caseSetId: '-1',
             sessionId,
@@ -324,7 +365,7 @@ async function navigateToResultsView(
     // 3. Build URL (supports multiple studies)
     const url = buildResultsUrl({
         studies: studyIds,
-        genes: validGenes,
+        genes: validGeneEntries,
         caseSelection: {
             type: 'case_set',
             caseSetId,
@@ -346,7 +387,7 @@ async function navigateToResultsView(
             name: s.name,
             sampleCount: s.allSampleCount,
         })),
-        genes: validGenes,
+        genes: validSymbols,
         caseSetId,
         ...(getResultsViewPageDescription(params.tab) && {
             pageDescription: getResultsViewPageDescription(params.tab),

@@ -74,7 +74,7 @@ export function buildResultsUrl(options: ResultsUrlOptions): string {
 
     const query: QueryParams = {
         cancer_study_list: studies.join(','),
-        gene_list: genes.join(' '),
+        gene_list: genes.join('\n'),
     };
 
     // Handle case selection

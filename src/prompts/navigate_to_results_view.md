@@ -10,9 +10,81 @@ Generates direct URL to cBioPortal ResultsView — gene alteration analysis and 
 Array of study IDs from router response. Supports cross-study analysis.
 
 ### genes (required)
-Array of UPPERCASE HUGO gene symbols: `["TP53"]`, `["TP53", "KRAS", "EGFR"]`
+Array of gene entries — each element is either a plain HUGO gene symbol or an OQL statement.
+
+**Plain symbols** (default alteration types — mutations, AMP, HOMDEL, fusions):
+```json
+["TP53", "KRAS", "EGFR"]
+```
+
+**OQL statements** (precise alteration filtering):
+```json
+["BRAF: MUT = V600E", "EGFR: AMP", "TP53"]
+```
+
+Mixed is fine. Plain and OQL entries can appear in the same array.
 
 For `tab: "plots"`, the gene dropdown on each axis is populated only from this list. Include every gene referenced in either axis — not just the primary gene of interest. E.g. "EGFR mRNA by TP53 mutation status" requires `genes: ["TP53", "EGFR"]`.
+
+#### OQL Syntax Reference
+
+**Mutations**
+- `MUT` — all non-synonymous mutations
+- `MUT = V600E` — specific amino acid change (shorthand: `BRAF: V600E`)
+- `MUT = MISSENSE` / `NONSENSE` / `NONSTART` / `NONSTOP` / `FRAMESHIFT` / `TRUNC` / `INFRAME` / `SPLICE` / `PROMOTER` — by type
+- `MUT = (12-13)` — position range (overlapping mutations); `(12-13*)` — fully contained only; `(12-)` / `(-13)` — open-ended
+- `MUT != MISSENSE` — exclude a mutation type
+
+**Copy number**
+- `AMP` — amplification
+- `HOMDEL` — deep/homozygous deletion
+- `GAIN` — copy number gain
+- `HETLOSS` — shallow deletion
+- `CNA >= GAIN` / `CNA <= HETLOSS` — comparison operators (`>`, `<`, `>=`, `<=`)
+
+**Expression**
+- `EXP > 2` / `EXP < -2` / `EXP >= 1.5` / `EXP <= -1.5` — mRNA expression (SDs from mean)
+- `PROT > 1.5` / `PROT < -1.5` — protein/phosphoprotein level
+- Phosphoprotein: use gene symbol with site, e.g. `EGFR_PY992: PROT > 2`
+
+**Fusions**
+- `FUSION` — all fusions
+
+**Modifiers** — append with `_`, alteration type comes first:
+- `MUT_DRIVER` / `FUSION_DRIVER` / `AMP_DRIVER` — driver events only (OncoKB/CancerHotspots)
+- `MUT_GERMLINE` / `MUT_SOMATIC` — by mutation origin
+- Can also use modifier alone: `BRCA1: GERMLINE` (shorthand for germline mutations)
+- Chain multiple: `TRUNC_GERMLINE_DRIVER` — truncating, germline, driver
+
+**Multi-gene shortcuts**
+- `DATATYPES: AMP GAIN HOMDEL EXP > 1.5 EXP < -1.5; CDKN2A MDM2 TP53` — apply same alteration types to multiple genes (`;` acts as line break)
+
+**Merged tracks** (OncoPrint grouping)
+- `["CDK PATHWAY" CDKN2A CDKN2B CDK4]` — group genes under a label
+- `[MDM2 MDM4]` — no label
+
+**Logic**: multiple specifications per gene use OR logic (e.g. `TP53: MUT AMP` = mutated OR amplified)
+
+**Statement terminator**: OQL statements may optionally end with `;`
+
+#### OQL Examples
+
+| User request | genes array |
+|---|---|
+| "BRAF V600E only" | `["BRAF: MUT = V600E"]` |
+| "EGFR amplifications only" | `["EGFR: AMP"]` |
+| "Germline BRCA1 mutations" | `["BRCA1: MUT_GERMLINE"]` |
+| "Somatic TP53 mutations" | `["TP53: MUT_SOMATIC"]` |
+| "Driver mutations in KRAS" | `["KRAS: MUT_DRIVER"]` |
+| "TP53 mutations except missense" | `["TP53: MUT != MISSENSE"]` |
+| "KRAS codon 12 mutations" | `["KRAS: MUT = (12-12)"]` |
+| "EGFR driver fusions" | `["EGFR: FUSION_DRIVER"]` |
+| "BRCA1 truncating germline driver" | `["BRCA1: TRUNC_GERMLINE_DRIVER"]` |
+| "EGFR phospho-Y992 overexpression" | `["EGFR_PY992: PROT > 2"]` |
+| "TP53 mutated or amplified" | `["TP53: MUT AMP"]` |
+| "AMP or HOMDEL across panel" | `["DATATYPES: AMP HOMDEL; EGFR KRAS TP53 PTEN"]` |
+
+Use plain symbols when the user has not specified a particular alteration type. Use OQL only when the user's request implies a specific subset of alterations.
 
 ### tab (optional)
 | Tab | Available when |
