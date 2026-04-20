@@ -3743,7 +3743,4 @@ function peg$parse(input, options) {
   }
 }
 
-export default {
-  SyntaxError: peg$SyntaxError,
-  parse:       peg$parse
-};
+export { peg$SyntaxError as SyntaxError, peg$parse as parse };

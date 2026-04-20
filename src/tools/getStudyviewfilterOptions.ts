@@ -41,6 +41,23 @@ const inputSchema = {
         .describe(
             'Keyword to search generic assay entities (case-insensitive match against stableId and NAME). Pass the gene symbol (e.g. "EGFR") or probe ID (e.g. "cg03860890") from the user query. Required when querying methylation profiles.'
         ),
+    geneSpecificQueries: z
+        .array(
+            z.object({
+                hugoGeneSymbol: z
+                    .string()
+                    .describe('HUGO gene symbol (e.g. "EGFR", "TP53")'),
+                profileType: z
+                    .string()
+                    .describe(
+                        'Profile type suffix from molecularProfileIds (e.g. "mutations", "gistic"). Strip the {studyId}_ prefix.'
+                    ),
+            })
+        )
+        .optional()
+        .describe(
+            'Gene-specific queries to fetch value distributions for mutationDataFilters or genomicDataFilters. Each entry returns available values with counts.'
+        ),
 };
 
 /**
@@ -60,6 +77,7 @@ type ToolInput = {
     attributeIds?: z.infer<typeof inputSchema.attributeIds>;
     genericAssayProfileIds?: z.infer<typeof inputSchema.genericAssayProfileIds>;
     entitySearch?: z.infer<typeof inputSchema.entitySearch>;
+    geneSpecificQueries?: z.infer<typeof inputSchema.geneSpecificQueries>;
 };
 
 /**
@@ -100,28 +118,44 @@ export async function handleGetStudyviewfilterOptions(
 async function getStudyviewfilterOptions(
     params: ToolInput
 ): Promise<ToolResponse> {
-    const { studyId, attributeIds, genericAssayProfileIds, entitySearch } =
-        params;
+    const {
+        studyId,
+        attributeIds,
+        genericAssayProfileIds,
+        entitySearch,
+        geneSpecificQueries,
+    } = params;
 
-    if (!attributeIds?.length && !genericAssayProfileIds?.length) {
+    if (
+        !attributeIds?.length &&
+        !genericAssayProfileIds?.length &&
+        !geneSpecificQueries?.length
+    ) {
         return createErrorResponse(
-            'Provide at least one of: attributeIds or genericAssayProfileIds'
+            'Provide at least one of: attributeIds, genericAssayProfileIds, or geneSpecificQueries'
         );
     }
 
-    // Run clinical attributes and generic assay lookups in parallel
-    const [clinicalResult, genericAssayResult] = await Promise.all([
-        attributeIds?.length
-            ? resolveClinicalAttributes(studyId, attributeIds)
-            : Promise.resolve(null),
-        genericAssayProfileIds?.length
-            ? resolveGenericAssayProfiles(
-                  studyId,
-                  genericAssayProfileIds,
-                  entitySearch
-              )
-            : Promise.resolve(null),
-    ]);
+    // Run all lookups in parallel
+    const [clinicalResult, genericAssayResult, geneSpecificResult] =
+        await Promise.all([
+            attributeIds?.length
+                ? resolveClinicalAttributes(studyId, attributeIds)
+                : Promise.resolve(null),
+            genericAssayProfileIds?.length
+                ? resolveGenericAssayProfiles(
+                      studyId,
+                      genericAssayProfileIds,
+                      entitySearch
+                  )
+                : Promise.resolve(null),
+            geneSpecificQueries?.length
+                ? studyViewDataClient.getGeneSpecificCounts(
+                      studyId,
+                      geneSpecificQueries
+                  )
+                : Promise.resolve(null),
+        ]);
 
     if (clinicalResult?.error) return clinicalResult.error;
 
@@ -131,6 +165,9 @@ async function getStudyviewfilterOptions(
     }
     if (genericAssayResult) {
         responseData.genericAssayEntities = genericAssayResult;
+    }
+    if (geneSpecificResult) {
+        responseData.geneSpecificCounts = geneSpecificResult;
     }
 
     return createDataResponse(
@@ -178,9 +215,15 @@ async function resolveClinicalAttributes(
         };
     }
 
+    // Only fetch values for categorical (STRING/BOOLEAN) attributes.
+    // NUMBER attributes are continuous — return no values, AI uses {start, end} ranges.
+    const categoricalIds = requested
+        .filter((a) => a.datatype !== 'NUMBER')
+        .map((a) => a.clinicalAttributeId);
+
     const valuesMap = await studyViewDataClient.getClinicalDataValuesBatch(
         studyId,
-        requested.map((a) => a.clinicalAttributeId)
+        categoricalIds
     );
 
     return {
@@ -189,7 +232,9 @@ async function resolveClinicalAttributes(
             displayName: attr.displayName,
             description: attr.description,
             datatype: attr.datatype,
-            values: valuesMap.get(attr.clinicalAttributeId) || [],
+            ...(attr.datatype === 'NUMBER'
+                ? { continuous: true }
+                : { values: valuesMap.get(attr.clinicalAttributeId) || [] }),
         })),
         error: null,
     };
@@ -230,7 +275,7 @@ async function resolveGenericAssayProfiles(
                 ? (() => {
                       const escaped = entitySearch.replace(
                           /[.*+?^${}()|[\]\\]/g,
-                          '\\$&',
+                          '\\$&'
                       );
                       const regex = new RegExp(escaped, 'i');
                       return allMeta.filter((meta) => {

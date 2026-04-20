@@ -115,6 +115,10 @@ Distinction from 3b: in 3c, alteration is the cause/grouping; in 3b, there is no
 
 _Gene-in-disease (broad query):_ "Tell me about IDH1 mutations in glioma", "TP53 in lung cancer" — call **both** `navigate_to_study_view` (gene as mutation filter, cohort overview) and `navigate_to_results_view` (OncoPrint, mutation table) in parallel. Present study view first.
 
+_OQL with precise filters StudyView cannot express_ (specific amino acid, protein position, GERMLINE, DRIVER modifier): route to `navigate_to_results_view` only. StudyView has no way to filter by exact amino acid change or modifier. Examples: `BRAF:MUT=V600E`, `EGFR:MUT=L858R`, `TP53:DRIVER`, `BRCA1:GERMLINE`.
+
+_OQL with broad alteration types StudyView can express_ (AMP, HOMDEL, GAIN, HETLOSS, mutation class like INFRAME or TRUNC, or plain MUTATED): call **both** tools. The OQL goes to `navigate_to_results_view`; build the equivalent `studyViewFilter` for `navigate_to_study_view` using `geneFilters` / `mutationDataFilters` / `genomicDataFilters`. Examples: `EGFR:AMP`, `TP53:TRUNC`, `KRAS:MUT=INFRAME`.
+
 _Gene A altered vs gene B altered (all alteration types):_ "How do IDH1-altered vs EGFR-altered patients differ?" — `navigate_to_results_view` with both genes, `tab: "comparison/survival"`, `comparisonSelectedGroups: ["IDH1", "EGFR"]`. Do not use `navigate_to_group_comparison` — it cannot express mutation + CNA combined.
 
 _Gene A mutant vs gene B mutant (mutation-specific):_ "ATRX mutant vs CIC mutant outcomes" — use `navigate_to_group_comparison` with custom groups, each group's `studyViewFilter` using `geneFilters` pointing to the mutations profile (`molecularProfileId` ending in `_mutations`). This creates mutation-only groups, not all-alteration groups.

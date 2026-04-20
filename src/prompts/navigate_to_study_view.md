@@ -135,19 +135,19 @@ Strip `{studyId}_` prefix from molecularProfileId:
 
 **Mode 1: Mutated vs Not Mutated**
 ```json
-{"hugoGeneSymbol": "TP53", "profileType": "mutations", "categorization": "MUTATED", "values": [[{"value": "MUTATED"}]]}
+{"hugoGeneSymbol": "TP53", "profileType": "mutations", "categorization": "MUTATED", "values": [[{"value": "Mutated"}]]}
 ```
-Values: `"MUTATED"` or `"NOT_MUTATED"`
+Values are always `"Mutated"` or `"Not Mutated"` — no lookup needed.
 
 **Mode 2: Mutation Types**
 ```json
-{"hugoGeneSymbol": "TP53", "profileType": "mutations", "categorization": "MUTATION_TYPE", "values": [[{"value": "Missense_Mutation"}]]}
+{"hugoGeneSymbol": "EGFR", "profileType": "mutations", "categorization": "MUTATION_TYPE", "values": [[{"value": "In_Frame_Del"}, {"value": "In_Frame_Ins"}]]}
 ```
-Common types: `"Missense_Mutation"`, `"Nonsense_Mutation"`, `"Frame_Shift_Del"`, `"Frame_Shift_Ins"`, `"In_Frame_Del"`, `"In_Frame_Ins"`, `"Splice_Site"`.
+Always call `get_studyviewfilter_options` with `geneSpecificQueries: [{"hugoGeneSymbol": "EGFR", "profileType": "mutations"}]` first — even if the type names look standard. Do not guess.
 
-`values` is a 2D array: **outer = OR, inner = AND**. For mutation types, use outer OR (each type in its own inner array):
-- OR: `[[{"value": "Missense_Mutation"}], [{"value": "Nonsense_Mutation"}]]`
-- AND (rare): `[[{"value": "Missense_Mutation"}, {"value": "Nonsense_Mutation"}]]`
+`values` is a 2D array: **outer = AND between groups, inner = OR within group**. To match any of several types, put all values in one inner array:
+- Match any type (OR): `[[{"value": "In_Frame_Del"}, {"value": "In_Frame_Ins"}]]`
+- Require all simultaneously (AND, not meaningful for mutation types): `[[{"value": "In_Frame_Del"}], [{"value": "In_Frame_Ins"}]]`
 
 ### genomicDataFilters — CNA or expression profiles
 
