@@ -102,35 +102,11 @@ export const geneFilterQuerySchema = z.object({
         ),
     entrezGeneId: z.number().optional(),
     hugoGeneSymbol: z.string().optional(),
-    includeDriver: z.boolean().optional(),
-    includeGermline: z.boolean().optional(),
-    includeSomatic: z.boolean().optional(),
-    includeUnknownOncogenicity: z.boolean().optional(),
-    includeUnknownStatus: z.boolean().optional(),
-    includeUnknownTier: z.boolean().optional(),
-    includeVUS: z.boolean().optional(),
-    tiersBooleanMap: z.record(z.string(), z.boolean()).optional(),
 });
 
 export const geneFilterSchema = z.object({
     geneQueries: z.array(z.array(geneFilterQuerySchema)),
     molecularProfileIds: z.array(z.string()),
-});
-
-export const alterationFilterSchema = z.object({
-    copyNumberAlterationEventTypes: z
-        .record(z.string(), z.boolean())
-        .optional(),
-    includeDriver: z.boolean().optional(),
-    includeGermline: z.boolean().optional(),
-    includeSomatic: z.boolean().optional(),
-    includeUnknownOncogenicity: z.boolean().optional(),
-    includeUnknownStatus: z.boolean().optional(),
-    includeUnknownTier: z.boolean().optional(),
-    includeVUS: z.boolean().optional(),
-    mutationEventTypes: z.record(z.string(), z.boolean()).optional(),
-    structuralVariants: z.boolean().optional(),
-    tiersBooleanMap: z.record(z.string(), z.boolean()).optional(),
 });
 
 // ============================================================================
@@ -171,14 +147,6 @@ export const structuralVariantGeneSubQuerySchema = z.object({
 export const structuralVariantFilterQuerySchema = z.object({
     gene1Query: structuralVariantGeneSubQuerySchema.optional(),
     gene2Query: structuralVariantGeneSubQuerySchema.optional(),
-    includeDriver: z.boolean().optional(),
-    includeGermline: z.boolean().optional(),
-    includeSomatic: z.boolean().optional(),
-    includeUnknownOncogenicity: z.boolean().optional(),
-    includeUnknownStatus: z.boolean().optional(),
-    includeUnknownTier: z.boolean().optional(),
-    includeVUS: z.boolean().optional(),
-    tiersBooleanMap: z.record(z.string(), z.boolean()).optional(),
 });
 
 export const studyViewStructuralVariantFilterSchema = z.object({
@@ -252,7 +220,6 @@ export const andedSampleTreatmentFiltersSchema = z.object({
  * ```
  */
 export const studyViewFilterSchema = z.object({
-    alterationFilter: alterationFilterSchema.optional(),
     caseLists: z.array(z.array(z.string())).optional(),
     clinicalDataFilters: z.array(clinicalDataFilterSchema).optional(),
     clinicalEventFilters: z.array(dataFilterSchema).optional(),

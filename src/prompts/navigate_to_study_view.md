@@ -162,12 +162,7 @@ Values: `"2"` = Amp, `"1"` = Gain, `"0"` = Diploid, `"-1"` = Shallow del, `"-2"`
 {"hugoGeneSymbol": "EGFR", "profileType": "mrna_seq_v2_rsem_zscores_ref_all_samples", "values": [{"start": 2.0}]}
 ```
 
-### alterationFilter — only when non-default
-
-Only include when user explicitly requests:
-- Drivers only: `{"includeDriver": true, "includeVUS": false, "includeUnknownOncogenicity": false}`
-- Somatic only: `{"includeGermline": false, "includeSomatic": true, "includeUnknownStatus": false}`
-- Specific CNA: `{"copyNumberAlterationEventTypes": {"AMP": true, "HOMDEL": false}}` — only `AMP` and `HOMDEL` are supported here; for `GAIN`, `HETLOSS`, or `DIPLOID`, use `genomicDataFilters` instead
+**Driver / VUS filtering:** StudyView does not support driver/VUS filtering via URL. For queries like "driver mutations in IDH1" or "exclude VUS", use `navigate_to_results_view` with OQL (`IDH1: MUT_DRIVER`) instead.
 
 ---
 
