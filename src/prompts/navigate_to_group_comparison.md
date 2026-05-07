@@ -25,10 +25,14 @@ Clinical attribute ID to group by (e.g., `"SEX"`, `"PATH_T_STAGE"`). Tool discov
 
 ### groups
 Array of custom groups (≥ 2). Two group types:
-- **Filter group:** `{ name, studyViewFilter }` — samples matching the filter. `studyIds` are auto-injected.
+- **Filter group:** `{ name, studyViewFilter }` — samples matching the filter. If `studyIds` is included in a group's `studyViewFilter`, only samples from those studies are included in that group; otherwise the top-level `studyIds` applies.
 - **Unselected group:** `{ name, isUnselected: true }` — samples in the cohort NOT matched by any other group (complement). At most one group may be unselected.
 
 Use when grouping logic cannot be expressed as a single attribute: merged values (T1+T2 vs T3+T4), gene-based splits, wildtype/unaltered comparisons, multi-cohort. **Cannot be used together with `clinicalAttributeId`, `clinicalAttributeValues`, or `includeNA`.** Can be combined with `studyViewFilter` for global pre-filtering.
+
+**Multi-cohort splits (comparing different cancer types across studies):** two approaches:
+- **By studyId** — set `studyIds` in each group's `studyViewFilter`. Simple, no extra lookups. Use when each group maps cleanly to one or more whole studies.
+- **By cancer type attribute** — use `clinicalDataFilters` with exact values from `get_studyviewfilter_options`. Use when grouping within a single multi-cancer study (e.g., MSK-IMPACT), or when merging specific subtypes across studies into one group. Each group independently chooses the right attribute granularity: prefer `CANCER_TYPE` when the target has a direct match; use `CANCER_TYPE_DETAILED` when the target is a subtype within a broader category. Both attributes can be mixed across groups in the same comparison.
 
 ### studyViewFilter
 Pre-filter samples before grouping. Works with both `clinicalAttributeId` and `groups` — when used with `groups`, it is intersected with each group's filter. Same format as `navigate_to_study_view` filterJson. `studyIds` are auto-injected — don't include them inside.
@@ -48,11 +52,20 @@ Use a value from `availableComparisonTabs` in the resolver metadata for the stud
 | `clinical` | Clinical attribute differences between groups | Always |
 | `survival` | Kaplan-Meier survival curves | Study has survival clinical attributes (`_STATUS`+`_MONTHS` pair) |
 | `alterations` | Enriched mutations and CNA between groups | Study has mutation or CNA profiles |
-| `mutations` | Detailed mutation comparison (lollipop plot) | Study has mutation profiles; **exactly 2 groups required** |
+| `mutations` | Detailed mutation comparison (lollipop plot) | Study has mutation profiles; **exactly 2 groups required**. Use `selectedGene` to pre-select a gene in the lollipop plot without filtering the cohort. |
 | `mrna` | mRNA expression enrichment | Study has mRNA profiles; single study only |
 | `protein` | Protein/phosphoprotein expression enrichment (RPPA) | Study has protein profiles; single study only |
 | `dna_methylation` | DNA methylation enrichment | Study has methylation profiles; single study only |
 | `generic_assay_{type}` | Custom assay enrichment (e.g. `generic_assay_treatment_response`) | Study has generic assay profiles; single study only |
+
+### selectedGene
+HUGO gene symbol to pre-select in the mutations tab (e.g., `"EGFR"`). Only meaningful when `tab` is `"mutations"`.
+
+**`selectedGene` vs `geneFilters` in `studyViewFilter` — not interchangeable:**
+- `selectedGene` — controls what is **displayed**. Cohort and denominators unchanged.
+- `geneFilters` in `studyViewFilter` — controls who is **in the cohort**. Only mutation carriers included; denominators shrink.
+
+Use `selectedGene` when a gene is mentioned in the context of comparing mutation profiles (e.g., "compare EGFR mutations between lung and brain"). Use `geneFilters` only when the cohort should be restricted to mutation carriers (e.g., "among EGFR-mutated patients, compare by sex").
 
 **Arm-level CNA:** When the user asks about chromosome arm deletions/gains (e.g., "19q deletion", "1p loss", "chr8 gain"), use `generic_assay_armlevel_cna` if present in `availableComparisonTabs` — it directly shows arm-level CNA enrichment per group. Prefer this over `alterations` for arm-level questions.
 
@@ -253,21 +266,40 @@ Use when comparing a mutation group against a CNA group.
 }
 ```
 
-### Custom groups — multi-cohort split
+### Custom groups — multi-cohort split (by studyId)
+Each group maps to one or more whole studies. Simple — no extra lookups needed.
 ```json
 {
-  "studyIds": ["luad_tcga_pan_can_atlas_2018", "lusc_tcga_pan_can_atlas_2018"],
+  "studyIds": ["chol_tcga_pan_can_atlas_2018", "blca_tcga_pan_can_atlas_2018"],
   "groups": [
     {
-      "name": "LUAD",
+      "name": "Cholangiocarcinoma",
+      "studyViewFilter": {"studyIds": ["chol_tcga_pan_can_atlas_2018"]}
+    },
+    {
+      "name": "Bladder Cancer",
+      "studyViewFilter": {"studyIds": ["blca_tcga_pan_can_atlas_2018"]}
+    }
+  ]
+}
+```
+
+### Custom groups — multi-cohort split (by cancer type attribute)
+Use when grouping within a single multi-cancer study. Call `get_studyviewfilter_options` first to get exact values. Each group picks the right granularity independently — `CANCER_TYPE` and `CANCER_TYPE_DETAILED` can be mixed in the same comparison.
+```json
+{
+  "studyIds": ["msk_impact_50k_2026"],
+  "groups": [
+    {
+      "name": "Cholangiocarcinoma",
       "studyViewFilter": {
-        "clinicalDataFilters": [{"attributeId": "CANCER_TYPE_DETAILED", "values": [{"value": "Lung Adenocarcinoma"}]}]
+        "clinicalDataFilters": [{"attributeId": "CANCER_TYPE_DETAILED", "values": [{"value": "Cholangiocarcinoma"}, {"value": "Intrahepatic Cholangiocarcinoma"}, {"value": "Extrahepatic Cholangiocarcinoma"}, {"value": "Perihilar Cholangiocarcinoma"}]}]
       }
     },
     {
-      "name": "LUSC",
+      "name": "Bladder Cancer",
       "studyViewFilter": {
-        "clinicalDataFilters": [{"attributeId": "CANCER_TYPE_DETAILED", "values": [{"value": "Lung Squamous Cell Carcinoma"}]}]
+        "clinicalDataFilters": [{"attributeId": "CANCER_TYPE", "values": [{"value": "Bladder Cancer"}]}]
       }
     }
   ]

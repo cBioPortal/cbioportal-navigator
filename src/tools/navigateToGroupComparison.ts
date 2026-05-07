@@ -116,6 +116,12 @@ const inputSchema = {
         .describe(
             'Optional comparison page tab. Pick from availableComparisonTabs in resolver metadata. Always available: overlap, clinical. Conditional (study must have relevant data): survival, alterations, mutations, mrna, protein, dna_methylation, generic_assay_{type} (e.g. "generic_assay_treatment_response"). mrna/protein/dna_methylation/generic_assay_* require single-study comparison.'
         ),
+    selectedGene: z
+        .string()
+        .optional()
+        .describe(
+            'HUGO gene symbol to pre-select in the mutations tab (e.g., "EGFR"). Only meaningful when tab is "mutations". Does NOT filter the cohort — use this to focus the visualization on a specific gene without changing group membership or denominators. To filter the cohort to gene-mutated samples, use geneFilters in studyViewFilter instead.'
+        ),
 };
 
 /**
@@ -155,6 +161,7 @@ export type NavigateToGroupComparisonInput = {
     studyViewFilter?: z.infer<typeof inputSchema.studyViewFilter>;
     includeNA?: z.infer<typeof inputSchema.includeNA>;
     tab?: string;
+    selectedGene?: string;
 };
 
 /**
@@ -289,6 +296,7 @@ export async function navigateToGroupComparison(
         studyViewFilter,
         includeNA,
         tab,
+        selectedGene,
     } = input;
 
     // Validate: exactly one of groups or clinicalAttributeId must be provided
@@ -314,7 +322,8 @@ export async function navigateToGroupComparison(
             studyIds,
             filterGroups,
             studyViewFilter,
-            tab as ComparisonTab | undefined
+            tab as ComparisonTab | undefined,
+            selectedGene
         );
     }
 
@@ -495,7 +504,7 @@ export async function navigateToGroupComparison(
     });
 
     // Step 8: Build comparison URL with optional tab
-    const url = buildComparisonUrl(sessionId, tab as ComparisonTab | undefined);
+    const url = buildComparisonUrl(sessionId, tab as ComparisonTab | undefined, selectedGene);
 
     // Step 9: Prepare group metadata
     const groupInfo: GroupInfo[] = groups.map((group) => ({
@@ -601,7 +610,8 @@ async function navigateToGroupComparisonByFilters(
     studyIds: string[],
     filterGroups: GroupDefinition[],
     globalFilter?: Record<string, any>,
-    tab?: ComparisonTab
+    tab?: ComparisonTab,
+    selectedGene?: string
 ): Promise<GroupComparisonResult> {
     // Validate: at most one unselected group
     const unselectedGroups = filterGroups.filter(
@@ -619,12 +629,14 @@ async function navigateToGroupComparisonByFilters(
     // Fetch samples for each filter-based group in parallel
     const groupSamples = await Promise.all(
         selectedFilterGroups.map(async ({ name, studyViewFilter }) => {
+            const { studyIds: groupStudyIds, ...restFilter } = studyViewFilter;
+            const effectiveStudyIds = (groupStudyIds as string[] | undefined) ?? studyIds;
             const filter = globalFilter
-                ? mergeStudyViewFilters(globalFilter, studyViewFilter, studyIds)
-                : { ...studyViewFilter, studyIds };
+                ? mergeStudyViewFilters(globalFilter, restFilter, effectiveStudyIds)
+                : { ...restFilter, studyIds: effectiveStudyIds };
             const samples: Sample[] =
                 await apiClient.fetchFilteredSamples(filter);
-            return { name, samples, studyViewFilter };
+            return { name, samples, effectiveStudyIds, restFilter };
         })
     );
 
@@ -649,7 +661,7 @@ async function navigateToGroupComparisonByFilters(
 
         const selectedKeys = new Set(
             groupSamples.flatMap(({ samples }) =>
-                samples.map((s) => `${s.studyId}_${s.sampleId}`)
+                samples.map((s: Sample) => `${s.studyId}_${s.sampleId}`)
             )
         );
         unselectedSamples = cohortSamples.filter(
@@ -697,7 +709,7 @@ async function navigateToGroupComparisonByFilters(
         origin: studyIds,
     });
 
-    const url = buildComparisonUrl(sessionId, tab as ComparisonTab | undefined);
+    const url = buildComparisonUrl(sessionId, tab as ComparisonTab | undefined, selectedGene);
 
     const groupInfo: GroupInfo[] = sessionGroups.map((group) => ({
         name: group.name,
@@ -709,14 +721,14 @@ async function navigateToGroupComparisonByFilters(
 
     // Per-group StudyView URLs (always generated in filter mode)
     const groupUrls: GroupUrl[] = [
-        ...groupSamples.map(({ name, studyViewFilter }) => {
+        ...groupSamples.map(({ name, effectiveStudyIds, restFilter }) => {
             const combinedFilter = globalFilter
-                ? mergeStudyViewFilters(globalFilter, studyViewFilter, studyIds)
-                : studyViewFilter;
+                ? mergeStudyViewFilters(globalFilter, restFilter, effectiveStudyIds)
+                : restFilter;
             return {
                 groupName: name,
                 url: buildStudyUrl({
-                    studyIds,
+                    studyIds: effectiveStudyIds,
                     filterJson: hasFiltersOtherThanStudyIds(combinedFilter)
                         ? combinedFilter
                         : undefined,

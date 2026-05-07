@@ -50,11 +50,16 @@ export type ComparisonTab =
  */
 export function buildComparisonUrl(
     sessionId: string,
-    tab?: ComparisonTab
+    tab?: ComparisonTab,
+    selectedGene?: string
 ): string {
     const query: QueryParams = {
         comparisonId: sessionId,
     };
+
+    if (selectedGene) {
+        query.selectedGene = selectedGene;
+    }
 
     // Tab is part of pathname, not query param
     const pathname = tab ? `/comparison/${tab}` : '/comparison';
