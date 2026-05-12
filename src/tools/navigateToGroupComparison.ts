@@ -504,7 +504,11 @@ export async function navigateToGroupComparison(
     });
 
     // Step 8: Build comparison URL with optional tab
-    const url = buildComparisonUrl(sessionId, tab as ComparisonTab | undefined, selectedGene);
+    const url = buildComparisonUrl(
+        sessionId,
+        tab as ComparisonTab | undefined,
+        selectedGene
+    );
 
     // Step 9: Prepare group metadata
     const groupInfo: GroupInfo[] = groups.map((group) => ({
@@ -630,9 +634,14 @@ async function navigateToGroupComparisonByFilters(
     const groupSamples = await Promise.all(
         selectedFilterGroups.map(async ({ name, studyViewFilter }) => {
             const { studyIds: groupStudyIds, ...restFilter } = studyViewFilter;
-            const effectiveStudyIds = (groupStudyIds as string[] | undefined) ?? studyIds;
+            const effectiveStudyIds =
+                (groupStudyIds as string[] | undefined) ?? studyIds;
             const filter = globalFilter
-                ? mergeStudyViewFilters(globalFilter, restFilter, effectiveStudyIds)
+                ? mergeStudyViewFilters(
+                      globalFilter,
+                      restFilter,
+                      effectiveStudyIds
+                  )
                 : { ...restFilter, studyIds: effectiveStudyIds };
             const samples: Sample[] =
                 await apiClient.fetchFilteredSamples(filter);
@@ -709,7 +718,11 @@ async function navigateToGroupComparisonByFilters(
         origin: studyIds,
     });
 
-    const url = buildComparisonUrl(sessionId, tab as ComparisonTab | undefined, selectedGene);
+    const url = buildComparisonUrl(
+        sessionId,
+        tab as ComparisonTab | undefined,
+        selectedGene
+    );
 
     const groupInfo: GroupInfo[] = sessionGroups.map((group) => ({
         name: group.name,
@@ -723,7 +736,11 @@ async function navigateToGroupComparisonByFilters(
     const groupUrls: GroupUrl[] = [
         ...groupSamples.map(({ name, effectiveStudyIds, restFilter }) => {
             const combinedFilter = globalFilter
-                ? mergeStudyViewFilters(globalFilter, restFilter, effectiveStudyIds)
+                ? mergeStudyViewFilters(
+                      globalFilter,
+                      restFilter,
+                      effectiveStudyIds
+                  )
                 : restFilter;
             return {
                 groupName: name,

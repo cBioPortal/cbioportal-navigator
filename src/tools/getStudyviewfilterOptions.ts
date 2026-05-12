@@ -230,7 +230,7 @@ async function resolveGenericAssayProfiles(
                 ? (() => {
                       const escaped = entitySearch.replace(
                           /[.*+?^${}()|[\]\\]/g,
-                          '\\$&',
+                          '\\$&'
                       );
                       const regex = new RegExp(escaped, 'i');
                       return allMeta.filter((meta) => {
