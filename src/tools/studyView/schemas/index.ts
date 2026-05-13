@@ -31,10 +31,6 @@ export {
     genomicDataFilterSchema,
     mutationDataFilterSchema,
     genericAssayDataFilterSchema,
-    // Structural variant filters
-    structuralVariantGeneSubQuerySchema,
-    structuralVariantFilterQuerySchema,
-    studyViewStructuralVariantFilterSchema,
     // Namespace data filters
     namespaceDataFilterSchema,
     // Treatment filters

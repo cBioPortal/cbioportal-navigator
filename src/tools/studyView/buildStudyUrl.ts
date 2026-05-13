@@ -70,20 +70,6 @@ function normalizeFilterJson(
         }));
     }
 
-    // Sort molecularProfileIds in structuralVariantFilters
-    if (
-        normalized.structuralVariantFilters &&
-        Array.isArray(normalized.structuralVariantFilters)
-    ) {
-        normalized.structuralVariantFilters =
-            normalized.structuralVariantFilters.map((filter: any) => ({
-                ...filter,
-                molecularProfileIds: filter.molecularProfileIds
-                    ? [...filter.molecularProfileIds].sort()
-                    : filter.molecularProfileIds,
-            }));
-    }
-
     return normalized;
 }
 

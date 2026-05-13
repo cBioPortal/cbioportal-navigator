@@ -75,6 +75,20 @@ Use exact profile IDs from router metadata.
 }
 ```
 
+### Structural variant filtering
+
+Use `geneFilters` with the `_structural_variants` profile. Leave `alterations` empty — the profile itself scopes the filter to SVs.
+
+**BRAF structural variants in glioma:**
+```json
+{
+  "geneFilters": [{
+    "molecularProfileIds": ["glioma_mskcc_2019_structural_variants"],
+    "geneQueries": [[{"hugoGeneSymbol": "BRAF", "alterations": []}]]
+  }]
+}
+```
+
 ### CNA `alterations` field
 
 `geneFilters` supports only `"AMP"` and `"HOMDEL"` for CNA. For `"GAIN"`, `"HETLOSS"`, or `"DIPLOID"`, use `genomicDataFilters` instead (see Gene Specific section below).

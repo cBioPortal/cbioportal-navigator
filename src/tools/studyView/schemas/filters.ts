@@ -157,38 +157,6 @@ export const genericAssayDataFilterSchema = z.object({
 });
 
 // ============================================================================
-// Structural Variant Filters
-// ============================================================================
-
-export const structuralVariantGeneSubQuerySchema = z.object({
-    entrezId: z.number().optional(),
-    hugoSymbol: z.string().optional(),
-    specialValue: z
-        .union([z.literal('ANY_GENE'), z.literal('NO_GENE')])
-        .optional(),
-});
-
-export const structuralVariantFilterQuerySchema = z.object({
-    gene1Query: structuralVariantGeneSubQuerySchema.optional(),
-    gene2Query: structuralVariantGeneSubQuerySchema.optional(),
-    includeDriver: z.boolean().optional(),
-    includeGermline: z.boolean().optional(),
-    includeSomatic: z.boolean().optional(),
-    includeUnknownOncogenicity: z.boolean().optional(),
-    includeUnknownStatus: z.boolean().optional(),
-    includeUnknownTier: z.boolean().optional(),
-    includeVUS: z.boolean().optional(),
-    tiersBooleanMap: z.record(z.string(), z.boolean()).optional(),
-});
-
-export const studyViewStructuralVariantFilterSchema = z.object({
-    molecularProfileIds: z.array(z.string()).optional(),
-    structVarQueries: z
-        .array(z.array(structuralVariantFilterQuerySchema))
-        .optional(),
-});
-
-// ============================================================================
 // Namespace Data Filters
 // ============================================================================
 
@@ -271,9 +239,6 @@ export const studyViewFilterSchema = z.object({
     sampleTreatmentFilters: andedSampleTreatmentFiltersSchema.optional(),
     sampleTreatmentGroupFilters: andedSampleTreatmentFiltersSchema.optional(),
     sampleTreatmentTargetFilters: andedSampleTreatmentFiltersSchema.optional(),
-    structuralVariantFilters: z
-        .array(studyViewStructuralVariantFilterSchema)
-        .optional(),
     studyIds: z.array(z.string()).optional(),
 });
 
