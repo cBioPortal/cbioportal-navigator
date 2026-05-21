@@ -27,6 +27,7 @@ import express from 'express';
 import { setConfig } from './tools/shared/config.js';
 import { initPrompts } from './tools/shared/promptLoader.js';
 import { registerTools } from './toolRegistry.js';
+import { GIT_VERSION } from './version.js';
 
 function createMcpServer(): McpServer {
     const server = new McpServer({
@@ -47,6 +48,7 @@ async function startStdio() {
     await server.connect(transport);
 
     console.error('cBioPortal Navigator running on stdio');
+    console.error(`Version: ${GIT_VERSION}`);
     console.error(
         `Base URL: ${process.env.CBIOPORTAL_BASE_URL || 'https://www.cbioportal.org'}`
     );
@@ -104,6 +106,7 @@ async function startHttp() {
     const port = parseInt(process.env.PORT || '8002');
     const server = app.listen(port, () => {
         console.log(`cBioPortal Navigator HTTP server running`);
+        console.log(`Version: ${GIT_VERSION}`);
         console.log(`MCP endpoint: http://localhost:${port}/mcp`);
         console.log(`Health check: http://localhost:${port}/health`);
         console.log(

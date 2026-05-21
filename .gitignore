@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 
+# Generated at build time
+src/version.ts
+
 # Logs
 *.log
 npm-debug.log*

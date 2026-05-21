@@ -9,6 +9,9 @@ RUN npm ci --ignore-scripts
 
 COPY . .
 
+ARG GIT_VERSION=unknown
+ENV GIT_VERSION=$GIT_VERSION
+
 RUN npm run build
 
 # Prod deps stage - run on host platform to avoid QEMU crash on arm64

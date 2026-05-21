@@ -9,8 +9,8 @@
     "cbioportal-navigator": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc && rm -rf dist/prompts && cp -r src/prompts dist/",
-    "dev": "tsx src/index.ts",
+    "build": "node scripts/gen-version.mjs && tsc && rm -rf dist/prompts && cp -r src/prompts dist/",
+    "dev": "node scripts/gen-version.mjs && tsx src/index.ts",
     "start": "node dist/index.js",
     "watch": "tsc --watch",
     "format": "prettier --write \"src/**/*.ts\"",

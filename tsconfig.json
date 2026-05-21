@@ -2,10 +2,11 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
-    "module": "ES2022",
-    "moduleResolution": "node",
+    "module": "node16",
+    "moduleResolution": "node16",
     "target": "ES2022",
     "lib": ["ES2022"],
+    "types": ["node"],
     // Disable expensive features for faster builds
     "declaration": false,
     "declarationMap": false,
