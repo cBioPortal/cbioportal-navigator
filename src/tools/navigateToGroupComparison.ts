@@ -203,7 +203,10 @@ export async function handleNavigateToGroupComparison(
             responseData.groupUrls = result.groupUrls;
         }
 
-        const pageDescription = getGroupComparisonPageDescription(input.tab);
+        const pageDescription = getGroupComparisonPageDescription(input.tab, {
+            groups: result.groupInfo,
+            attributeName: result.attributeName,
+        });
         if (pageDescription) {
             responseData.pageDescription = pageDescription;
         }

@@ -223,8 +223,14 @@ async function navigateToStudyView(
         hasPlotsConfig: !!(
             params.plotsHorzSelection || params.plotsVertSelection
         ),
-        ...(getStudyViewPageDescription(params.tab) && {
-            pageDescription: getStudyViewPageDescription(params.tab),
+        ...(getStudyViewPageDescription(params.tab, {
+            plotsHorz: params.plotsHorzSelection,
+            plotsVert: params.plotsVertSelection,
+        }) && {
+            pageDescription: getStudyViewPageDescription(params.tab, {
+                plotsHorz: params.plotsHorzSelection,
+                plotsVert: params.plotsVertSelection,
+            }),
         }),
     });
 }

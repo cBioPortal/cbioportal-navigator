@@ -299,8 +299,16 @@ async function navigateToResultsView(
             caseSetId: '-1',
             sessionId,
             studyViewUrl,
-            ...(getResultsViewPageDescription(params.tab) && {
-                pageDescription: getResultsViewPageDescription(params.tab),
+            ...(getResultsViewPageDescription(params.tab, {
+                plotsHorz: params.plotsHorzSelection,
+                plotsVert: params.plotsVertSelection,
+                comparisonSelectedGroups: params.comparisonSelectedGroups,
+            }) && {
+                pageDescription: getResultsViewPageDescription(params.tab, {
+                    plotsHorz: params.plotsHorzSelection,
+                    plotsVert: params.plotsVertSelection,
+                    comparisonSelectedGroups: params.comparisonSelectedGroups,
+                }),
             }),
         });
     }
@@ -348,8 +356,16 @@ async function navigateToResultsView(
         })),
         genes: validGenes,
         caseSetId,
-        ...(getResultsViewPageDescription(params.tab) && {
-            pageDescription: getResultsViewPageDescription(params.tab),
+        ...(getResultsViewPageDescription(params.tab, {
+            plotsHorz: params.plotsHorzSelection,
+            plotsVert: params.plotsVertSelection,
+            comparisonSelectedGroups: params.comparisonSelectedGroups,
+        }) && {
+            pageDescription: getResultsViewPageDescription(params.tab, {
+                plotsHorz: params.plotsHorzSelection,
+                plotsVert: params.plotsVertSelection,
+                comparisonSelectedGroups: params.comparisonSelectedGroups,
+            }),
         }),
     });
 }
