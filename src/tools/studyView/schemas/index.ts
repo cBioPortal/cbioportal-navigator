@@ -26,7 +26,6 @@ export {
     // Gene filters
     geneFilterQuerySchema,
     geneFilterSchema,
-    alterationFilterSchema,
     // Genomic data filters
     genomicDataFilterSchema,
     mutationDataFilterSchema,

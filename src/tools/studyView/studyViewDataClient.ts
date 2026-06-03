@@ -248,6 +248,80 @@ export class StudyViewDataClient {
     }
 
     /**
+     * Get gene-specific value distributions for StudyView gene-specific filters.
+     *
+     * Routes automatically to column-store via overrideApisForColumnStore:
+     * - mutations profileType → fetchMutationDataCountsUsingPOST (DETAILED projection)
+     *   Returns mutation type strings (e.g. "Missense_Mutation", "In_Frame_Del")
+     *   Used in mutationDataFilters with categorization: "MUTATION_TYPE"
+     * - other profileTypes (gistic, cna) → fetchGenomicDataCountsUsingPOST
+     *   Returns numeric CNA strings ("2"=AMP, "1"=GAIN, "0"=DIPLOID, "-1"=HETLOSS, "-2"=HOMDEL)
+     *   Used in genomicDataFilters
+     *
+     * @param studyId - Study identifier
+     * @param queries - Array of { hugoGeneSymbol, profileType } to query
+     * @returns Array of results with value/label/count per gene+profile
+     */
+    async getGeneSpecificCounts(
+        studyId: string,
+        queries: Array<{ hugoGeneSymbol: string; profileType: string }>
+    ): Promise<
+        Array<{
+            hugoGeneSymbol: string;
+            profileType: string;
+            counts: Array<{ value: string; label: string; count: number }>;
+        }>
+    > {
+        if (queries.length === 0) return [];
+
+        const studyViewFilter = { studyIds: [studyId] } as StudyViewFilter;
+
+        // Split into mutation vs non-mutation queries
+        const mutationQueries = queries.filter(
+            (q) => q.profileType === 'mutations'
+        );
+        const genomicQueries = queries.filter(
+            (q) => q.profileType !== 'mutations'
+        );
+
+        const [mutationResults, genomicResults] = await Promise.all([
+            mutationQueries.length > 0
+                ? this.internalApi.fetchMutationDataCountsUsingPOST({
+                      projection: 'DETAILED',
+                      genomicDataCountFilter: {
+                          genomicDataFilters: mutationQueries.map((q) => ({
+                              hugoGeneSymbol: q.hugoGeneSymbol,
+                              profileType: q.profileType,
+                          })) as any,
+                          studyViewFilter,
+                      },
+                  })
+                : Promise.resolve([]),
+            genomicQueries.length > 0
+                ? this.internalApi.fetchGenomicDataCountsUsingPOST({
+                      genomicDataCountFilter: {
+                          genomicDataFilters: genomicQueries.map((q) => ({
+                              hugoGeneSymbol: q.hugoGeneSymbol,
+                              profileType: q.profileType,
+                          })) as any,
+                          studyViewFilter,
+                      },
+                  })
+                : Promise.resolve([]),
+        ]);
+
+        return [...mutationResults, ...genomicResults].map((item) => ({
+            hugoGeneSymbol: item.hugoGeneSymbol,
+            profileType: item.profileType,
+            counts: item.counts.map((c) => ({
+                value: c.value,
+                label: c.label,
+                count: c.count,
+            })),
+        }));
+    }
+
+    /**
      * Get available treatments for one or more studies.
      *
      * Uses the patient-level endpoint /api/column-store/treatments/patient-counts/fetch

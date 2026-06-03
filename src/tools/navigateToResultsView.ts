@@ -45,6 +45,7 @@ import { loadPrompt } from './shared/promptLoader.js';
 import { buildStudyUrl } from './studyView/buildStudyUrl.js';
 import { validateTabAvailability } from './studyView/validateStudyViewTab.js';
 import { getResultsViewPageDescription } from './shared/pageDescriptions.js';
+import * as oqlParser from './resultsView/oql-parser.js';
 
 /**
  * Tool definition schema (without description, which is loaded at startup)
@@ -91,6 +92,12 @@ const inputSchema = {
         .optional()
         .default('oncoprint')
         .describe('Tab (or tab/subtab) to navigate to'),
+    profileFilter: z
+        .string()
+        .optional()
+        .describe(
+            'Comma-separated molecular profile suffixes to activate. Required when OQL contains EXP or PROT — must include ALL desired profiles (suffix mode overrides defaults). Suffix = molecularProfileId.replace(studyId + "_", ""). See prompt for construction rules.'
+        ),
     zScoreThreshold: z
         .number()
         .optional()
@@ -144,6 +151,7 @@ type NavigateToResultsViewInput = {
     zScoreThreshold?: z.infer<typeof inputSchema.zScoreThreshold>;
     rppaScoreThreshold?: z.infer<typeof inputSchema.rppaScoreThreshold>;
     studyViewFilter?: z.infer<typeof inputSchema.studyViewFilter>;
+    profileFilter?: z.infer<typeof inputSchema.profileFilter>;
     plotsHorzSelection?: z.infer<typeof inputSchema.plotsHorzSelection>;
     plotsVertSelection?: z.infer<typeof inputSchema.plotsVertSelection>;
     comparisonSelectedGroups?: z.infer<
@@ -198,17 +206,57 @@ async function navigateToResultsView(
         return createErrorResponse('At least one gene must be provided');
     }
 
-    const validGenes = await geneResolver.validateBatch(params.genes);
+    // 1a. Parse OQL — validate syntax and extract gene symbols from AST
+    const oqlQuery = params.genes.join('\n');
+    let parsedOql: ReturnType<typeof oqlParser.parse>;
+    try {
+        parsedOql = oqlParser.parse(oqlQuery.toUpperCase());
+    } catch (e: any) {
+        return createErrorResponse('Invalid OQL syntax in genes', {
+            error: e.message,
+            location: e.location,
+        });
+    }
 
-    if (validGenes.length === 0) {
+    // Extract gene symbols from AST — handles plain genes, OQL statements,
+    // merged tracks, and skips DATATYPES pseudo-gene
+    const geneSymbols = (parsedOql ?? [])
+        .flatMap((entry: any) => {
+            if (entry.list) {
+                // MergedGeneQuery: ["label" GENE1 GENE2]
+                return entry.list.map((q: any) => q.gene);
+            }
+            return [entry.gene];
+        })
+        .filter((g: string) => g.toUpperCase() !== 'DATATYPES');
+
+    const validSymbols = await geneResolver.validateBatch(geneSymbols);
+
+    if (validSymbols.length === 0) {
         return createErrorResponse('No valid genes found', {
             providedGenes: params.genes,
         });
     }
 
-    if (validGenes.length < params.genes.length) {
+    // Rebuild gene entries: drop entries whose extracted symbol is entirely invalid
+    const validSymbolSet = new Set(validSymbols.map((s) => s.toUpperCase()));
+    const validGeneEntries = params.genes.filter((g) => {
+        const parsed = oqlParser.parse(g.toUpperCase()) ?? [];
+        return parsed.some((entry: any) => {
+            const genes = entry.list
+                ? entry.list.map((q: any) => q.gene)
+                : [entry.gene];
+            return genes.some(
+                (sym: string) =>
+                    sym.toUpperCase() !== 'DATATYPES' &&
+                    validSymbolSet.has(sym.toUpperCase())
+            );
+        });
+    });
+
+    if (validGeneEntries.length < params.genes.length) {
         const invalidGenes = params.genes.filter(
-            (g) => !validGenes.includes(g)
+            (g) => !validGeneEntries.includes(g)
         );
         console.warn(
             `Some genes were invalid and skipped: ${invalidGenes.join(', ')}`
@@ -263,7 +311,7 @@ async function navigateToResultsView(
         const sessionClient = new MainSessionClient(config.baseUrl);
         const { id: sessionId } = await sessionClient.createSession({
             cancer_study_list: studyIds.join(','),
-            gene_list: validGenes.join(' '),
+            gene_list: validGeneEntries.join('\n'),
             case_set_id: '-1',
             case_ids: caseIds,
             tab_index: 'tab_visualize',
@@ -294,7 +342,7 @@ async function navigateToResultsView(
                 name: s.name,
                 sampleCount: s.allSampleCount,
             })),
-            genes: validGenes,
+            genes: validSymbols,
             filteredSampleCount: samples.length,
             caseSetId: '-1',
             sessionId,
@@ -329,20 +377,58 @@ async function navigateToResultsView(
         geneResolver.resolvePlotsGene(params.plotsVertSelection),
     ]);
 
+    // When genes use OQL (alterations !== false), cBioPortal names the per-gene
+    // comparison group after the full OQL string (e.g. "CDKN2A: HOMDEL"), not the
+    // bare symbol. Expand comparisonSelectedGroups to include both forms so the
+    // groups are correctly pre-selected regardless of naming.
+    let comparisonSelectedGroups = params.comparisonSelectedGroups;
+    if (comparisonSelectedGroups && comparisonSelectedGroups.length > 0) {
+        const symbolToOqlEntry = new Map<string, string>();
+        for (const entry of validGeneEntries) {
+            const parsed = oqlParser.parse(entry.toUpperCase()) ?? [];
+            for (const node of parsed) {
+                if ('gene' in node && node.alterations !== false) {
+                    symbolToOqlEntry.set(node.gene.toUpperCase(), entry);
+                }
+            }
+        }
+        const oqlForms = comparisonSelectedGroups
+            .map((g) => symbolToOqlEntry.get(g.toUpperCase()))
+            .filter(
+                (e): e is string =>
+                    e !== undefined && !comparisonSelectedGroups!.includes(e)
+            );
+        if (oqlForms.length > 0) {
+            comparisonSelectedGroups = [
+                ...comparisonSelectedGroups,
+                ...oqlForms,
+            ];
+        }
+    }
+
     // 3. Build URL (supports multiple studies)
     const url = buildResultsUrl({
         studies: studyIds,
-        genes: validGenes,
+        genes: validGeneEntries,
         caseSelection: {
             type: 'case_set',
             caseSetId,
         },
         tab: params.tab,
         options: {
+            ...(params.profileFilter && {
+                profileFilter: params.profileFilter,
+            }),
+            ...(params.zScoreThreshold !== undefined && {
+                zScoreThreshold: params.zScoreThreshold,
+            }),
+            ...(params.rppaScoreThreshold !== undefined && {
+                rppaScoreThreshold: params.rppaScoreThreshold,
+            }),
             ...(plotsHorzSelection && { plotsHorzSelection }),
             ...(plotsVertSelection && { plotsVertSelection }),
-            ...(params.comparisonSelectedGroups && {
-                comparisonSelectedGroups: params.comparisonSelectedGroups,
+            ...(comparisonSelectedGroups && {
+                comparisonSelectedGroups,
             }),
         },
     });
@@ -354,7 +440,7 @@ async function navigateToResultsView(
             name: s.name,
             sampleCount: s.allSampleCount,
         })),
-        genes: validGenes,
+        genes: validSymbols,
         caseSetId,
         ...(getResultsViewPageDescription(params.tab, {
             plotsHorz: params.plotsHorzSelection,

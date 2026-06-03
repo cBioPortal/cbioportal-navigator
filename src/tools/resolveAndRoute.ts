@@ -202,10 +202,12 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
 
     // 4. Fetch metadata
     // - For studyIds (direct): fetch metadata for all studies
-    // - For studyKeywords (search): fetch metadata only for top 5, basic info for rest
-    const metadataLimit = isKeywordSearch ? 5 : resolvedStudyIds.length;
-    const studyIdsWithMetadata = resolvedStudyIds.slice(0, metadataLimit);
-    const studyIdsWithoutMetadata = resolvedStudyIds.slice(metadataLimit);
+    // - For studyKeywords (search): fetch metadata only for top 5, basic info for rest (capped at 40 total)
+    const totalLimit = isKeywordSearch ? 40 : resolvedStudyIds.length;
+    const cappedStudyIds = resolvedStudyIds.slice(0, totalLimit);
+    const metadataLimit = isKeywordSearch ? 5 : cappedStudyIds.length;
+    const studyIdsWithMetadata = cappedStudyIds.slice(0, metadataLimit);
+    const studyIdsWithoutMetadata = cappedStudyIds.slice(metadataLimit);
 
     // Create lookup map for O(1) access
     const studyDetailsMap = new Map(
@@ -217,12 +219,10 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
         studyIdsWithMetadata.map(async (studyId) => {
             const study = studyDetailsMap.get(studyId)!;
 
-            const [clinicalAttributes, molecularProfiles, treatments] =
-                await Promise.all([
-                    studyViewDataClient.getClinicalAttributes([studyId]),
-                    studyViewDataClient.getMolecularProfiles([studyId]),
-                    studyViewDataClient.getTreatments([studyId]),
-                ]);
+            const [clinicalAttributes, molecularProfiles] = await Promise.all([
+                studyViewDataClient.getClinicalAttributes([studyId]),
+                studyViewDataClient.getMolecularProfiles([studyId]),
+            ]);
 
             const regularProfileIds = molecularProfiles
                 .filter((p) => p.molecularAlterationType !== 'GENERIC_ASSAY')
@@ -256,23 +256,44 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
                         genericAssayProfiles: genericAssayProfileIds,
                     }),
                     availableComparisonTabs,
-                    treatments: treatments,
                 },
             };
         })
     );
 
-    // Basic info for remaining studies (keyword search only)
+    // Basic info + profile availability for remaining studies (one batch call)
+    const otherStudyProfileMap = new Map<
+        string,
+        ReturnType<typeof computeProfiles>
+    >();
+    if (studyIdsWithoutMetadata.length > 0) {
+        const allProfiles = await studyViewDataClient.getMolecularProfiles(
+            studyIdsWithoutMetadata
+        );
+        const profilesByStudy = new Map<string, typeof allProfiles>();
+        for (const profile of allProfiles) {
+            if (!profilesByStudy.has(profile.studyId))
+                profilesByStudy.set(profile.studyId, []);
+            profilesByStudy.get(profile.studyId)!.push(profile);
+        }
+        for (const [studyId, profiles] of profilesByStudy) {
+            otherStudyProfileMap.set(studyId, computeProfiles(profiles));
+        }
+    }
+
     const otherStudies = studyIdsWithoutMetadata.map((studyId) => {
         const study = studyDetailsMap.get(studyId)!;
         return {
             studyId: study.studyId,
             name: study.name,
             sampleCount: study.allSampleCount,
-            studyViewUrl: buildCBioPortalPageUrl({
-                pathname: '/study',
-                query: { id: study.studyId },
-            }),
+            profiles: otherStudyProfileMap.get(studyId) ?? {
+                mutations: false,
+                cna: false,
+                sv: false,
+                mrna: false,
+                protein: false,
+            },
         };
     });
 
@@ -290,10 +311,62 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
 
     return createDataResponse(message, {
         totalCount,
-        resolvedStudyIds,
         studiesWithMetadata,
         ...(otherStudies.length > 0 && { otherStudies }),
     });
+}
+
+function computeProfiles(
+    molecularProfiles: Array<{
+        molecularAlterationType: string;
+        datatype?: string;
+        molecularProfileId: string;
+        studyId: string;
+    }>
+): {
+    mutations: string | false;
+    cna: string | false;
+    sv: string | false;
+    mrna: string | false;
+    protein: string | false;
+} {
+    const id = (p: { molecularProfileId: string }) => p.molecularProfileId;
+
+    const mutationProfile = molecularProfiles.find(
+        (p) => p.molecularAlterationType === 'MUTATION_EXTENDED'
+    );
+    const cnaProfile = molecularProfiles.find(
+        (p) =>
+            p.molecularAlterationType === 'COPY_NUMBER_ALTERATION' &&
+            p.datatype === 'DISCRETE'
+    );
+    const svProfile = molecularProfiles.find(
+        (p) => p.molecularAlterationType === 'STRUCTURAL_VARIANT'
+    );
+
+    const mrnaProfiles = molecularProfiles.filter(
+        (p) => p.molecularAlterationType === 'MRNA_EXPRESSION'
+    );
+    const mrnaProfile =
+        mrnaProfiles.find((p) => {
+            const pid = id(p);
+            return pid.includes('all_sample') && pid.includes('Zscores');
+        }) ?? mrnaProfiles.find((p) => id(p).includes('Zscores'));
+
+    const proteinProfiles = molecularProfiles.filter(
+        (p) => p.molecularAlterationType === 'PROTEIN_LEVEL'
+    );
+    const proteinProfile =
+        proteinProfiles.find((p) => id(p).includes('quantification_zscores')) ??
+        proteinProfiles.find((p) => id(p).includes('Zscores'));
+
+    return {
+        mutations: mutationProfile ? id(mutationProfile) : false,
+        cna: cnaProfile ? id(cnaProfile) : false,
+        sv: svProfile ? id(svProfile) : false,
+        mrna: mrnaProfile ? id(mrnaProfile) : false,
+        protein: proteinProfile ? id(proteinProfile) : false,
+    };
 }
 
 /**
