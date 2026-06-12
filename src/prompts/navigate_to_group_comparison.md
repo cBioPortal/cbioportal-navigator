@@ -3,7 +3,7 @@
 Creates group comparison sessions and generates URL to cBioPortal's Group Comparison page.
 
 **→ See router tool for universal guidelines (no guessing IDs, exact values, Link First principle).**
-**→ `studyViewFilter` format (geneFilters, mutationDataFilters, genomicDataFilters, etc.) follows the same rules as `navigate_to_study_view`. `profileType` = molecularProfileId with `{studyId}_` prefix stripped.**
+**→ `studyViewFilter` format (geneFilters, mutationDataFilters, genomicDataFilters, clinicalDataFilters, genericAssayDataFilters, etc.) follows the same rules as `navigate_to_study_view`. `profileType` = molecularProfileId with `{studyId}_` prefix stripped.**
 
 ## What Group Comparison Shows
 
@@ -15,33 +15,35 @@ Creates group comparison sessions and generates URL to cBioPortal's Group Compar
 
 ---
 
+## Workflow
+
+Every comparison is defined by custom `groups` — each group is either a `studyViewFilter` (samples matching that filter) or `isUnselected: true` (complement of all other groups). There is no separate "group by attribute" mode — splitting by a clinical attribute means building one group per value (or range) yourself:
+
+1. Call `get_studyviewfilter_options` with `attributeIds` to get exact `values` (categorical/STRING/BOOLEAN) or quartile `bins` (NUMBER) for the attribute.
+2. Build one group per value/range, using `clinicalDataFilters` in each group's `studyViewFilter`. See `get_studyviewfilter_options` docs for filter syntax, including how to represent a missing-data group (`{"value": "NA"}`).
+3. For merged values (e.g. T1+T2 vs T3+T4), list multiple `values` in a single group's filter.
+4. For "vs rest" comparisons (e.g. EGFR mutant vs everyone else), use `isUnselected: true` for the second group instead of constructing its filter explicitly.
+
+---
+
 ## Parameters
 
 ### studyIds (required)
-Array of study IDs from router response. Cross-study supported, but the clinical attribute **must exist in all specified studies** with compatible value types.
+Array of study IDs from router response. Cross-study supported, but any clinical attribute used in `clinicalDataFilters` **must exist in all specified studies** with compatible value types.
 
-### clinicalAttributeId
-Clinical attribute ID to group by (e.g., `"SEX"`, `"PATH_T_STAGE"`). Tool discovers all values and creates one group per value automatically. **Cannot be used together with `groups`.**
-
-### groups
-Array of custom groups (≥ 2). Two group types:
+### groups (required)
+Array of groups (≥ 2). Two group types:
 - **Filter group:** `{ name, studyViewFilter }` — samples matching the filter. If `studyIds` is included in a group's `studyViewFilter`, only samples from those studies are included in that group; otherwise the top-level `studyIds` applies.
 - **Unselected group:** `{ name, isUnselected: true }` — samples in the cohort NOT matched by any other group (complement). At most one group may be unselected.
 
-Use when grouping logic cannot be expressed as a single attribute: merged values (T1+T2 vs T3+T4), gene-based splits, wildtype/unaltered comparisons, multi-cohort. **Cannot be used together with `clinicalAttributeId`, `clinicalAttributeValues`, or `includeNA`.** Can be combined with `studyViewFilter` for global pre-filtering.
+Use for clinical attribute splits (one group per value/range, including merged values like T1+T2 vs T3+T4, or an "NA"/missing-data group), cohort-relative splits of continuous values (gene expression/protein/methylation/clinical NUMBER attributes — use `bins` from `get_studyviewfilter_options`), gene-based splits, wildtype/unaltered comparisons, or multi-cohort comparisons. Can be combined with `studyViewFilter` for global pre-filtering.
 
 **Multi-cohort splits (comparing different cancer types across studies):** two approaches:
 - **By studyId** — set `studyIds` in each group's `studyViewFilter`. Simple, no extra lookups. Use when each group maps cleanly to one or more whole studies.
 - **By cancer type attribute** — use `clinicalDataFilters` with exact values from `get_studyviewfilter_options`. Use when grouping within a single multi-cancer study (e.g., MSK-IMPACT), or when merging specific subtypes across studies into one group. Each group independently chooses the right attribute granularity: prefer `CANCER_TYPE` when the target has a direct match; use `CANCER_TYPE_DETAILED` when the target is a subtype within a broader category. Both attributes can be mixed across groups in the same comparison.
 
 ### studyViewFilter
-Pre-filter samples before grouping. Works with both `clinicalAttributeId` and `groups` — when used with `groups`, it is intersected with each group's filter. Same format as `navigate_to_study_view` filterJson. `studyIds` are auto-injected — don't include them inside.
-
-### clinicalAttributeValues (clinicalAttributeId only)
-Subset of values to compare (categorical only). Reduces noise when attribute has many values. Case-insensitive matching.
-
-### includeNA (clinicalAttributeId only)
-Include "NA" group for samples missing the attribute. Default: `true` (categorical), `false` (numerical).
+Pre-filter samples before grouping. Intersected with each group's filter. Same format as `navigate_to_study_view` filterJson. `studyIds` are auto-injected — don't include them inside.
 
 ### tab
 Use a value from `availableComparisonTabs` in the resolver metadata for the study. Omit to land on `overlap` (default).
@@ -71,25 +73,13 @@ Use `selectedGene` when a gene is mentioned in the context of comparing mutation
 
 ---
 
-## Grouping Behavior (clinicalAttributeId)
-
-**Categorical (STRING):** Groups by unique values. Top 19 + NA = max 20 groups, sorted by sample count.
-
-**Numerical (NUMBER):** Auto-splits into 4 quartiles with equal sample counts (e.g., AGE → "33.5-55", "55-67", "67-75.5", "75.5-89"). NaN samples go to NA group.
-
-**Patient vs Sample level:** Tool auto-detects from metadata. Patient-level attributes (SEX, AGE) apply to all samples; sample-level (SAMPLE_TYPE) are per-sample.
-
-**Minimum 2 groups required** for comparison.
-
----
-
 ## Response Format
 
 The tool returns:
 - **url:** Direct link to comparison page (with optional tab)
 - **studyViewUrl:** StudyView link for exploring the cohort (with pre-filter applied if provided)
 - **groups:** Array with name and sample count per group
-- **groupUrls** _(when pre-filter, value subset, or custom groups are used):_ one StudyView URL per group with combined filters
+- **groupUrls:** One StudyView URL per filter-based group with combined filters (omitted for an `isUnselected` group, which has no simple StudyView representation)
 
 When presenting results, include group names and sample counts. Always offer both the comparison link and the `studyViewUrl`. For `groupUrls`, provide each group's URL for detailed exploration.
 
@@ -97,46 +87,72 @@ When presenting results, include group names and sample counts. Always offer bot
 
 ## Examples
 
-### Compare by attribute
+### Compare by clinical attribute (categorical)
+Call `get_studyviewfilter_options` with `attributeIds: ["SEX"]` first to confirm exact values, then build one group per value.
 ```json
 {
   "studyIds": ["luad_tcga_pan_can_atlas_2018"],
-  "clinicalAttributeId": "SEX"
+  "groups": [
+    {
+      "name": "Male",
+      "studyViewFilter": {"clinicalDataFilters": [{"attributeId": "SEX", "values": [{"value": "Male"}]}]}
+    },
+    {
+      "name": "Female",
+      "studyViewFilter": {"clinicalDataFilters": [{"attributeId": "SEX", "values": [{"value": "Female"}]}]}
+    }
+  ]
 }
 ```
 
-### Compare by attribute within a sub-cohort
+### Compare by clinical attribute, including a missing-data group
+Add an `"NA"` group for samples with no recorded value — `"NA"` is always a valid filter value even when the attribute reports no NA value among `values`.
 ```json
 {
   "studyIds": ["luad_tcga_pan_can_atlas_2018"],
-  "clinicalAttributeId": "SEX",
+  "groups": [
+    {"name": "Male", "studyViewFilter": {"clinicalDataFilters": [{"attributeId": "SEX", "values": [{"value": "Male"}]}]}},
+    {"name": "Female", "studyViewFilter": {"clinicalDataFilters": [{"attributeId": "SEX", "values": [{"value": "Female"}]}]}},
+    {"name": "Unknown", "studyViewFilter": {"clinicalDataFilters": [{"attributeId": "SEX", "values": [{"value": "NA"}]}]}}
+  ],
+  "tab": "clinical"
+}
+```
+
+### Compare by clinical attribute (NUMBER, quartiles)
+Call `get_studyviewfilter_options` with `attributeIds: ["AGE"]` to get `bins`, then build one group per quartile range.
+```json
+{
+  "studyIds": ["luad_tcga_pan_can_atlas_2018"],
+  "groups": [
+    {"name": "AGE Q1", "studyViewFilter": {"clinicalDataFilters": [{"attributeId": "AGE", "values": [{"end": 59}]}]}},
+    {"name": "AGE Q2", "studyViewFilter": {"clinicalDataFilters": [{"attributeId": "AGE", "values": [{"start": 59, "end": 66}]}]}},
+    {"name": "AGE Q3", "studyViewFilter": {"clinicalDataFilters": [{"attributeId": "AGE", "values": [{"start": 66, "end": 73}]}]}},
+    {"name": "AGE Q4", "studyViewFilter": {"clinicalDataFilters": [{"attributeId": "AGE", "values": [{"start": 73}]}]}}
+  ],
+  "tab": "survival"
+}
+```
+For a 2-group "high vs low" split, merge bins 1+2 vs bins 3+4 (the boundary between bin 2 and bin 3 is the median) — same pattern as merged categorical values.
+
+### Compare by clinical attribute within a sub-cohort
+Use `studyViewFilter` to pre-filter the cohort (e.g. restrict to TP53-mutant patients), then group the remaining samples by attribute value.
+```json
+{
+  "studyIds": ["luad_tcga_pan_can_atlas_2018"],
   "studyViewFilter": {
-    "clinicalDataFilters": [{"attributeId": "AGE", "values": [{"start": 60}]}],
     "geneFilters": [{
       "molecularProfileIds": ["luad_tcga_pan_can_atlas_2018_mutations"],
       "geneQueries": [[{"hugoGeneSymbol": "TP53"}]]
     }]
-  }
+  },
+  "groups": [
+    {"name": "Male", "studyViewFilter": {"clinicalDataFilters": [{"attributeId": "SEX", "values": [{"value": "Male"}]}]}},
+    {"name": "Female", "studyViewFilter": {"clinicalDataFilters": [{"attributeId": "SEX", "values": [{"value": "Female"}]}]}}
+  ]
 }
 ```
-
-### Numerical attribute (auto quartiles)
-```json
-{
-  "studyIds": ["luad_tcga_pan_can_atlas_2018"],
-  "clinicalAttributeId": "AGE"
-}
-```
-→ Creates 4 quartile groups automatically.
-
-### Compare subset of values
-```json
-{
-  "studyIds": ["luad_tcga_pan_can_atlas_2018"],
-  "clinicalAttributeId": "RACE",
-  "clinicalAttributeValues": ["White", "Asian", "Black or African American"]
-}
-```
+→ The global `studyViewFilter` is merged with each group's filter. Groups contain only TP53-mutant patients.
 
 ### Custom groups — merged stage values
 ```json
@@ -312,9 +328,7 @@ Use when grouping within a single multi-cancer study. Call `get_studyviewfilter_
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| No samples | Filter too restrictive | Adjust filter criteria |
-| Attribute not found | Invalid clinicalAttributeId | Check router `clinicalAttributeIds` |
-| < 2 groups | All samples same value | Choose different attribute |
-| Incompatible params | `groups` used with `clinicalAttributeId`, `clinicalAttributeValues`, or `includeNA` | Use one approach or the other |
+| No samples found for group "X" | Filter too restrictive | Adjust filter criteria |
+| < 2 groups | Schema requires minimum 2 groups | Provide at least 2 groups |
 | No unselected samples | All cohort samples covered by other groups | Check filter logic |
 | Multiple unselected | More than one group with `isUnselected: true` | Only one complement group allowed |

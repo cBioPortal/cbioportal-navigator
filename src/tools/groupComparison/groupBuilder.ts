@@ -1,14 +1,11 @@
 /**
- * Utilities for building comparison groups from samples and clinical data.
+ * Utilities for building comparison groups from sample identifiers.
  *
  * This module provides functions to:
- * - Group samples by clinical attribute values
  * - Convert sample identifiers to session group data format
- * - Handle NA values (samples without the clinical attribute)
  *
  * Based on cbioportal-frontend:
  * - ComparisonGroupManagerUtils.ts: getStudiesAttr, getGroupParameters
- * - StudyViewPageStore.ts: createCategoricalAttributeComparisonSession (line 1944-1983)
  */
 
 import _ from 'lodash';
@@ -32,19 +29,6 @@ export interface SessionGroupData {
         samples: string[];
     }[];
     origin: string[];
-}
-
-/**
- * Clinical data item with value
- */
-export interface ClinicalDataItem {
-    studyId: string;
-    sampleId?: string;
-    patientId?: string;
-    entityId?: string;
-    value: string;
-    uniqueSampleKey?: string;
-    uniquePatientKey?: string;
 }
 
 /**
@@ -100,108 +84,4 @@ export function createGroup(
         studies: getStudiesAttr(sampleIdentifiers),
         origin,
     };
-}
-
-/**
- * Group samples by clinical attribute values.
- *
- * Handles both patient-level and sample-level attributes by mapping
- * clinical data back to samples using appropriate keys.
- *
- * Based on: cbioportal-frontend/src/pages/studyView/StudyViewPageStore.ts:1944-1983
- *
- * @param clinicalData - Array of ClinicalData with values
- * @param samples - All samples to potentially group
- * @param isPatientAttribute - Whether this is a patient-level attribute
- * @returns Map of attribute value → sample identifiers
- */
-export function groupSamplesByAttributeValue(
-    clinicalData: ClinicalDataItem[],
-    samples: Sample[],
-    isPatientAttribute: boolean
-): Map<string, SampleIdentifier[]> {
-    // For patient-level attributes, we need to map back to samples
-    // because clinical data uses patientId but we need sampleIds for groups
-    if (isPatientAttribute) {
-        // Create lookup by uniquePatientKey
-        const patientKeyToData = _.keyBy(
-            clinicalData,
-            (d) => d.uniquePatientKey
-        );
-
-        // Map each sample to its patient's clinical data value
-        // Filter out samples without data - they'll be handled by createNAGroup
-        const dataWithSamples = samples
-            .map((sample) => {
-                const datum = patientKeyToData[sample.uniquePatientKey!];
-                if (!datum) return null; // Skip samples without data
-                return {
-                    sampleId: sample.sampleId,
-                    studyId: sample.studyId,
-                    value: datum.value,
-                };
-            })
-            .filter((item): item is NonNullable<typeof item> => item !== null);
-
-        // Group by value (case-insensitive)
-        return new Map(
-            Object.entries(
-                _.groupBy(dataWithSamples, (d) => d.value.toLowerCase())
-            ).map(([key, items]) => [
-                // Use original case from first item
-                items[0].value,
-                items.map((item) => ({
-                    studyId: item.studyId,
-                    sampleId: item.sampleId,
-                })),
-            ])
-        );
-    } else {
-        // For sample-level attributes, direct grouping
-        // Group by value (case-insensitive)
-        const lcValueToSampleIdentifiers = _.groupBy(clinicalData, (d) =>
-            d.value.toLowerCase()
-        );
-
-        return new Map(
-            Object.entries(lcValueToSampleIdentifiers).map(
-                ([lcValue, items]) => [
-                    // Use original case from first item
-                    items[0].value,
-                    items.map((item) => ({
-                        studyId: item.studyId,
-                        sampleId: item.sampleId!,
-                    })),
-                ]
-            )
-        );
-    }
-}
-
-/**
- * Create NA group for samples that don't have the clinical attribute.
- *
- * @param samplesWithData - Set of sampleKeys that have clinical data
- * @param allSamples - All samples in the filtered set
- * @param origin - Study IDs this comparison originates from
- * @returns SessionGroupData for NA group, or null if no NA samples exist
- */
-export function createNAGroup(
-    samplesWithData: Set<string>,
-    allSamples: Sample[],
-    origin: string[]
-): SessionGroupData | null {
-    const naSamples = allSamples.filter(
-        (s) => !samplesWithData.has(`${s.studyId}_${s.sampleId}`)
-    );
-
-    if (naSamples.length === 0) {
-        return null;
-    }
-
-    return createGroup(
-        'NA',
-        naSamples.map((s) => ({ studyId: s.studyId, sampleId: s.sampleId })),
-        origin
-    );
 }

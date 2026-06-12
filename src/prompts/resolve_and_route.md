@@ -39,11 +39,31 @@ All matching studies are returned (capped at 40), ranked by: keyword match count
 
 ### Study Selection
 
-- **When multiple studies match, pick one and proceed immediately.** Do not ask the user to choose first. Prefer **TCGA studies** over others; within TCGA, prefer the **PanCancer Atlas** version (e.g., `luad_tcga_pan_can_atlas_2018`). Generate the URL with the selected study, then list the other matching studies as alternatives — use each study's `studyViewUrl` field to render them as clickable links.
-- **Profile availability takes precedence over TCGA preference (ResultsView OQL queries only).** Before selecting a study, verify it has the data types the query requires. For top-5 studies, check `molecularProfileIds` directly — the presence of `_mutations`, `_gistic`/`_cna`, `_structural_variants`, `_mrna`/`_rna_seq`/`_Zscores`, `_rppa` suffixes indicates the respective profile types. For otherStudies, use the `profiles` flags (`mutations`, `cna`, `sv`, `mrna`, `protein`). Note: clinical attributes encoding fusion status (e.g. `BRAF_KIAA1549_FUSION`) are not a substitute for an SV molecular profile — FUSION OQL requires `sv`. When the preferred study (including pan-disease studies) lacks a required profile, fall back in order: (1) another TCGA PanCancer Atlas study covering the same disease with the profile, (2) any TCGA study with the profile, (3) the highest-ranked non-TCGA study with the profile. If no study has the required profile, inform the user rather than generating a URL that will return no data.
-- **Broad disease terms → prefer pan-disease studies.** When the user queries a general disease category (e.g., "glioma", "sarcoma", "lymphoma"), prefer studies that cover the full disease spectrum over subtype-specific studies. For example, "glioma" encompasses both low-grade glioma (LGG) and glioblastoma (GBM), so `lgggbm_tcga_pub` (LGG+GBM combined) is more appropriate than `gbm_tcga` (GBM only). Similarly, prefer combined/pan-disease studies when the query does not specify a particular subtype.
-- **Pan-cancer studies** (e.g., MSK-CHORD) may match disease-specific queries — consider whether the user wants a disease-specific or cross-cancer study.
-- **No matches →** guide user to browse at https://www.cbioportal.org (studies from TCGA, ICGC, TARGET, institutional studies, cell line data)
+**Baseline ranking** (applies to all navigation tools) — when multiple studies match, pick one and proceed immediately; do not ask the user to choose first.
+
+- Prefer **TCGA studies**; within TCGA, prefer the **PanCancer Atlas** version (e.g., `luad_tcga_pan_can_atlas_2018`).
+- For broad disease terms (e.g., "glioma", "sarcoma", "lymphoma"), prefer pan-disease/combined studies over subtype-specific ones — e.g., `lgggbm_tcga_pub` (LGG+GBM) over `gbm_tcga` (GBM only).
+- Pan-cancer studies (e.g., MSK-CHORD) may also match disease-specific queries — weigh whether the user wants a disease-specific or cross-cancer study.
+
+**Override — `navigate_to_results_view` OQL queries only.** The study chosen above must also have the molecular profile the query's OQL requires:
+
+| OQL / query type | Required profile |
+|---|---|
+| Mutation (`MUT`) | `_mutations` |
+| CNA (`AMP`, `HOMDEL`, `GAIN`, ...) | discrete `_gistic`/`_cna` |
+| `FUSION` | `_structural_variants` |
+| `EXP` | **z-scored** mRNA (`_Zscores`, e.g. `..._mrna_median_all_sample_Zscores`) |
+| `PROT` | **z-scored** protein (`_rppa_Zscores`/`quantification_zscores`) |
+
+A raw `_mrna`/`_rna_seq`/`_rppa` profile without `_Zscores` does NOT satisfy `EXP`/`PROT` — those thresholds are z-score based; for a cohort-relative split on a raw/non-Zscore profile, use Rule 2's custom groups with `bins` instead. Clinical attributes encoding fusion status (e.g. `BRAF_KIAA1549_FUSION`) are not a substitute for an SV profile — `FUSION` OQL requires `sv`.
+
+Check availability via: for top-5 studies, scan `molecularProfileIds` for the suffixes above; for otherStudies, use the `profiles` flags (`mutations`, `cna`, `sv`, `mrna`, `protein` — `mrna`/`protein` are already Zscore-gated).
+
+If the chosen study lacks the required profile, fall back in order: (1) another study meeting the baseline ranking above that has the profile, (2) any TCGA study with the profile, (3) the highest-ranked non-TCGA study with the profile. If no study has the required profile, inform the user rather than generating a URL that will return no data.
+
+Once a study is finalized, generate its URL, then list the other matching studies as alternatives — use each study's `studyViewUrl` field to render them as clickable links.
+
+**No matches →** guide user to browse at https://www.cbioportal.org (studies from TCGA, ICGC, TARGET, institutional studies, cell line data)
 
 ---
 
@@ -66,9 +86,7 @@ View a patient's complete profile, clinical timeline, genomic alterations, or co
 **User wants to compare/split a cohort where the grouping variable is clinical, cohort-level, or a continuous molecular value split cohort-relatively (high vs low, quartiles, median).**
 Signals: compare, vs, difference, split, by sex/age/stage/smoking/expression level...
 
-Two approaches:
-- **By attribute:** group by a single clinical attribute (auto-discovers values; numerical attributes are auto quartile-binned)
-- **Custom groups:** each group defined by its own filter — use for merged values (T1+T2 vs T3+T4), multi-cohort splits (LUAD vs LUSC), multi-factor groups combining gene + clinical criteria, or cohort-relative splits of continuous molecular values (gene expression/protein/methylation "high vs low", quartiles) — call `get_studyviewfilter_options` with `geneSpecificQueries`/`genericAssayProfileIds` to get `bins`, then use those `{start,end}` ranges in `genomicDataFilters`/`genericAssayDataFilters`
+**Approach — custom `groups`:** every comparison is built from custom groups, each defined by its own `studyViewFilter` (or `isUnselected: true` for "vs rest"). For a clinical attribute split, call `get_studyviewfilter_options` with `attributeIds` to get exact `values` (categorical) or quartile `bins` (NUMBER), then build one group per value/range using `clinicalDataFilters` — including merged values (T1+T2 vs T3+T4) and an "NA"/missing-data group. Also use custom groups for: multi-cohort splits (LUAD vs LUSC), multi-factor groups combining gene + clinical criteria, or cohort-relative splits of continuous molecular values (gene expression/protein/methylation "high vs low", quartiles) — call `get_studyviewfilter_options` with `geneSpecificQueries`/`genericAssayProfileIds` to get `bins`, then use those `{start,end}` ranges in `genomicDataFilters`/`genericAssayDataFilters`.
 
 **Important — when NOT to use group comparison:**
 - User explicitly asks about a specific outcome between groups defined by **gene alteration status** (mutation/CNA/SV, including "Gene X vs rest" Altered/Unaltered) or an **absolute/biological threshold** (e.g. z-score overexpression `EXP > 2`, an explicit user-given cutoff) → Rule 3c
@@ -82,7 +100,7 @@ Two approaches:
 - "Compare luad by KRAS mutation"
 - "Compare early stage (T1+T2) vs late stage (T3+T4)"
 - "LUAD vs LUSC mutation comparison"
-- "Survival by CD8A expression, high vs low" → custom groups using `genomicDataFilters` ranges from `bins`
+- "Survival by PDCD1 expression, high vs low" → custom groups using `genomicDataFilters` ranges from `bins`
 - "Split this cohort by MGMT methylation level (quartiles) and compare clinical features"
 
 ### Rule 3 → `navigate_to_results_view`

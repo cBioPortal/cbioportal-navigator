@@ -22,7 +22,7 @@ Returns exact valid values for clinical attributes and generic assay entities. R
 - `navigate_to_study_view` — cohort overview, filtered patient groups
 - `navigate_to_patient_view` — individual patient profiles
 - `navigate_to_results_view` — gene alteration analysis, OncoPrint, altered vs unaltered comparison
-- `navigate_to_group_comparison` — subgroup comparison (by clinical attribute, or custom filter-based groups)
+- `navigate_to_group_comparison` — subgroup comparison via custom groups (clinical attribute splits, multi-cohort, gene-based)
 
 Call each navigation tool **at most once** per query, fully configured. Navigation tools may be called in parallel **with each other** when the query spans multiple views — but **never in parallel with `resolve_and_route`**. Always wait for resolver results before selecting a study or setting navigation parameters. Study selection — especially profile availability (SV, expression) — cannot be verified without resolver output. In particular: `tab: "structuralVariants"` requires confirming `_structural_variants` in the resolved study's `molecularProfileIds`; `profileFilter` for expression requires confirming the mRNA profile ID.
 

@@ -1,15 +1,16 @@
 /**
- * Navigate to Group Comparison page based on clinical attribute.
+ * Navigate to Group Comparison page based on custom filter-defined groups.
  *
- * This module implements the main logic for creating group comparison sessions
- * from clinical attributes. It:
- * 1. Fetches samples matching the filter
- * 2. Retrieves clinical data for the specified attribute
- * 3. Groups samples by attribute values
- * 4. Creates a comparison session on the backend
- * 5. Returns a navigation URL to the comparison page
+ * This module implements the logic for creating group comparison sessions
+ * from custom StudyViewFilter-defined groups. It:
+ * 1. Fetches samples for each group's filter (intersected with an optional
+ *    global pre-filter)
+ * 2. Computes the complement (isUnselected) group, if any
+ * 3. Creates a comparison session on the backend
+ * 4. Returns a navigation URL to the comparison page, plus per-group
+ *    StudyView URLs
  *
- * Based on: cbioportal-frontend/src/pages/studyView/StudyViewPageStore.ts:1944-1983
+ * Based on: cbioportal-frontend/src/pages/groupComparison/comparisonGroupManager/ComparisonGroupManagerUtils.ts
  *
  * @packageDocumentation
  */
@@ -18,21 +19,14 @@ import { z } from 'zod';
 import { apiClient } from './shared/cbioportalClient.js';
 import { ComparisonSessionClient } from './groupComparison/comparisonSessionClient.js';
 import {
-    groupSamplesByAttributeValue,
     createGroup,
-    createNAGroup,
     type Sample,
-    type ClinicalDataItem,
     type SessionGroupData,
 } from './groupComparison/groupBuilder.js';
 import {
     buildComparisonUrl,
     type ComparisonTab,
 } from './groupComparison/buildComparisonUrl.js';
-import {
-    splitDataIntoQuartiles,
-    type Quartile,
-} from './groupComparison/numericalBinning.js';
 import { buildStudyUrl } from './studyView/buildStudyUrl.js';
 import {
     createNavigationResponse,
@@ -80,34 +74,14 @@ const inputSchema = {
             ])
         )
         .min(2)
-        .optional()
         .describe(
-            'Custom filter-based groups. Each group provides either a studyViewFilter or isUnselected: true (complement of all other groups). Use for merged attribute values (T1+T2 vs T3+T4), gene-based splits, wildtype/unaltered comparisons, or multi-cohort comparisons. Cannot be combined with clinicalAttributeId, clinicalAttributeValues, or includeNA. Can be combined with studyViewFilter for global pre-filtering. Minimum 2 groups required, at most one may be isUnselected.'
-        ),
-    clinicalAttributeId: z
-        .string()
-        .min(1)
-        .optional()
-        .describe(
-            'Clinical attribute ID to auto-group by (e.g., "SEX", "PATH_T_STAGE"). Tool discovers all values and creates one group per value. Cannot be combined with groups.'
-        ),
-    clinicalAttributeValues: z
-        .array(z.string())
-        .optional()
-        .describe(
-            'Optional subset of attribute values to include in comparison (e.g., ["White", "Asian"] for RACE). Only with clinicalAttributeId, not groups. Only applies to categorical attributes.'
+            'Groups to compare (minimum 2). Each group provides either a studyViewFilter or isUnselected: true (complement of all other groups). Use for clinical attribute splits (including merged values, e.g. T1+T2 vs T3+T4, or an "NA"/missing-data group via clinicalDataFilters), cohort-relative splits of continuous values (use bins from get_studyviewfilter_options), gene-based splits, wildtype/unaltered comparisons, or multi-cohort comparisons. Can be combined with studyViewFilter for global pre-filtering. At most one group may be isUnselected.'
         ),
     studyViewFilter: z
         .record(z.string(), z.any())
         .optional()
         .describe(
-            'Optional StudyViewFilter to pre-filter samples before grouping. Works with both clinicalAttributeId and groups (applied as global pre-filter intersected with each group). Same format as navigate_to_study_view filterJson.'
-        ),
-    includeNA: z
-        .boolean()
-        .optional()
-        .describe(
-            'Whether to include an NA group for samples without the attribute. Only with clinicalAttributeId, not groups. Default: true for categorical, false for numerical.'
+            "Optional StudyViewFilter to pre-filter samples before grouping. Intersected with each group's filter. Same format as navigate_to_study_view filterJson. studyIds are auto-injected — do not include them inside."
         ),
     tab: z
         .string()
@@ -153,13 +127,8 @@ export type GroupDefinition = FilterGroup | UnselectedGroup;
 
 export type NavigateToGroupComparisonInput = {
     studyIds: z.infer<typeof inputSchema.studyIds>;
-    groups?: GroupDefinition[];
-    clinicalAttributeId?: z.infer<typeof inputSchema.clinicalAttributeId>;
-    clinicalAttributeValues?: z.infer<
-        typeof inputSchema.clinicalAttributeValues
-    >;
+    groups: GroupDefinition[];
     studyViewFilter?: z.infer<typeof inputSchema.studyViewFilter>;
-    includeNA?: z.infer<typeof inputSchema.includeNA>;
     tab?: string;
     selectedGene?: string;
 };
@@ -179,33 +148,22 @@ export async function handleNavigateToGroupComparison(
         const result = await navigateToGroupComparison(input);
 
         const responseData: any = {
-            description: result.attributeId
-                ? `Group comparison by ${result.attributeName} (${result.attributeId})`
-                : `Group comparison (${result.groupInfo.length} custom groups)`,
+            description: `Group comparison (${result.groupInfo.length} custom groups)`,
             studies: input.studyIds,
             totalGroups: result.groupInfo.length,
             groups: result.groupInfo,
         };
 
-        if (result.attributeId) {
-            responseData.attribute = {
-                id: result.attributeId,
-                name: result.attributeName,
-                datatype: result.attributeDatatype,
-            };
-        }
-
         // Always include studyViewUrl for cohort exploration
         responseData.studyViewUrl = result.studyViewUrl;
 
-        // Add per-group URLs when available (pre-filter or value subset)
+        // Add per-group URLs when available
         if (result.groupUrls) {
             responseData.groupUrls = result.groupUrls;
         }
 
         const pageDescription = getGroupComparisonPageDescription(input.tab, {
             groups: result.groupInfo,
-            attributeName: result.attributeName,
         });
         if (pageDescription) {
             responseData.pageDescription = pageDescription;
@@ -259,34 +217,26 @@ export interface GroupComparisonResult {
     url: string;
     studyViewUrl: string;
     groupInfo: GroupInfo[];
-    // Attribute information (only for clinicalAttributeId mode)
-    attributeId?: string;
-    attributeName?: string;
-    attributeDatatype?: string;
-    // Per-group URLs (when pre-filter or value subset is used, always for groups mode)
+    // Per-group StudyView URLs (one per filter-based group; omitted for an isUnselected group)
     groupUrls?: GroupUrl[];
 }
 
 /**
- * Core logic for creating group comparison session and URL.
+ * Core logic for creating a group comparison session and URL from custom
+ * StudyViewFilter-defined groups.
  *
  * Flow:
- * 1. Fetch samples matching the filter
- * 2. Get clinical attribute metadata (patient vs sample level, datatype)
- * 3. Fetch clinical data for the attribute
- * 4. Group samples by attribute values (or quartiles for numerical)
- * 5. Limit to top 20 value-based groups
- * 6. Create NA group if requested (within 20-group limit)
- * 7. Create comparison session on backend
- * 8. Build comparison URL with optional tab
- * 9. Prepare group metadata
- * 10. Generate studyview URLs (base URL or per-group based on scenario)
- *
- * Based on: StudyViewPageStore.ts:createCategoricalAttributeComparisonSession
+ * 1. Fetch samples for each filter-based group in parallel (intersected with
+ *    the global pre-filter, if any)
+ * 2. Compute the complement (isUnselected) group, if any
+ * 3. Create a comparison session on the backend
+ * 4. Build the comparison URL with optional tab
+ * 5. Generate per-group StudyView URLs and the overall studyViewUrl
  *
  * @param input - Validated input parameters
  * @returns Object with comparison URL, group metadata, and studyview URLs
- * @throws Error if session creation fails or no valid groups found
+ * @throws Error if a group has no samples, session creation fails, or
+ *   isUnselected leaves no remaining samples
  */
 export async function navigateToGroupComparison(
     input: NavigateToGroupComparisonInput
@@ -294,332 +244,11 @@ export async function navigateToGroupComparison(
     const {
         studyIds,
         groups: filterGroups,
-        clinicalAttributeId,
-        clinicalAttributeValues,
-        studyViewFilter,
-        includeNA,
+        studyViewFilter: globalFilter,
         tab,
         selectedGene,
     } = input;
 
-    // Validate: exactly one of groups or clinicalAttributeId must be provided
-    if (!filterGroups && !clinicalAttributeId) {
-        throw new Error(
-            'Either groups (filter-based) or clinicalAttributeId must be provided'
-        );
-    }
-    if (filterGroups && clinicalAttributeId) {
-        throw new Error(
-            'groups and clinicalAttributeId are mutually exclusive — provide one or the other'
-        );
-    }
-    if (filterGroups && (clinicalAttributeValues || includeNA !== undefined)) {
-        throw new Error(
-            'clinicalAttributeValues and includeNA cannot be used with groups — these options only apply to clinicalAttributeId mode'
-        );
-    }
-
-    // Dispatch to filter-based mode
-    if (filterGroups) {
-        return navigateToGroupComparisonByFilters(
-            studyIds,
-            filterGroups,
-            studyViewFilter,
-            tab as ComparisonTab | undefined,
-            selectedGene
-        );
-    }
-
-    // Step 1: Fetch samples matching the filter
-    // Ensure studyIds is always included in the filter
-    const filter = studyViewFilter
-        ? { ...studyViewFilter, studyIds }
-        : { studyIds };
-    const samples: Sample[] = await apiClient.fetchFilteredSamples(filter);
-
-    if (samples.length === 0) {
-        throw new Error('No samples found matching the filter criteria');
-    }
-
-    // Step 2: Get clinical attribute metadata to determine patient vs sample level and datatype
-    const attribute = await apiClient.getClinicalAttribute(
-        studyIds,
-        clinicalAttributeId
-    );
-
-    if (!attribute) {
-        throw new Error(
-            `Clinical attribute "${clinicalAttributeId}" not found in the specified studies`
-        );
-    }
-
-    const isPatientAttribute = attribute.patientAttribute;
-    const isNumerical = attribute.datatype === 'NUMBER';
-
-    // Set includeNA default based on attribute type
-    // Numerical: default false (quartiles are meaningful without NA)
-    // Categorical: default true (show all data including missing)
-    const shouldIncludeNA = includeNA !== undefined ? includeNA : !isNumerical;
-
-    // Step 3: Fetch clinical data for the attribute
-    const clinicalData: ClinicalDataItem[] =
-        await apiClient.fetchClinicalDataForSamples(
-            clinicalAttributeId,
-            samples,
-            isPatientAttribute
-        );
-
-    if (clinicalData.length === 0) {
-        throw new Error(
-            `No clinical data found for attribute "${clinicalAttributeId}"`
-        );
-    }
-
-    // Step 4: Group samples - use quartiles for numerical, categorical for others
-    let groups: SessionGroupData[] = [];
-    let quartiles: Quartile[] | null = null;
-
-    if (isNumerical) {
-        // Use quartile binning for numerical attributes
-        quartiles = splitDataIntoQuartiles(clinicalData, 4);
-
-        for (const quartile of quartiles) {
-            // Map quartile data back to sample identifiers
-            const quartileDataSet = new Set(
-                quartile.data.map((d) =>
-                    isPatientAttribute ? d.uniquePatientKey : d.uniqueSampleKey
-                )
-            );
-
-            const sampleIdentifiers = samples
-                .filter((s) => {
-                    const key = isPatientAttribute
-                        ? s.uniquePatientKey
-                        : s.uniqueSampleKey;
-                    return quartileDataSet.has(key);
-                })
-                .map((s) => ({
-                    studyId: s.studyId,
-                    sampleId: s.sampleId,
-                }));
-
-            if (sampleIdentifiers.length > 0) {
-                groups.push(
-                    createGroup(quartile.name, sampleIdentifiers, studyIds)
-                );
-            }
-        }
-    } else {
-        // Categorical grouping
-        const groupsMap = groupSamplesByAttributeValue(
-            clinicalData,
-            samples,
-            isPatientAttribute
-        );
-
-        if (groupsMap.size === 0) {
-            throw new Error('No valid groups created from clinical data');
-        }
-
-        // Filter out any "NA" groups (these will be handled by createNAGroup)
-        // Filter by clinicalAttributeValues if specified (case-insensitive)
-        // Sort groups by size (descending)
-        const allowedValues = clinicalAttributeValues
-            ? new Set(clinicalAttributeValues.map((v) => v.toLowerCase()))
-            : null;
-
-        const sortedGroups = Array.from(groupsMap.entries())
-            .filter(([groupName]) => {
-                // Always exclude NA groups (handled by createNAGroup)
-                if (groupName.toLowerCase() === 'na') {
-                    return false;
-                }
-                // If clinicalAttributeValues specified, only include matched values
-                if (allowedValues) {
-                    return allowedValues.has(groupName.toLowerCase());
-                }
-                // Include all values if not specified
-                return true;
-            })
-            .sort(([, a], [, b]) => b.length - a.length);
-
-        groups = sortedGroups.map(([groupName, sampleIdentifiers]) =>
-            createGroup(groupName, sampleIdentifiers, studyIds)
-        );
-    }
-
-    // Step 5: Limit groups to top 20, including NA group in count
-    const MAX_GROUPS = 20;
-    const naCount = shouldIncludeNA ? 1 : 0;
-    const maxValueGroups = MAX_GROUPS - naCount;
-
-    // Limit value-based groups
-    groups = groups.slice(0, maxValueGroups);
-
-    // Step 6: Create NA group if requested and include within 20-group limit
-    if (shouldIncludeNA) {
-        // Build set of samples that have clinical data
-        const samplesWithData = new Set<string>();
-
-        if (isPatientAttribute) {
-            const patientsWithData = new Set(
-                clinicalData.map((d) => d.uniquePatientKey)
-            );
-            samples.forEach((sample) => {
-                if (patientsWithData.has(sample.uniquePatientKey!)) {
-                    samplesWithData.add(`${sample.studyId}_${sample.sampleId}`);
-                }
-            });
-        } else {
-            clinicalData.forEach((d) => {
-                samplesWithData.add(`${d.studyId}_${d.sampleId}`);
-            });
-        }
-
-        const naGroup = createNAGroup(samplesWithData, samples, studyIds);
-        if (naGroup) {
-            groups.push(naGroup);
-        }
-    }
-
-    if (groups.length < 2) {
-        throw new Error(
-            'At least 2 groups are required for comparison (found ' +
-                groups.length +
-                ')'
-        );
-    }
-
-    // Step 7: Create comparison session on backend
-    const config = getConfig();
-    const sessionClient = new ComparisonSessionClient(config.baseUrl);
-
-    // Match frontend conventions:
-    //   Categorical: clinicalAttributeName = displayName, no groupNameOrder
-    //   Numerical:   clinicalAttributeName = "Quartiles of {displayName}", groupNameOrder preserves ascending order
-    const { id: sessionId } = await sessionClient.createSession({
-        groups,
-        origin: studyIds,
-        clinicalAttributeName: isNumerical
-            ? `Quartiles of ${attribute.displayName}`
-            : attribute.displayName,
-        ...(isNumerical && { groupNameOrder: groups.map((g) => g.name) }),
-    });
-
-    // Step 8: Build comparison URL with optional tab
-    const url = buildComparisonUrl(
-        sessionId,
-        tab as ComparisonTab | undefined,
-        selectedGene
-    );
-
-    // Step 9: Prepare group metadata
-    const groupInfo: GroupInfo[] = groups.map((group) => ({
-        name: group.name,
-        sampleCount: group.studies.reduce(
-            (total, study) => total + study.samples.length,
-            0
-        ),
-    }));
-
-    // Step 10: Generate studyview URLs
-    // studyViewUrl: always present — base study view (with pre-filter if provided)
-    const studyViewUrl = buildStudyUrl({
-        studyIds,
-        filterJson: hasFiltersOtherThanStudyIds(studyViewFilter)
-            ? studyViewFilter
-            : undefined,
-    });
-
-    // Per-group URLs when: pre-filter exists OR user selected a value subset
-    const shouldGeneratePerGroupUrls =
-        hasFiltersOtherThanStudyIds(studyViewFilter) ||
-        (clinicalAttributeValues && clinicalAttributeValues.length > 0);
-
-    if (!shouldGeneratePerGroupUrls) {
-        return {
-            url,
-            studyViewUrl,
-            groupInfo,
-            attributeId: clinicalAttributeId,
-            attributeName: attribute.displayName,
-            attributeDatatype: attribute.datatype,
-        };
-    }
-
-    // Pre-filter or value subset: also return 1 URL per group
-    const groupUrls: GroupUrl[] = groupInfo.map((group, index) => {
-        // Start with base filter
-        const filterJson = studyViewFilter
-            ? JSON.parse(JSON.stringify(studyViewFilter))
-            : {};
-
-        // Ensure studyIds
-        filterJson.studyIds = studyIds;
-
-        // Add clinical attribute filter for this group
-        if (!filterJson.clinicalDataFilters) {
-            filterJson.clinicalDataFilters = [];
-        }
-
-        if (isNumerical && quartiles && quartiles[index]) {
-            // Use range filter for numerical
-            filterJson.clinicalDataFilters.push({
-                attributeId: clinicalAttributeId,
-                values: [
-                    {
-                        start: quartiles[index].minValue,
-                        end: quartiles[index].maxValue,
-                    },
-                ],
-            });
-        } else {
-            // Use categorical value filter
-            filterJson.clinicalDataFilters.push({
-                attributeId: clinicalAttributeId,
-                values: [{ value: group.name }],
-            });
-        }
-
-        const groupUrl = buildStudyUrl({
-            studyIds,
-            filterJson,
-        });
-
-        return {
-            groupName: group.name,
-            url: groupUrl,
-        };
-    });
-
-    return {
-        url,
-        studyViewUrl,
-        groupInfo,
-        attributeId: clinicalAttributeId,
-        attributeName: attribute.displayName,
-        attributeDatatype: attribute.datatype,
-        groupUrls,
-    };
-}
-
-/**
- * Filter-based group comparison mode.
- *
- * Each group is defined by a StudyViewFilter. Samples are materialized for
- * each group independently, then a comparison session is created.
- *
- * @param studyIds - Study IDs (auto-injected into each group's filter)
- * @param filterGroups - Array of {name, studyViewFilter} group definitions
- * @param tab - Optional comparison tab
- */
-async function navigateToGroupComparisonByFilters(
-    studyIds: string[],
-    filterGroups: GroupDefinition[],
-    globalFilter?: Record<string, any>,
-    tab?: ComparisonTab,
-    selectedGene?: string
-): Promise<GroupComparisonResult> {
     // Validate: at most one unselected group
     const unselectedGroups = filterGroups.filter(
         (g): g is UnselectedGroup => 'isUnselected' in g && g.isUnselected
@@ -735,7 +364,7 @@ async function navigateToGroupComparisonByFilters(
         ),
     }));
 
-    // Per-group StudyView URLs (always generated in filter mode)
+    // Per-group StudyView URLs (one per filter-based group)
     const groupUrls: GroupUrl[] = [
         ...groupSamples.map(({ name, effectiveStudyIds, restFilter }) => {
             const combinedFilter = globalFilter

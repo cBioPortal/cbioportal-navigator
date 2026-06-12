@@ -14,7 +14,7 @@ Six tools: `resolve_and_route`, `get_studyviewfilter_options`, `navigate_to_stud
 
 4. **Manual Schema Maintenance** — `src/tools/studyView/schemas/` is manual, not auto-generated. Source types have known issues; only ~20 of 121 schemas used; API is stable.
 
-5. **Group Comparison NA & Patient-Level** — Patient-level attributes map `uniquePatientKey` → all patient's samples. Default `includeNA: true` (differs from frontend). Numerical attributes use automatic quartile binning.
+5. **Clinical Attribute Bins & Unified Group Comparison** — `get_studyviewfilter_options` returns quartile `bins` for NUMBER clinical attributes via `fetchClinicalDataBinCountsUsingPOST` (binMethod: QUARTILE), same `{start?, end?, count}` shape as gene-expression bins from `getGeneSpecificCounts`. `navigate_to_group_comparison` has a single mode — custom `groups` (`studyViewFilter` or `isUnselected: true`); the former `clinicalAttributeId`/`clinicalAttributeValues`/`includeNA` auto-grouping mode was removed. Clinical-attribute splits (merged values, quartile ranges, and an `"NA"`/missing-data group via `clinicalDataFilters: [{value: "NA"}]`, which correctly returns samples with no recorded value) are built by the AI from `get_studyviewfilter_options` values/bins.
 
 6. **StudyView→ResultsView via Session** — `navigate_to_results_view` with `studyViewFilter` fetches filtered samples, creates `POST /api/session/main_session`, returns `?session_id=...` URL.
 
@@ -22,12 +22,12 @@ Six tools: `resolve_and_route`, `get_studyviewfilter_options`, `navigate_to_stud
 
 8. **Companion URLs** — Navigation tools return a `studyViewUrl` alongside the primary `url` when a filtered subset is involved:
     - `navigate_to_results_view` with `studyViewFilter`: returns `studyViewUrl` (StudyView with same filter) so users can explore the cohort.
-    - `navigate_to_group_comparison`: always returns `studyViewUrl` (base study or with pre-filter). When pre-filter or value subset is used, also returns `groupUrls` (per-group StudyView URLs).
+    - `navigate_to_group_comparison`: always returns `studyViewUrl` (base study or with pre-filter) and `groupUrls` (one per filter-based group, omitted for an `isUnselected` group).
     - `system.md` instructs the LLM to present both links, and allows parallel navigation tool calls when a query spans multiple views.
 
 9. **No targetPage Constraint** — `resolve_and_route` only resolves studies and returns metadata. The LLM decides which navigation tool(s) to call based on the selection guide in the tool description. This allows multi-tool calls and flexible routing in multi-turn conversations.
 
-10. **Unselected Group (Wildtype/Complement)** — In `navigate_to_group_comparison` `groups` mode, one group may use `{ name, isUnselected: true }` instead of a `studyViewFilter`. This group receives all cohort samples NOT matched by any other group (complement). Implemented in `navigateToGroupComparisonByFilters`: fetches full cohort (with global `studyViewFilter` if provided), subtracts union of all filter-group samples. At most one unselected group allowed. No `groupUrl` is generated for the unselected group (no simple StudyView filter can express a complement).
+10. **Unselected Group (Wildtype/Complement)** — In `navigate_to_group_comparison`, one group may use `{ name, isUnselected: true }` instead of a `studyViewFilter`. This group receives all cohort samples NOT matched by any other group (complement). Implemented in `navigateToGroupComparison`: fetches full cohort (with global `studyViewFilter` if provided), subtracts union of all filter-group samples. At most one unselected group allowed. No `groupUrl` is generated for the unselected group (no simple StudyView filter can express a complement).
 
 11. **ResultsView Per-Gene Comparison Groups** — `navigate_to_results_view` accepts `comparisonSelectedGroups: string[]` to pre-select which groups appear in the comparison tab. With default OQL (no custom OQL), each queried gene gets its own group named after the gene symbol. Passing `["IDH1", "EGFR"]` compares IDH1-altered vs EGFR-altered samples (true altered = mutation + CNA + SV via OQL). Omit for default Altered vs Unaltered aggregate groups. Group name = gene symbol; `comparison_selectedGroups` is JSON-stringified in the URL.
 

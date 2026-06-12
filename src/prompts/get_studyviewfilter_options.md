@@ -4,7 +4,7 @@ Fetches exact valid values for building `filterJson` in StudyView — covers **c
 
 ## What This Tool Does
 
-- **Clinical attributes:** returns datatype + exact values for STRING/BOOLEAN; `continuous: true` for NUMBER (use `{start, end}` ranges)
+- **Clinical attributes:** returns datatype + exact values for STRING/BOOLEAN; `continuous: true` and quartile `bins` for NUMBER (use `{start, end}` ranges)
 - **Generic assay entities:** returns entity list and values (categorical) or `"continuous": true` flag (LIMIT-VALUE)
 - **Gene-specific:** returns value distributions for `mutationDataFilters` and `genomicDataFilters`
 
@@ -15,7 +15,7 @@ Fetches exact valid values for building `filterJson` in StudyView — covers **c
 ## Input
 
 ### studyId
-Study identifier from router response.
+Study identifier from router response. **Singular** (`studyId`, not `studyIds`) — unlike the navigation tools, which take a `studyIds` array for cross-study cohorts, this tool always operates on exactly one study.
 
 ### attributeIds _(optional)_
 Array of clinical attribute IDs from `router.metadata.clinicalAttributeIds`.
@@ -56,11 +56,17 @@ At least one of `attributeIds`, `genericAssayProfileIds`, `geneSpecificQueries`,
     "attributeId": "AGE",
     "displayName": "Diagnosis Age",
     "datatype": "NUMBER",
-    "continuous": true
+    "continuous": true,
+    "bins": [
+      { "end": 59, "count": 138 },
+      { "start": 59, "end": 66, "count": 114 },
+      { "start": 66, "end": 73, "count": 133 },
+      { "start": 73, "count": 110 }
+    ]
   }
 ]
 ```
-NUMBER attributes have `continuous: true` — use `{"start": 40, "end": 60}` in `clinicalDataFilters`.
+NUMBER attributes have `continuous: true` — for an explicit threshold (e.g. "age over 60"), use `{"start": 60}` directly in `clinicalDataFilters`, no query needed. For a data-driven/cohort-relative split ("quartiles", "high vs low"), use the `bins` ranges — each entry is a quartile with ~equal sample counts, dropping the bin for samples with no recorded value (see `"NA"` below for that group).
 
 ### `genericAssayEntities` (when genericAssayProfileIds provided)
 ```json
@@ -198,7 +204,7 @@ CNA values: `"2"` = AMP, `"1"` = GAIN, `"0"` = DIPLOID, `"-1"` = HETLOSS, `"-2"`
 
 **2-group high/low split:** merge bins 1+2 vs bins 3+4 — the boundary between bin 2 and bin 3 is the median. E.g. with bins `[{end:3.3886}, {start:3.3886,end:4.41235}, {start:4.41235,end:5.9576}, {start:5.9576}]`, "Low" = `{"end": 4.41235}` and "High" = `{"start": 4.41235}`.
 
-**Group comparison from bins** — pass each range as a separate group's `studyViewFilter.genomicDataFilters` to `navigate_to_group_comparison`'s `groups` mode:
+**Group comparison from bins** — pass each range as a separate group's `studyViewFilter.genomicDataFilters` in `navigate_to_group_comparison`'s `groups`:
 
 ```json
 {
@@ -220,6 +226,81 @@ CNA values: `"2"` = AMP, `"1"` = GAIN, `"0"` = DIPLOID, `"-1"` = HETLOSS, `"-2"`
   "tab": "survival"
 }
 ```
+
+---
+
+## Building `clinicalDataFilters`
+
+### Categorical (STRING/BOOLEAN) — exact value
+
+Use `value` strings from `attributes[].values`:
+
+```json
+{
+  "clinicalDataFilters": [{"attributeId": "SEX", "values": [{"value": "Female"}]}]
+}
+```
+
+Merge multiple values into one group by listing them together: `"values": [{"value": "T1"}, {"value": "T2"}]`.
+
+### NUMBER — explicit threshold or data-driven split
+
+**Explicit threshold from the user** (e.g. "age over 60") — use it directly, no query needed:
+
+```json
+{
+  "clinicalDataFilters": [{"attributeId": "AGE", "values": [{"start": 60}]}]
+}
+```
+
+**Data-driven split** (quartiles, "high vs low") — use `{start, end}` ranges from `attributes[].bins` directly:
+
+```json
+{
+  "clinicalDataFilters": [{"attributeId": "AGE", "values": [{"end": 59}]}]
+}
+```
+→ filters to the lowest quartile (Q1) of AGE.
+
+**2-group high/low split:** merge bins 1+2 vs bins 3+4 — the boundary between bin 2 and bin 3 is the median, same as for `genomicDataFilters` bins above.
+
+### "NA" / missing-data group
+
+`"NA"` is a valid value representing samples with no recorded value for the attribute — appears in `attributes[].values` for categorical attributes (e.g. `["Male", "Female", "NA"]`) and is always usable even when not listed (NUMBER attributes have no recorded NA value but the underlying samples still exist):
+
+```json
+{
+  "clinicalDataFilters": [{"attributeId": "SEX", "values": [{"value": "NA"}]}]
+}
+```
+→ samples where SEX was not recorded.
+
+### Group comparison from values/bins
+
+Pass each value or range as a separate group's `studyViewFilter.clinicalDataFilters` in `navigate_to_group_comparison`'s `groups`:
+
+```json
+{
+  "studyIds": ["luad_tcga_pan_can_atlas_2018"],
+  "groups": [
+    {
+      "name": "Male",
+      "studyViewFilter": {"clinicalDataFilters": [{"attributeId": "SEX", "values": [{"value": "Male"}]}]}
+    },
+    {
+      "name": "Female",
+      "studyViewFilter": {"clinicalDataFilters": [{"attributeId": "SEX", "values": [{"value": "Female"}]}]}
+    },
+    {
+      "name": "Unknown",
+      "studyViewFilter": {"clinicalDataFilters": [{"attributeId": "SEX", "values": [{"value": "NA"}]}]}
+    }
+  ],
+  "tab": "clinical"
+}
+```
+
+Same pattern with `bins` ranges for NUMBER attributes (e.g. AGE Q1 vs Q4) — see the survival example for `genomicDataFilters` bins above.
 
 ---
 

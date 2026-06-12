@@ -28,7 +28,6 @@ export type ResultsViewDescriptionContext = PlotsDescriptionContext & {
 
 export type GroupComparisonDescriptionContext = {
     groups?: Array<{ name: string; sampleCount?: number }>;
-    attributeName?: string;
 };
 
 const DATA_TYPE_LABELS: Record<string, string> = {
@@ -56,9 +55,6 @@ function plotsAxisLabel(sel: PlotsAxisInput): string {
 }
 
 function buildGroupStr(context: GroupComparisonDescriptionContext): string {
-    if (context.attributeName) {
-        return `${context.attributeName} groups`;
-    }
     if (context.groups?.length) {
         return context.groups
             .map((g) =>

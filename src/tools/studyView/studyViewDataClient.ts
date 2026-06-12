@@ -122,6 +122,63 @@ export class StudyViewDataClient {
     }
 
     /**
+     * Get quartile bin ranges for NUMBER clinical attributes.
+     *
+     * Uses fetchClinicalDataBinCountsUsingPOST with
+     * binMethod: "QUARTILE". Returns bins of { start?, end?, count } that
+     * partition the cohort into 4 equal-sized groups, dropping the "NA" bin
+     * (samples with no recorded value — not a usable range for filtering).
+     * Mirrors the continuous-bins handling in getGeneSpecificCounts.
+     *
+     * @param studyId - Study identifier
+     * @param attributeIds - Clinical attribute IDs (NUMBER datatype)
+     * @returns Map of attributeId → bins array
+     */
+    async getClinicalDataBins(
+        studyId: string,
+        attributeIds: string[]
+    ): Promise<
+        Map<string, Array<{ start?: number; end?: number; count: number }>>
+    > {
+        if (attributeIds.length === 0) return new Map();
+
+        const bins = await this.internalApi.fetchClinicalDataBinCountsUsingPOST(
+            {
+                dataBinMethod: 'DYNAMIC',
+                clinicalDataBinCountFilter: {
+                    attributes: attributeIds.map((attributeId) => ({
+                        attributeId,
+                        binMethod: 'QUARTILE',
+                        disableLogScale: false,
+                    })) as any,
+                    studyViewFilter: { studyIds: [studyId] } as StudyViewFilter,
+                },
+            }
+        );
+
+        const map = new Map<
+            string,
+            Array<{ start?: number; end?: number; count: number }>
+        >();
+        for (const bin of bins as Array<{
+            attributeId: string;
+            start?: number;
+            end?: number;
+            count: number;
+        }>) {
+            if (bin.start === undefined && bin.end === undefined) continue;
+            const arr = map.get(bin.attributeId) ?? [];
+            arr.push({
+                ...(bin.start !== undefined && { start: bin.start }),
+                ...(bin.end !== undefined && { end: bin.end }),
+                count: bin.count,
+            });
+            map.set(bin.attributeId, arr);
+        }
+        return map;
+    }
+
+    /**
      * Get all sample lists (case lists) for a study.
      *
      * Follows the pattern from cbioportal-frontend StudyViewPageStore.ts (lines 11831-11837)

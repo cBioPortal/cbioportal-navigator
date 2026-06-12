@@ -22,7 +22,11 @@ import { loadPrompt } from './shared/promptLoader.js';
  * Tool definition schema (without description, which is loaded at startup)
  */
 const inputSchema = {
-    studyId: z.string().describe('Study identifier (e.g., "luad_tcga")'),
+    studyId: z
+        .string()
+        .describe(
+            'Study identifier (e.g., "luad_tcga"). Singular — unlike other navigator tools (which take a studyIds array for cross-study support), this tool always fetches filter options for exactly one study.'
+        ),
     attributeIds: z
         .array(z.string())
         .optional()
@@ -230,16 +234,20 @@ async function resolveClinicalAttributes(
         };
     }
 
-    // Only fetch values for categorical (STRING/BOOLEAN) attributes.
-    // NUMBER attributes are continuous — return no values, AI uses {start, end} ranges.
+    // Categorical (STRING/BOOLEAN) attributes get exact values.
+    // NUMBER attributes are continuous — return {start, end} quartile bins
+    // for data-driven splits, in addition to continuous: true for explicit ranges.
     const categoricalIds = requested
         .filter((a) => a.datatype !== 'NUMBER')
         .map((a) => a.clinicalAttributeId);
+    const numericalIds = requested
+        .filter((a) => a.datatype === 'NUMBER')
+        .map((a) => a.clinicalAttributeId);
 
-    const valuesMap = await studyViewDataClient.getClinicalDataValuesBatch(
-        studyId,
-        categoricalIds
-    );
+    const [valuesMap, binsMap] = await Promise.all([
+        studyViewDataClient.getClinicalDataValuesBatch(studyId, categoricalIds),
+        studyViewDataClient.getClinicalDataBins(studyId, numericalIds),
+    ]);
 
     return {
         attributes: requested.map((attr) => ({
@@ -248,7 +256,10 @@ async function resolveClinicalAttributes(
             description: attr.description,
             datatype: attr.datatype,
             ...(attr.datatype === 'NUMBER'
-                ? { continuous: true }
+                ? {
+                      continuous: true,
+                      bins: binsMap.get(attr.clinicalAttributeId) ?? [],
+                  }
                 : { values: valuesMap.get(attr.clinicalAttributeId) || [] }),
         })),
         error: null,
