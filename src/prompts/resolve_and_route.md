@@ -63,15 +63,15 @@ View a patient's complete profile, clinical timeline, genomic alterations, or co
 - "Browse female patients with TP53 mutations"
 
 ### Rule 2 → `navigate_to_group_comparison`
-**User wants to compare/split a cohort where the grouping variable is clinical or cohort-level.**
-Signals: compare, vs, difference, split, by sex/age/stage/smoking...
+**User wants to compare/split a cohort where the grouping variable is clinical, cohort-level, or a continuous molecular value split cohort-relatively (high vs low, quartiles, median).**
+Signals: compare, vs, difference, split, by sex/age/stage/smoking/expression level...
 
 Two approaches:
 - **By attribute:** group by a single clinical attribute (auto-discovers values; numerical attributes are auto quartile-binned)
-- **Custom groups:** each group defined by its own filter — use for merged values (T1+T2 vs T3+T4), multi-cohort splits (LUAD vs LUSC), or multi-factor groups combining gene + clinical criteria
+- **Custom groups:** each group defined by its own filter — use for merged values (T1+T2 vs T3+T4), multi-cohort splits (LUAD vs LUSC), multi-factor groups combining gene + clinical criteria, or cohort-relative splits of continuous molecular values (gene expression/protein/methylation "high vs low", quartiles) — call `get_studyviewfilter_options` with `geneSpecificQueries`/`genericAssayProfileIds` to get `bins`, then use those `{start,end}` ranges in `genomicDataFilters`/`genericAssayDataFilters`
 
 **Important — when NOT to use group comparison:**
-- User explicitly asks about a specific outcome between gene-defined groups (survival, expression enrichment) → Rule 3c
+- User explicitly asks about a specific outcome between groups defined by **gene alteration status** (mutation/CNA/SV, including "Gene X vs rest" Altered/Unaltered) or an **absolute/biological threshold** (e.g. z-score overexpression `EXP > 2`, an explicit user-given cutoff) → Rule 3c
 - Either gene group requires OQL-precision (`geneFilters` cannot express specific amino acid, DRIVER, GERMLINE, position range) → Rule 3c
 - Alteration frequencies between genes ("EGFR vs KRAS alteration rates") → Rule 3a
 
@@ -82,6 +82,8 @@ Two approaches:
 - "Compare luad by KRAS mutation"
 - "Compare early stage (T1+T2) vs late stage (T3+T4)"
 - "LUAD vs LUSC mutation comparison"
+- "Survival by CD8A expression, high vs low" → custom groups using `genomicDataFilters` ranges from `bins`
+- "Split this cohort by MGMT methylation level (quartiles) and compare clinical features"
 
 ### Rule 3 → `navigate_to_results_view`
 **Gene(s) mentioned as the subject of analysis** (not just as a patient filter). Ask: what is the user trying to learn about this gene?
@@ -127,6 +129,8 @@ For gene A vs gene B, use OQL to specify each gene's alteration type — plain s
 - "IDH1 mut vs EGFR amp" → `genes: ["IDH1: MUT", "EGFR: AMP"]`, `comparisonSelectedGroups: ["IDH1", "EGFR"]`
 
 Distinction from 3b: in 3c, alteration is the cause/grouping; in 3b, there is no alteration grouping — just raw expression values.
+
+Distinction from Rule 2: `EXP`/`PROT` thresholds here are absolute/biological (z-score based, e.g. `EXP > 2` = overexpression) — appropriate when the study has a z-scored profile or the user gives an explicit cutoff. For cohort-relative splits ("high vs low", "quartiles") — especially when only a raw/continuous (non-z-score) profile is available — use Rule 2's custom groups with `bins` from `get_studyviewfilter_options` instead.
 
 **Special cases:**
 

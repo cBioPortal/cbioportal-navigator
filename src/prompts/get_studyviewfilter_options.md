@@ -30,8 +30,9 @@ Keyword to filter generic assay entities by stableId or NAME (case-insensitive r
 Array of `{ hugoGeneSymbol, profileType }` to query gene-specific value distributions.
 
 - `profileType` is the profile suffix — strip `{studyId}_` from the molecularProfileId (e.g. `"luad_tcga_pan_can_atlas_2018_mutations"` → `"mutations"`, `"luad_tcga_pan_can_atlas_2018_gistic"` → `"gistic"`)
-- `profileType === "mutations"` → returns mutation type breakdown (used in `mutationDataFilters` with `categorization: "MUTATION_TYPE"`)
-- Other profileTypes (e.g. `"gistic"`) → returns CNA level breakdown (used in `genomicDataFilters`)
+- `profileType === "mutations"` → returns mutation type breakdown as `counts` (used in `mutationDataFilters` with `categorization: "MUTATION_TYPE"`)
+- Discrete CNA profiles (e.g. `"gistic"`, `"cna"`) → returns CNA level breakdown as `counts` (used in `genomicDataFilters`)
+- Continuous profiles (mRNA, protein, methylation, log2 copy-number, etc.) → returns quartile bin ranges as `bins` (used in `genomicDataFilters` as `{start}`/`{end}` ranges)
 
 ### includeTreatments _(optional)_
 Set to `true` to fetch available drug/agent names for use in `patientTreatmentFilters` or `sampleTreatmentFilters`.
@@ -98,11 +99,21 @@ NUMBER attributes have `continuous: true` — use `{"start": 40, "end": 60}` in 
       { "value": "-1", "label": "Shallow Deletion",   "count": 80 },
       { "value": "-2", "label": "Deep Deletion",      "count": 10 }
     ]
+  },
+  {
+    "hugoGeneSymbol": "PDCD1",
+    "profileType": "rna_seq_mrna",
+    "bins": [
+      { "end": 3.3886, "count": 8 },
+      { "start": 3.3886, "end": 4.41235, "count": 7 },
+      { "start": 4.41235, "end": 5.9576, "count": 8 },
+      { "start": 5.9576, "count": 7 }
+    ]
   }
 ]
 ```
 
-`value` is what goes into the filter. `label` is the display name.
+For `counts`, `value` is what goes into the filter and `label` is the display name. For `bins`, each entry is a quartile range (4 bins, ~equal sample counts) — `start`/`end` go directly into `genomicDataFilters` as `{start}`/`{end}`.
 
 ---
 
@@ -142,9 +153,9 @@ No need to query — values are always `"Mutated"` and `"Not Mutated"`. Use dire
 }
 ```
 
-### `genomicDataFilters` — CNA discrete levels
+### `genomicDataFilters` — discrete CNA levels
 
-Use `value` strings from non-mutation profileType results:
+Use `value` strings from `counts` results:
 
 ```json
 {
@@ -158,9 +169,9 @@ Use `value` strings from non-mutation profileType results:
 
 CNA values: `"2"` = AMP, `"1"` = GAIN, `"0"` = DIPLOID, `"-1"` = HETLOSS, `"-2"` = HOMDEL.
 
-### `genomicDataFilters` — continuous expression
+### `genomicDataFilters` — continuous data (mRNA, protein, methylation, log2 CNA, etc.)
 
-For mRNA/protein profiles (continuous), no query needed — use numerical ranges directly:
+**Explicit threshold from the user** (e.g. "Z-score > 2", "expression below 5") — use it directly, no query needed:
 
 ```json
 {
@@ -169,6 +180,44 @@ For mRNA/protein profiles (continuous), no query needed — use numerical ranges
     "profileType": "rna_seq_v2_mrna_median_Zscores",
     "values": [{"start": 2.0}]
   }]
+}
+```
+
+**Data-driven split** (quartiles, "high vs low", "split by expression") — query `geneSpecificQueries` for that gene+profile to get `bins`: 4 quartile ranges with ~equal sample counts. Use a `{start, end}` range directly:
+
+```json
+{
+  "genomicDataFilters": [{
+    "hugoGeneSymbol": "PDCD1",
+    "profileType": "rna_seq_mrna",
+    "values": [{"end": 3.3886}]
+  }]
+}
+```
+→ filters to the lowest quartile (Q1) of PDCD1 expression.
+
+**2-group high/low split:** merge bins 1+2 vs bins 3+4 — the boundary between bin 2 and bin 3 is the median. E.g. with bins `[{end:3.3886}, {start:3.3886,end:4.41235}, {start:4.41235,end:5.9576}, {start:5.9576}]`, "Low" = `{"end": 4.41235}` and "High" = `{"start": 4.41235}`.
+
+**Group comparison from bins** — pass each range as a separate group's `studyViewFilter.genomicDataFilters` to `navigate_to_group_comparison`'s `groups` mode:
+
+```json
+{
+  "studyIds": ["gbm_iatlas_prins_2019"],
+  "groups": [
+    {
+      "name": "PDCD1 Low",
+      "studyViewFilter": {
+        "genomicDataFilters": [{"hugoGeneSymbol": "PDCD1", "profileType": "rna_seq_mrna", "values": [{"end": 4.41235}]}]
+      }
+    },
+    {
+      "name": "PDCD1 High",
+      "studyViewFilter": {
+        "genomicDataFilters": [{"hugoGeneSymbol": "PDCD1", "profileType": "rna_seq_mrna", "values": [{"start": 4.41235}]}]
+      }
+    }
+  ],
+  "tab": "survival"
 }
 ```
 

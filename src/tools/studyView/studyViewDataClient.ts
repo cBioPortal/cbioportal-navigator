@@ -250,16 +250,23 @@ export class StudyViewDataClient {
     /**
      * Get gene-specific value distributions for StudyView gene-specific filters.
      *
+     * Routes automatically based on profileType and the molecular profile's datatype:
      * - mutations profileType → fetchMutationDataCountsUsingPOST (DETAILED projection)
-     *   Returns mutation type strings (e.g. "Missense_Mutation", "In_Frame_Del")
+     *   Returns mutation type strings (e.g. "Missense_Mutation", "In_Frame_Del") as `counts`
      *   Used in mutationDataFilters with categorization: "MUTATION_TYPE"
-     * - other profileTypes (gistic, cna) → fetchGenomicDataCountsUsingPOST
-     *   Returns numeric CNA strings ("2"=AMP, "1"=GAIN, "0"=DIPLOID, "-1"=HETLOSS, "-2"=HOMDEL)
+     * - discrete CNA (COPY_NUMBER_ALTERATION + datatype DISCRETE, e.g. gistic) →
+     *   fetchGenomicDataCountsUsingPOST. Returns numeric CNA strings
+     *   ("2"=AMP, "1"=GAIN, "0"=DIPLOID, "-1"=HETLOSS, "-2"=HOMDEL) as `counts`
      *   Used in genomicDataFilters
+     * - everything else (continuous data: mRNA, protein, methylation, log2 CNA, etc.) →
+     *   fetchGenomicDataBinCountsUsingPOST (QUARTILE binning). Returns `bins` of
+     *   { start?, end?, count } that partition the cohort into 4 equal-sized groups.
+     *   Used in genomicDataFilters as {start}/{end} ranges, including for
+     *   navigate_to_group_comparison's `groups` mode.
      *
      * @param studyId - Study identifier
      * @param queries - Array of { hugoGeneSymbol, profileType } to query
-     * @returns Array of results with value/label/count per gene+profile
+     * @returns Array of results with `counts` (categorical) or `bins` (continuous) per gene+profile
      */
     async getGeneSpecificCounts(
         studyId: string,
@@ -268,7 +275,8 @@ export class StudyViewDataClient {
         Array<{
             hugoGeneSymbol: string;
             profileType: string;
-            counts: Array<{ value: string; label: string; count: number }>;
+            counts?: Array<{ value: string; label: string; count: number }>;
+            bins?: Array<{ start?: number; end?: number; count: number }>;
         }>
     > {
         if (queries.length === 0) return [];
@@ -279,45 +287,119 @@ export class StudyViewDataClient {
         const mutationQueries = queries.filter(
             (q) => q.profileType === 'mutations'
         );
-        const genomicQueries = queries.filter(
+        const nonMutationQueries = queries.filter(
             (q) => q.profileType !== 'mutations'
         );
 
-        const [mutationResults, genomicResults] = await Promise.all([
-            mutationQueries.length > 0
-                ? this.internalApi.fetchMutationDataCountsUsingPOST({
-                      projection: 'DETAILED',
-                      genomicDataCountFilter: {
-                          genomicDataFilters: mutationQueries.map((q) => ({
-                              hugoGeneSymbol: q.hugoGeneSymbol,
-                              profileType: q.profileType,
-                          })) as any,
-                          studyViewFilter,
-                      },
-                  })
-                : Promise.resolve([]),
-            genomicQueries.length > 0
-                ? this.internalApi.fetchGenomicDataCountsUsingPOST({
-                      genomicDataCountFilter: {
-                          genomicDataFilters: genomicQueries.map((q) => ({
-                              hugoGeneSymbol: q.hugoGeneSymbol,
-                              profileType: q.profileType,
-                          })) as any,
-                          studyViewFilter,
-                      },
-                  })
-                : Promise.resolve([]),
-        ]);
+        // For non-mutation queries, look up each profile's datatype to decide
+        // whether it's discrete CNA (data-counts) or continuous (bin-counts).
+        const profiles =
+            nonMutationQueries.length > 0
+                ? await this.getMolecularProfiles([studyId])
+                : [];
+        const profileMap = new Map(
+            profiles.map((p) => [p.molecularProfileId, p])
+        );
+        const isDiscreteCna = (profileType: string): boolean => {
+            const profile = profileMap.get(`${studyId}_${profileType}`);
+            return (
+                profile?.molecularAlterationType === 'COPY_NUMBER_ALTERATION' &&
+                profile?.datatype === 'DISCRETE'
+            );
+        };
 
-        return [...mutationResults, ...genomicResults].map((item) => ({
-            hugoGeneSymbol: item.hugoGeneSymbol,
-            profileType: item.profileType,
-            counts: item.counts.map((c) => ({
-                value: c.value,
-                label: c.label,
-                count: c.count,
-            })),
+        const discreteQueries = nonMutationQueries.filter((q) =>
+            isDiscreteCna(q.profileType)
+        );
+        const continuousQueries = nonMutationQueries.filter(
+            (q) => !isDiscreteCna(q.profileType)
+        );
+
+        const [mutationResults, discreteResults, continuousBins] =
+            await Promise.all([
+                mutationQueries.length > 0
+                    ? this.internalApi.fetchMutationDataCountsUsingPOST({
+                          projection: 'DETAILED',
+                          genomicDataCountFilter: {
+                              genomicDataFilters: mutationQueries.map((q) => ({
+                                  hugoGeneSymbol: q.hugoGeneSymbol,
+                                  profileType: q.profileType,
+                              })) as any,
+                              studyViewFilter,
+                          },
+                      })
+                    : Promise.resolve([]),
+                discreteQueries.length > 0
+                    ? this.internalApi.fetchGenomicDataCountsUsingPOST({
+                          genomicDataCountFilter: {
+                              genomicDataFilters: discreteQueries.map((q) => ({
+                                  hugoGeneSymbol: q.hugoGeneSymbol,
+                                  profileType: q.profileType,
+                              })) as any,
+                              studyViewFilter,
+                          },
+                      })
+                    : Promise.resolve([]),
+                continuousQueries.length > 0
+                    ? this.internalApi.fetchGenomicDataBinCountsUsingPOST({
+                          dataBinMethod: 'DYNAMIC',
+                          genomicDataBinCountFilter: {
+                              genomicDataBinFilters: continuousQueries.map(
+                                  (q) => ({
+                                      hugoGeneSymbol: q.hugoGeneSymbol,
+                                      profileType: q.profileType,
+                                      binMethod: 'QUARTILE',
+                                      disableLogScale: false,
+                                  })
+                              ) as any,
+                              studyViewFilter,
+                          },
+                      })
+                    : Promise.resolve([]),
+            ]);
+
+        const countResults = [...mutationResults, ...discreteResults].map(
+            (item) => ({
+                hugoGeneSymbol: item.hugoGeneSymbol,
+                profileType: item.profileType,
+                counts: item.counts.map((c) => ({
+                    value: c.value,
+                    label: c.label,
+                    count: c.count,
+                })),
+            })
+        );
+
+        // Group continuous bins by gene+profileType, dropping the "NA" bin
+        // (samples with no data — not a usable range for filtering).
+        const binsByQuery = new Map<
+            string,
+            Array<{ start?: number; end?: number; count: number }>
+        >();
+        for (const bin of continuousBins as Array<{
+            hugoGeneSymbol: string;
+            profileType: string;
+            start?: number;
+            end?: number;
+            count: number;
+        }>) {
+            if (bin.start === undefined && bin.end === undefined) continue;
+            const key = `${bin.hugoGeneSymbol}|${bin.profileType}`;
+            const bins = binsByQuery.get(key) ?? [];
+            bins.push({
+                ...(bin.start !== undefined && { start: bin.start }),
+                ...(bin.end !== undefined && { end: bin.end }),
+                count: bin.count,
+            });
+            binsByQuery.set(key, bins);
+        }
+        const binResults = continuousQueries.map((q) => ({
+            hugoGeneSymbol: q.hugoGeneSymbol,
+            profileType: q.profileType,
+            bins: binsByQuery.get(`${q.hugoGeneSymbol}|${q.profileType}`) ?? [],
         }));
+
+        return [...countResults, ...binResults];
     }
 
     /**
