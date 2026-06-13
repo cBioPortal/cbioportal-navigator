@@ -208,7 +208,7 @@ export class StudyViewDataClient {
     /**
      * Get value distributions for categorical generic assay entities.
      *
-     * Uses fetchGenericAssayDataCountsUsingPOST (column-store whitelisted).
+     * Uses fetchGenericAssayDataCountsUsingPOST.
      * Only meaningful for CATEGORICAL/BINARY datatypes; for LIMIT-VALUE callers
      * should skip this and rely on numerical range filters instead.
      *
@@ -250,7 +250,6 @@ export class StudyViewDataClient {
     /**
      * Get gene-specific value distributions for StudyView gene-specific filters.
      *
-     * Routes automatically to column-store via overrideApisForColumnStore:
      * - mutations profileType → fetchMutationDataCountsUsingPOST (DETAILED projection)
      *   Returns mutation type strings (e.g. "Missense_Mutation", "In_Frame_Del")
      *   Used in mutationDataFilters with categorization: "MUTATION_TYPE"
@@ -324,7 +323,7 @@ export class StudyViewDataClient {
     /**
      * Get available treatments for one or more studies.
      *
-     * Uses the patient-level endpoint /api/column-store/treatments/patient-counts/fetch
+     * Uses the patient-level endpoint /api/treatments/patient-counts/fetch
      * to fetch all unique treatments available in the study.
      *
      * @param studyIds - Array of study identifiers

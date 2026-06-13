@@ -331,7 +331,7 @@ export async function navigateToGroupComparison(
     }
 
     // Step 1: Fetch samples matching the filter
-    // Ensure studyIds is always included in the filter for column-store routing
+    // Ensure studyIds is always included in the filter
     const filter = studyViewFilter
         ? { ...studyViewFilter, studyIds }
         : { studyIds };

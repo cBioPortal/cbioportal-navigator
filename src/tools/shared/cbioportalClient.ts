@@ -45,113 +45,6 @@ export class CbioportalApiClient {
             'https://www.cbioportal.org';
         this.api = new CBioPortalAPI(apiBaseUrl);
         this.internalApi = new CBioPortalAPIInternal(apiBaseUrl);
-        this.overrideApisForColumnStore();
-    }
-
-    /**
-     * Override API request methods to route specific endpoints to column-store.
-     *
-     * @remarks
-     * This implements the same pattern as cbioportal-frontend's proxyColumnStore
-     * using a whitelist approach. Only endpoints that have column-store implementations
-     * in the backend are rewritten.
-     *
-     * Backend column-store controllers:
-     * - ColumnarStoreStudyViewController: StudyView-specific endpoints
-     * - ColumnStoreStudyController: Public study endpoints
-     * - ColumnStoreSampleController: Public sample endpoints
-     */
-    private overrideApisForColumnStore(): void {
-        // Override internalApi for StudyView endpoints
-        // Based on cbioportal-frontend/src/shared/api/cbioportalInternalClientInstance.ts
-        this.overrideRequestMethod(this.internalApi, (url) => {
-            const internalApiEndpoints = [
-                'clinical-data-counts', // fetchClinicalDataCounts - Currently in use
-                'filtered-samples', // fetchFilteredSamples
-                'mutated-genes', // fetchMutatedGenes
-                'molecular-profile-sample-counts', // fetchMolecularProfileSampleCounts
-                'cna-genes', // fetchCNAGenes
-                'structuralvariant-genes', // fetchStructuralVariantGenes
-                'sample-lists-counts', // fetchCaseListCounts
-                'clinical-data-bin-counts', // fetchClinicalDataBinCounts
-                'clinical-data-density-plot', // fetchClinicalDataDensityPlot
-                'mutation-data-counts', // fetchMutationDataCounts
-                'treatments/patient-counts', // fetchPatientTreatmentCounts
-                'treatments/sample-counts', // fetchSampleTreatmentCounts
-                'clinical-event-type-counts', // getClinicalEventTypeCounts
-                'genomic-data-counts', // fetchGenomicDataCounts
-                'genomic-data-bin-counts', // fetchGenomicDataBinCounts
-                'generic-assay-data-bin-counts', // fetchGenericAssayDataBinCounts
-                'generic-assay-data-counts', // fetchGenericAssayDataCounts
-                'clinical-data-violin-plots', // fetchClinicalDataViolinPlots
-                'alteration-enrichments', // fetchAlterationEnrichments
-                'custom-data-counts', // fetchCustomDataCounts
-                'custom-data-bin-counts', // fetchCustomDataBinCounts
-            ];
-
-            // Check if URL matches any whitelisted endpoint
-            if (
-                internalApiEndpoints.some((endpoint) => url.includes(endpoint))
-            ) {
-                return url.replace(/^\/api\//, '/api/column-store/');
-            }
-            return url;
-        });
-
-        // Override api for public endpoints
-        // Based on cbioportal-frontend/src/shared/api/cbioportalClientInstance.ts
-        this.overrideRequestMethod(this.api, (url) => {
-            // Match studies endpoints: /api/studies or /api/studies/meta
-            // Corresponds to: getAllStudies
-            // Note: URL includes domain (e.g., https://www.cbioportal.org/api/studies)
-            if (/\/api\/studies(\?|\/meta|$)/.test(url)) {
-                return url.replace(/\/api\//, '/api/column-store/');
-            }
-
-            // Match samples endpoints:
-            // - /api/samples (fetchSamples, getSamplesByKeyword)
-            // - /api/studies/{studyId}/samples (getAllSamplesInStudy, getSampleInStudy)
-            // - /api/studies/{studyId}/patients/{patientId}/samples (getAllSamplesOfPatientInStudy)
-            if (
-                /\/api\/(samples|studies\/[^\/]+\/(samples|patients\/[^\/]+\/samples))/.test(
-                    url
-                )
-            ) {
-                return url.replace(/\/api\//, '/api/column-store/');
-            }
-
-            return url;
-        });
-    }
-
-    /**
-     * Generic method to override the request method of an API client.
-     *
-     * @param client - The API client (CBioPortalAPI or CBioPortalAPIInternal)
-     * @param urlTransformer - Function that transforms URLs (returns original or modified URL)
-     */
-    private overrideRequestMethod(
-        client: any,
-        urlTransformer: (url: string) => string
-    ): void {
-        const oldRequest = client.request;
-        client.request = function (...args: any[]) {
-            // args[0] = HTTP method (GET/POST/etc)
-            // args[1] = URL path
-            // args[2] = request body
-            // args[3] = headers
-            if (args[1] && typeof args[1] === 'string') {
-                const originalUrl = args[1];
-                const transformedUrl = urlTransformer(args[1]);
-                if (originalUrl !== transformedUrl) {
-                    console.error(
-                        `[Column Store] ${originalUrl} -> ${transformedUrl}`
-                    );
-                }
-                args[1] = transformedUrl;
-            }
-            return oldRequest.apply(this, args);
-        };
     }
 
     /**
@@ -216,33 +109,9 @@ export class CbioportalApiClient {
     }
 
     /**
-     * Get sample count for a study
-     *
-     * @remarks
-     * This method uses /studies/{studyId}/samples?projection=META which:
-     * - Routes through column-store (matched by line 116-119 regex)
-     * - Returns only headers without fetching actual sample data (more efficient)
-     * - Provides accurate sample count via the 'total-count' response header
-     *
-     * This is preferred over using study.allSampleCount from /studies/{studyId}
-     * because that endpoint doesn't route through column-store and returns
-     * incorrect counts (typically 1 instead of actual count).
-     */
-    async getSampleCount(studyId: string): Promise<number> {
-        const response =
-            await this.api.getAllSamplesInStudyUsingGETWithHttpInfo({
-                studyId,
-                projection: 'META',
-            });
-        const totalCount = response.headers['total-count'];
-        return totalCount ? parseInt(totalCount, 10) : 0;
-    }
-
-    /**
      * Fetch filtered samples based on StudyViewFilter
      *
      * @remarks
-     * This endpoint routes through column-store (whitelisted on line 70).
      * Returns samples matching the provided filter criteria.
      *
      * @param studyViewFilter - Filter object (uses studyIds if no other filters specified)

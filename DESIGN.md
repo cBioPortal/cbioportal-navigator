@@ -6,7 +6,7 @@ Six tools: `resolve_and_route`, `get_studyviewfilter_options`, `navigate_to_stud
 
 ## Key Design Decisions
 
-1. **Column-Store Integration** — `/api/studies/{id}` has `allSampleCount` bug (returns 1). Solution: transparent URL rewriting to `/api/column-store/` for whitelisted endpoints. `studyKeywords` uses getAllStudies (accurate counts); `studyIds` uses getById.
+1. **Plain API Endpoints** — cbioportal.org now serves all StudyView/study/sample data under regular `/api/` paths (column-store was merged into the main API; the `/api/column-store/` prefix and the old `allSampleCount` bug are gone). No URL rewriting needed; `apiClient` calls `cbioportal-ts-api-client` directly.
 
 2. **Two-Tier Filter Metadata** — Router returns only attribute IDs (~300 tokens). `get_studyviewfilter_options` provides details on-demand (clinical + generic assay). Avoids ~1,500 tokens per query when filters aren't needed.
 
