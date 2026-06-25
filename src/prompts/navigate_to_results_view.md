@@ -153,6 +153,7 @@ The comparison tab has subtabs accessible via `"comparison/{subtab}"`. Use `avai
 
 **Best for:**
 - One gene's alteration effect on outcomes — "TP53 mutation and survival" → omit `comparisonSelectedGroups` (default Altered vs Unaltered)
+- Mutant vs wildtype gene alteration enrichment ("what other genes are altered in X mutant") → OQL `GENE: MUT`, `tab: "comparison/alterations"`, `profileFilter: "mutations"`. Restricting `profileFilter` to `"mutations"` ensures the Unaltered group contains only mutation-profiled non-mutant samples. Works cross-study.
 - Gene A vs gene B (any alteration type) — "IDH1-altered vs RB1-altered patients" → `genes: ["IDH1", "RB1"]`, `comparisonSelectedGroups: ["IDH1", "RB1"]`
 - Gene A vs gene B (mutation-specific) — "BRAF-mutant vs NRAS-mutant survival" → `genes: ["BRAF: MUT", "NRAS: MUT"]`, `comparisonSelectedGroups: ["BRAF", "NRAS"]`
 - Gene A vs gene B (mixed OQL) — "BRAF V600E vs NRAS mutant" → `genes: ["BRAF: MUT = V600E", "NRAS: MUT"]`, `comparisonSelectedGroups: ["BRAF", "NRAS"]`
@@ -166,15 +167,19 @@ The comparison tab has subtabs accessible via `"comparison/{subtab}"`. Use `avai
 - **rppaScoreThreshold:** Protein expression threshold. Default: 2.0
 - **studyViewFilter:** Filter object to restrict analysis to a filtered sample subset. When provided, fetches matching samples and returns a session-based URL (`?session_id=...`). Use the same filterJson format as `navigate_to_study_view`.
 
-### profileFilter — expression profile selection
+### profileFilter — profile selection
 
-**Required when OQL contains `EXP` or `PROT`.** Without it, OncoPrint finds no matching data and shows 0% altered.
+`profileFilter` is a comma-separated list of molecular profile suffixes. Suffix = `molecularProfileId` with `{studyId}_` stripped. Example: `luad_tcga_rna_seq_v2_mrna_median_Zscores` → suffix `rna_seq_v2_mrna_median_Zscores`.
 
-**How it works:** `profileFilter` is a comma-separated list of molecular profile suffixes. Suffix = `molecularProfileId` with `{studyId}_` stripped. Example: `luad_tcga_rna_seq_v2_mrna_median_Zscores` → suffix `rna_seq_v2_mrna_median_Zscores`.
+**Critical:** suffix mode overrides all defaults — you must include every profile type you want active.
 
-**Critical:** suffix mode overrides all defaults — you must include every profile type you want active, not just the expression profile.
+Two distinct use cases with different construction rules:
 
-**Construction rules:**
+**Mode 1 — Expression OQL (`EXP` or `PROT`)**
+
+Required when OQL contains `EXP` or `PROT`. Without it, OncoPrint finds no matching data and shows 0% altered.
+
+Construction rules:
 1. Collect profile IDs from the selected study:
    - **Top-5 study**: scan `molecularProfileIds`; for mRNA prefer ID containing `all_sample` + `Zscores`, fall back to `_median_Zscores`; for protein prefer `quantification_zscores`, fall back to `rppa_Zscores`
    - **otherStudies**: read non-`false` values from the `profiles` object
@@ -182,17 +187,21 @@ The comparison tab has subtabs accessible via `"comparison/{subtab}"`. Use `avai
 3. Add the expression profile required by the OQL: `mrna` for `EXP`, `protein` for `PROT`
 4. Strip `{studyId}_` from each ID to get the suffix, join with commas, no spaces
 
-**Example — `luad_tcga_pan_can_atlas_2018` with `EXP > 2`:**
+Example — `luad_tcga_pan_can_atlas_2018` with `EXP > 2`:
 ```
 profileFilter: "mutations,gistic,structural_variants,rna_seq_v2_mrna_median_all_sample_Zscores"
 ```
 
-**Example — `brca_tcga_pan_can_atlas_2018` with `PROT > 1.5`:**
+Example — `brca_tcga_pan_can_atlas_2018` with `PROT > 1.5`:
 ```
 profileFilter: "mutations,gistic,structural_variants,protein_quantification_zscores"
 ```
 
-**Restriction:** `EXP`/`PROT` OQL only works for single-study queries. Do not use with multiple `studyIds`.
+Restriction: `EXP`/`PROT` OQL only works for single-study queries. Do not use with multiple `studyIds`.
+
+**Mode 2 — Mutation-based mut-vs-WT comparison** (OQL `GENE: MUT`, `tab: "comparison/alterations"`)
+
+Set `profileFilter: "mutations"` only. This controls the profiling boundary: the Unaltered group will contain only mutation-profiled non-mutant samples, excluding unprofiled samples. Do not add `cna` or `sv` — rules from Mode 1 do not apply here.
 
 ---
 

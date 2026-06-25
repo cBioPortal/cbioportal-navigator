@@ -3,7 +3,8 @@
 Creates group comparison sessions and generates URL to cBioPortal's Group Comparison page.
 
 **→ See router tool for universal guidelines (no guessing IDs, exact values, Link First principle).**
-**→ `studyViewFilter` format (geneFilters, mutationDataFilters, genomicDataFilters, clinicalDataFilters, genericAssayDataFilters, etc.) follows the same rules as `navigate_to_study_view`. `profileType` = molecularProfileId with `{studyId}_` prefix stripped.**
+**→ `studyViewFilter` format (geneFilters, mutationDataFilters, genomicDataFilters, clinicalDataFilters, genericAssayDataFilters, genomicProfiles, etc.) follows the same rules as `navigate_to_study_view`. `profileType` = molecularProfileId with `{studyId}_` prefix stripped.**
+**→ For mutant vs wildtype comparisons where Altered vs Unaltered groups suffice, prefer `navigate_to_results_view` with OQL `GENE: MUT`, `tab: "comparison/alterations"`, `profileFilter: "mutations"` — works cross-study and automatically restricts the Unaltered group to mutation-profiled non-mutant samples. Use group comparison for mut-vs-WT only when custom group definitions beyond Altered/Unaltered are required.**
 
 ## What Group Comparison Shows
 
@@ -202,6 +203,9 @@ Use `studyViewFilter` to pre-filter the cohort (e.g. restrict to TP53-mutant pat
 ```json
 {
   "studyIds": ["luad_tcga_pan_can_atlas_2018"],
+  "studyViewFilter": {
+    "genomicProfiles": [["mutations"]]
+  },
   "groups": [
     {
       "name": "EGFR Mutant",
@@ -220,7 +224,7 @@ Use `studyViewFilter` to pre-filter the cohort (e.g. restrict to TP53-mutant pat
   "tab": "survival"
 }
 ```
-→ "EGFR Wildtype" = all study samples NOT in the EGFR Mutant group. Use `isUnselected` whenever the second group is the complement of the first (wildtype, unaltered, negative). Combine with `studyViewFilter` to restrict the cohort first.
+→ `genomicProfiles: [["mutations"]]` pre-filters the cohort to mutation-profiled samples before groups are built. "EGFR Wildtype" = mutation-profiled samples NOT in the EGFR Mutant group — unprofiled samples are excluded. Always add `genomicProfiles` to the global `studyViewFilter` for mutation-based wildtype groups.
 
 ### Custom groups — gene A mutant vs gene B mutant (mutation-specific comparison)
 Use when the user says "mutant vs mutant" — each group filtered to that gene's mutations only, not all alterations.

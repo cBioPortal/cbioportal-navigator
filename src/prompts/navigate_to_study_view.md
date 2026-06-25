@@ -149,9 +149,9 @@ Strip `{studyId}_` prefix from molecularProfileId:
 
 **Mode 1: Mutated vs Not Mutated**
 ```json
-{"hugoGeneSymbol": "TP53", "profileType": "mutations", "categorization": "MUTATED", "values": [[{"value": "Mutated"}]]}
+{"hugoGeneSymbol": "TP53", "profileType": "mutations", "categorization": "MUTATED", "values": [[{"value": "MUTATED"}]]}
 ```
-Values are always `"Mutated"` or `"Not Mutated"` — no lookup needed.
+Values are always `"MUTATED"` or `"NOT_MUTATED"` — no lookup needed.
 
 **Mode 2: Mutation Types**
 ```json
@@ -204,6 +204,16 @@ For studies with `genericAssayProfiles` in router metadata (genetic ancestry, mu
 ---
 
 ## Other Filter Types
+
+### genomicProfiles
+
+Restricts cohort to samples profiled for the specified molecular profile type(s), determined via gene panel data. Each inner array is OR'd; outer arrays are AND'd.
+
+```json
+{"genomicProfiles": [["mutations"]]}
+```
+
+Accepts profile type suffixes — same convention as `profileType` in `mutationDataFilters` (strip `{studyId}_` prefix from molecularProfileId). Use to pre-filter to mutation-profiled samples before applying other filters.
 
 ### sampleIdentifiers
 ```json
