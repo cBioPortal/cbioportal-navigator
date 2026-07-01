@@ -15,14 +15,19 @@
  * Features:
  * - Study resolution via keywords or direct studyId
  * - Batch gene validation (filters out invalid genes)
- * - Supports tabs: oncoprint, mutations, cna, plots, survival, coexpression, enrichments, pathways
+ * - Supports tabs: oncoprint, mutations, structuralVariants, cancerTypesSummary,
+ *   mutualExclusivity, plots, survival, coexpression, comparison (+ subtabs),
+ *   cnSegments, pathways, download
  * - Optional case set selection and Z-score thresholds
  * - Default case set: {studyId}_all (all samples)
+ * - Oncoprint annotation tracks: clinical, heatmap (mRNA/protein/methylation),
+ *   and generic assay tracks via oncoprintClinicalTracks/oncoprintHeatmapTracks/
+ *   oncoprintGenericAssayTracks
  *
  * Architecture:
  * Uses studyResolver for study identification, geneResolver for gene validation,
- * profileResolver for metadata, and buildResultsUrl for URL construction. Returns
- * success response with validated genes, or ambiguity/error responses.
+ * and buildResultsUrl for URL construction. Returns success response with
+ * validated genes, or ambiguity/error responses.
  *
  * @packageDocumentation
  */
@@ -31,7 +36,10 @@ import { z } from 'zod';
 import { studyResolver } from './shared/studyResolver.js';
 import { geneResolver } from './shared/geneResolver.js';
 import { plotsSelectionParamSchema } from './shared/plotsSchemas.js';
-import { buildResultsUrl } from './resultsView/buildResultsUrl.js';
+import {
+    buildResultsUrl,
+    formatTrackGroups,
+} from './resultsView/buildResultsUrl.js';
 import { MainSessionClient } from './resultsView/mainSessionClient.js';
 import { apiClient } from './shared/cbioportalClient.js';
 import { getConfig } from './shared/config.js';
@@ -128,6 +136,52 @@ const inputSchema = {
         .describe(
             'Pre-select groups in the comparison tab. Two types of groups exist: aggregate ("Altered group" / "Unaltered group") and per-gene (one per queried gene, named after the gene symbol when using default OQL). Pass gene symbols to compare gene-specific altered groups, e.g. ["IDH1", "EGFR"]. Omit to use the default (Altered vs Unaltered).'
         ),
+    oncoprintClinicalTracks: z
+        .array(z.string())
+        .optional()
+        .describe(
+            'Clinical attribute IDs to display as annotation tracks below the oncoprint genomic tracks (e.g. ["AGE", "SEX"]). Use IDs from resolve_and_route metadata.clinicalAttributeIds. Only affects the oncoprint tab.'
+        ),
+    oncoprintHeatmapTracks: z
+        .array(
+            z.object({
+                molecularProfileId: z
+                    .string()
+                    .describe(
+                        'Full molecular profile ID of an mRNA, protein, or methylation profile (e.g. "luad_tcga_pan_can_atlas_2018_rna_seq_v2_mrna_median_all_sample_Zscores"). Use the exact ID from resolve_and_route metadata.heatmapProfileIds — not a suffix.'
+                    ),
+                entities: z
+                    .array(z.string())
+                    .min(1)
+                    .describe(
+                        'Hugo gene symbols to show as heatmap rows for this profile.'
+                    ),
+            })
+        )
+        .optional()
+        .describe(
+            'Adds expression/methylation heatmap rows to the oncoprint, grouped by molecular profile. Only affects the oncoprint tab.'
+        ),
+    oncoprintGenericAssayTracks: z
+        .array(
+            z.object({
+                molecularProfileId: z
+                    .string()
+                    .describe(
+                        'Full GENERIC_ASSAY molecular profile ID (e.g. treatment response, arm-level CNA, genetic ancestry). Use the exact ID from resolve_and_route metadata.genericAssayProfiles — not a suffix.'
+                    ),
+                entities: z
+                    .array(z.string())
+                    .min(1)
+                    .describe(
+                        'Generic assay entity stable IDs to show as rows for this profile. Obtain these from get_studyviewfilter_options(genericAssayProfileIds).'
+                    ),
+            })
+        )
+        .optional()
+        .describe(
+            'Adds generic assay data rows (e.g. treatment response, arm-level CNA, genetic ancestry) to the oncoprint, grouped by molecular profile. Only affects the oncoprint tab.'
+        ),
 };
 
 /**
@@ -156,6 +210,13 @@ type NavigateToResultsViewInput = {
     plotsVertSelection?: z.infer<typeof inputSchema.plotsVertSelection>;
     comparisonSelectedGroups?: z.infer<
         typeof inputSchema.comparisonSelectedGroups
+    >;
+    oncoprintClinicalTracks?: z.infer<
+        typeof inputSchema.oncoprintClinicalTracks
+    >;
+    oncoprintHeatmapTracks?: z.infer<typeof inputSchema.oncoprintHeatmapTracks>;
+    oncoprintGenericAssayTracks?: z.infer<
+        typeof inputSchema.oncoprintGenericAssayTracks
     >;
 };
 
@@ -288,6 +349,21 @@ async function navigateToResultsView(
         }
     }
 
+    // Validate gene symbols in heatmap track entities, drop tracks left with
+    // no valid genes. Generic assay entity IDs are not genes — passed through.
+    const oncoprintHeatmapTracks = params.oncoprintHeatmapTracks
+        ? (
+              await Promise.all(
+                  params.oncoprintHeatmapTracks.map(async (track) => ({
+                      molecularProfileId: track.molecularProfileId,
+                      entities: await geneResolver.validateBatch(
+                          track.entities
+                      ),
+                  }))
+              )
+          ).filter((track) => track.entities.length > 0)
+        : undefined;
+
     const studyDetails = await Promise.all(
         studyIds.map((id) => studyResolver.getById(id))
     );
@@ -326,7 +402,25 @@ async function navigateToResultsView(
 
         const url = buildCBioPortalPageUrl(
             params.tab ? `/results/${params.tab}` : '/results',
-            { session_id: sessionId }
+            {
+                session_id: sessionId,
+                ...(params.oncoprintClinicalTracks &&
+                    params.oncoprintClinicalTracks.length > 0 && {
+                        clinicallist: params.oncoprintClinicalTracks.join(','),
+                    }),
+                ...(oncoprintHeatmapTracks &&
+                    oncoprintHeatmapTracks.length > 0 && {
+                        heatmap_track_groups: formatTrackGroups(
+                            oncoprintHeatmapTracks
+                        ),
+                    }),
+                ...(params.oncoprintGenericAssayTracks &&
+                    params.oncoprintGenericAssayTracks.length > 0 && {
+                        generic_assay_groups: formatTrackGroups(
+                            params.oncoprintGenericAssayTracks
+                        ),
+                    }),
+            }
         );
 
         // Build companion StudyView URL for exploring the filtered cohort
@@ -347,6 +441,10 @@ async function navigateToResultsView(
             caseSetId: '-1',
             sessionId,
             studyViewUrl,
+            ...(oncoprintHeatmapTracks &&
+                oncoprintHeatmapTracks.length > 0 && {
+                    oncoprintHeatmapTracks,
+                }),
             ...(getResultsViewPageDescription(params.tab, {
                 plotsHorz: params.plotsHorzSelection,
                 plotsVert: params.plotsVertSelection,
@@ -430,6 +528,19 @@ async function navigateToResultsView(
             ...(comparisonSelectedGroups && {
                 comparisonSelectedGroups,
             }),
+            ...(params.oncoprintClinicalTracks &&
+                params.oncoprintClinicalTracks.length > 0 && {
+                    oncoprintClinicalTracks: params.oncoprintClinicalTracks,
+                }),
+            ...(oncoprintHeatmapTracks &&
+                oncoprintHeatmapTracks.length > 0 && {
+                    oncoprintHeatmapTracks,
+                }),
+            ...(params.oncoprintGenericAssayTracks &&
+                params.oncoprintGenericAssayTracks.length > 0 && {
+                    oncoprintGenericAssayTracks:
+                        params.oncoprintGenericAssayTracks,
+                }),
         },
     });
 
@@ -442,6 +553,10 @@ async function navigateToResultsView(
         })),
         genes: validSymbols,
         caseSetId,
+        ...(oncoprintHeatmapTracks &&
+            oncoprintHeatmapTracks.length > 0 && {
+                oncoprintHeatmapTracks,
+            }),
         ...(getResultsViewPageDescription(params.tab, {
             plotsHorz: params.plotsHorzSelection,
             plotsVert: params.plotsVertSelection,

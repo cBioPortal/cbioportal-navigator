@@ -103,6 +103,10 @@ Signals: compare, vs, difference, split, by sex/age/stage/smoking/expression lev
 - "Survival by PDCD1 expression, high vs low" → custom groups using `genomicDataFilters` ranges from `bins`
 - "Split this cohort by MGMT methylation level (quartiles) and compare clinical features"
 
+**Specific gene(s) as the enrichment subject of a clinical/molecular split:** When Rule 2 applies (grouping variable is clinical/molecular) **and** the user also names specific gene(s) as what's being examined across those groups (e.g., naming a handful of genes and asking how their alteration rates differ across subtype/stage/grade/etc.) — this has two complementary answers, and both should be provided: call `navigate_to_group_comparison` with groups built from that attribute (`tab: "comparison/alterations"`) for the statistical enrichment question ("which of these genes differ significantly between groups"), **and** `navigate_to_results_view` with those genes plus `oncoprintClinicalTracks: [attributeId]` for the visual per-sample question ("what does the pattern look like"). Fetch exact attribute values via `get_studyviewfilter_options` once and reuse them for both calls. Present the group comparison link first (quantitative answer), then the OncoPrint link (visual confirmation).
+
+- "EGFR and MET alteration rates by histologic subtype in lung adenocarcinoma" → group_comparison (groups by histologic subtype attribute, `comparison/alterations`) + results_view (`genes: ["EGFR","MET"]`, `oncoprintClinicalTracks: [attributeId]`)
+
 ### Rule 3 → `navigate_to_results_view`
 **Gene(s) mentioned as the subject of analysis** (not just as a patient filter). Ask: what is the user trying to learn about this gene?
 
@@ -182,6 +186,7 @@ The router returns `studiesWithMetadata` containing:
 - **clinicalAttributeIds** — available clinical attributes (e.g., `AGE`, `SEX`, `TUMOR_STAGE`). Call `get_studyviewfilter_options` to get datatype + valid values before filtering.
 - **molecularProfileIds** — non-generic-assay profiles (e.g., `luad_tcga_mutations`, `luad_tcga_gistic`). Mutation profiles end in `_mutations`; CNA profiles in `_gistic` or `_cna`.
 - **genericAssayProfiles** _(optional)_ — generic assay profile IDs (e.g., genetic ancestry, mutational signatures). Call `get_studyviewfilter_options` with `genericAssayProfileIds` to get entity stableIds and values.
+- **heatmapProfileIds** _(optional)_ — mRNA/protein/methylation profile IDs eligible for oncoprint heatmap tracks (`navigate_to_results_view`'s `oncoprintHeatmapTracks`). Use the exact ID, not a suffix.
 - **availableComparisonTabs** — which comparison tabs this study supports (e.g., `["overlap","clinical","survival","alterations","mutations","mrna"]`). Use when selecting `tab` for `navigate_to_group_comparison` or `comparison/{subtab}` for `navigate_to_results_view`.
 - **treatments** — not returned by default. Call `get_studyviewfilter_options` with `includeTreatments: true` to fetch drug/agent names when the user asks about treatment filters.
 

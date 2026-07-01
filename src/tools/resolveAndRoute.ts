@@ -234,6 +234,20 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
                 .map((p) => p.molecularProfileId)
                 .sort();
 
+            // Profiles eligible for oncoprint heatmap tracks (mRNA/protein shown in
+            // analysis tab, plus all methylation profiles) — mirrors frontend's
+            // heatmapMolecularProfiles (ResultsViewPageStore.ts)
+            const heatmapProfileIds = molecularProfiles
+                .filter(
+                    (p) =>
+                        ((p.molecularAlterationType === 'MRNA_EXPRESSION' ||
+                            p.molecularAlterationType === 'PROTEIN_LEVEL') &&
+                            p.showProfileInAnalysisTab) ||
+                        p.molecularAlterationType === 'METHYLATION'
+                )
+                .map((p) => p.molecularProfileId)
+                .sort();
+
             const availableComparisonTabs = computeAvailableComparisonTabs(
                 molecularProfiles,
                 clinicalAttributes.map((attr) => attr.clinicalAttributeId)
@@ -254,6 +268,9 @@ async function resolveAndRoute(params: ToolInput): Promise<ToolResponse> {
                     molecularProfileIds: regularProfileIds,
                     ...(genericAssayProfileIds.length > 0 && {
                         genericAssayProfiles: genericAssayProfileIds,
+                    }),
+                    ...(heatmapProfileIds.length > 0 && {
+                        heatmapProfileIds,
                     }),
                     availableComparisonTabs,
                 },

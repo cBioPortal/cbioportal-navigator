@@ -33,6 +33,22 @@ import {
     QueryParams,
 } from '../shared/cbioportalUrlBuilder.js';
 
+export interface TrackGroup {
+    molecularProfileId: string;
+    entities: string[];
+}
+
+/**
+ * Format heatmap/generic-assay track groups for the `heatmap_track_groups` /
+ * `generic_assay_groups` URL params: `molecularProfileId,entity1,entity2;...`
+ */
+export function formatTrackGroups(tracks: TrackGroup[]): string {
+    return tracks
+        .filter((t) => t.entities.length > 0)
+        .map((t) => [t.molecularProfileId, ...t.entities].join(','))
+        .join(';');
+}
+
 export interface ResultsUrlOptions {
     studies: string[];
     genes: string[];
@@ -59,8 +75,11 @@ export interface ResultsUrlOptions {
         plotsColoringSelection?: Record<string, any>;
         // Comparison options
         comparisonSelectedGroups?: string[];
+        // Oncoprint annotation tracks
+        oncoprintClinicalTracks?: string[];
+        oncoprintHeatmapTracks?: TrackGroup[];
+        oncoprintGenericAssayTracks?: TrackGroup[];
         // Generic
-        genericAssayGroups?: string;
         genesetList?: string;
         [key: string]: any;
     };
@@ -130,8 +149,29 @@ export function buildResultsUrl(options: ResultsUrlOptions): string {
                 urlOptions.comparisonSelectedGroups
             );
         }
-        if (urlOptions.genericAssayGroups) {
-            query.generic_assay_groups = urlOptions.genericAssayGroups;
+        if (
+            urlOptions.oncoprintClinicalTracks &&
+            urlOptions.oncoprintClinicalTracks.length > 0
+        ) {
+            query.clinicallist = urlOptions.oncoprintClinicalTracks.join(',');
+        }
+        if (
+            urlOptions.oncoprintHeatmapTracks &&
+            urlOptions.oncoprintHeatmapTracks.length > 0
+        ) {
+            const formatted = formatTrackGroups(
+                urlOptions.oncoprintHeatmapTracks
+            );
+            if (formatted) query.heatmap_track_groups = formatted;
+        }
+        if (
+            urlOptions.oncoprintGenericAssayTracks &&
+            urlOptions.oncoprintGenericAssayTracks.length > 0
+        ) {
+            const formatted = formatTrackGroups(
+                urlOptions.oncoprintGenericAssayTracks
+            );
+            if (formatted) query.generic_assay_groups = formatted;
         }
         if (urlOptions.genesetList) {
             query.geneset_list = urlOptions.genesetList;
@@ -156,7 +196,9 @@ export function buildResultsUrl(options: ResultsUrlOptions): string {
                     'plotsVertSelection',
                     'plotsColoringSelection',
                     'comparisonSelectedGroups',
-                    'genericAssayGroups',
+                    'oncoprintClinicalTracks',
+                    'oncoprintHeatmapTracks',
+                    'oncoprintGenericAssayTracks',
                     'genesetList',
                 ].includes(key)
             ) {

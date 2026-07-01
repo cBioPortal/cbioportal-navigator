@@ -205,6 +205,43 @@ Set `profileFilter: "mutations"` only. This controls the profiling boundary: the
 
 ---
 
+## Oncoprint Annotation Tracks
+
+Three optional parameters add annotation rows below the genomic (gene) tracks in the **oncoprint tab only** — they have no effect on other tabs. They are independent of `genes`/OQL, which always control the genomic tracks.
+
+### oncoprintClinicalTracks
+
+Array of clinical attribute IDs, e.g. `["AGE", "SEX", "TUMOR_STAGE"]`. Use IDs from `resolve_and_route` metadata `clinicalAttributeIds` — do not guess.
+
+### oncoprintHeatmapTracks
+
+Adds expression/methylation heatmap rows, grouped by molecular profile:
+
+```json
+"oncoprintHeatmapTracks": [
+  { "molecularProfileId": "luad_tcga_pan_can_atlas_2018_rna_seq_v2_mrna_median_all_sample_Zscores", "entities": ["EGFR", "KRAS"] }
+]
+```
+
+- `molecularProfileId` — **must be the exact full ID** from `resolve_and_route` metadata `heatmapProfileIds`, not a suffix (unlike `profileFilter`, there is no suffix-matching for this parameter — an unrecognized ID is silently dropped by the frontend).
+- `entities` — Hugo gene symbols to display as rows. Invalid gene symbols are silently dropped before the URL is built — check the response's `oncoprintHeatmapTracks` field to confirm which genes actually made it in.
+- One entry per molecular profile; group multiple genes from the same profile into one entry's `entities` array rather than repeating the profile.
+
+### oncoprintGenericAssayTracks
+
+Adds generic assay data rows (e.g. treatment response, arm-level CNA, genetic ancestry, mutational signatures), grouped by molecular profile:
+
+```json
+"oncoprintGenericAssayTracks": [
+  { "molecularProfileId": "study_id_treatment_ic50", "entities": ["Cisplatin", "Paclitaxel"] }
+]
+```
+
+- `molecularProfileId` — exact full ID from `resolve_and_route` metadata `genericAssayProfiles`, not a suffix.
+- `entities` — generic assay entity stable IDs. Get these by calling `get_studyviewfilter_options` with `genericAssayProfileIds: [molecularProfileId]` first — entity IDs are study/profile-specific and cannot be guessed.
+
+---
+
 ## When to use studyViewFilter
 
 Use `studyViewFilter` when the user wants to analyze genes **within a specific subset** of a study:
@@ -319,5 +356,21 @@ Use profile IDs from router metadata. Only include `plotsHorzSelection`/`plotsVe
       { "attributeId": "SEX", "values": [{ "value": "Female" }] }
     ]
   }
+}
+```
+
+**User:** "OncoPrint for EGFR and KRAS in LUAD, with age/sex tracks and EGFR mRNA expression heatmap"
+
+```json
+{
+  "studyIds": ["luad_tcga_pan_can_atlas_2018"],
+  "genes": ["EGFR", "KRAS"],
+  "oncoprintClinicalTracks": ["AGE", "SEX"],
+  "oncoprintHeatmapTracks": [
+    {
+      "molecularProfileId": "luad_tcga_pan_can_atlas_2018_rna_seq_v2_mrna_median_all_sample_Zscores",
+      "entities": ["EGFR"]
+    }
+  ]
 }
 ```
