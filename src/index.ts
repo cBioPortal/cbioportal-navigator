@@ -77,7 +77,7 @@ async function startHttp() {
         });
     });
 
-    app.all('/mcp', async (req, res) => {
+    app.post('/mcp', async (req, res) => {
         try {
             const server = createMcpServer();
             const transport = new StreamableHTTPServerTransport({
@@ -102,6 +102,23 @@ async function startHttp() {
             }
         }
     });
+
+    // This stateless server only implements request/response over POST. It sends
+    // no server-initiated messages, so it does not offer the optional standalone
+    // SSE stream (GET) or session teardown (DELETE). Responding 405 tells MCP
+    // clients to skip the standalone stream; otherwise they treat the dropped
+    // stream as a failure and reconnect indefinitely.
+    const methodNotAllowed = (_req: express.Request, res: express.Response) => {
+        res.status(405)
+            .set('Allow', 'POST')
+            .json({
+                jsonrpc: '2.0',
+                error: { code: -32000, message: 'Method not allowed.' },
+                id: null,
+            });
+    };
+    app.get('/mcp', methodNotAllowed);
+    app.delete('/mcp', methodNotAllowed);
 
     const port = parseInt(process.env.PORT || '8002');
     const server = app.listen(port, () => {
