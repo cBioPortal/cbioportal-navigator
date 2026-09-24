@@ -2,15 +2,16 @@
  * OpenTelemetry tracing + DogStatsD metrics for MCP tool calls.
  *
  * Mirrors the tool telemetry in cbioportal-mcp (src/cbioportal_mcp/telemetry.py)
- * so the navigator can be charted on the same Datadog dashboard ("MCP Tool
- * Metrics" group of the cbioagent dashboard):
+ * and emits the same metric names, so the "MCP Tool Metrics" group of the
+ * cbioagent dashboard compares both servers by their `service` tag:
  *
  * - DogStatsD metrics (dashboard aggregates):
  *     `<prefix>.tool.calls`        counter
  *     `<prefix>.tool.duration_ms`  distribution (supports p95/p99)
  *     `<prefix>.tool.errors`       counter
  *   Tags: `tool`, `success`, `client_kind`, `client_name`, `service`, `env`.
- *   The prefix defaults to `cbioportal_navigator`.
+ *   The prefix defaults to `cbioportal_mcp`, shared with cbioportal-mcp;
+ *   `service:cbioportal-navigator` tells the two servers apart.
  *
  * - One OTel span per tool call, named `mcp.tool/<tool>`, exported over
  *   OTLP/HTTP to the Datadog agent. Attributes match cbioportal-mcp:
@@ -28,7 +29,8 @@
  * - `DD_SERVICE` / `OTEL_SERVICE_NAME`: service name (default: `cbioportal-navigator`).
  * - `DD_ENV`: added as the `env` metric tag and `deployment.environment` resource attribute.
  * - `CBIOPORTAL_NAVIGATOR_DD_METRICS_ENABLED`: set to `false` to disable metrics.
- * - `CBIOPORTAL_NAVIGATOR_DD_METRIC_PREFIX`: metric prefix override.
+ * - `CBIOPORTAL_NAVIGATOR_DD_METRIC_PREFIX`: metric prefix override
+ *   (default: `cbioportal_mcp`).
  *
  * With none of these set (e.g. local stdio use) telemetry is a no-op.
  * Telemetry failures never fail a tool call.
@@ -155,8 +157,7 @@ function configureMetrics(): void {
         'localhost';
     const port = parseInt(process.env.DD_DOGSTATSD_PORT || '8125');
     const prefix =
-        process.env.CBIOPORTAL_NAVIGATOR_DD_METRIC_PREFIX ||
-        'cbioportal_navigator';
+        process.env.CBIOPORTAL_NAVIGATOR_DD_METRIC_PREFIX || 'cbioportal_mcp';
     statsd = new DogStatsDClient(host, port, prefix, {
         service: serviceName(),
         env: process.env.DD_ENV,

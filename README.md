@@ -44,7 +44,6 @@ cbioportal-navigator/
 │   │   ├── patientView/           # URL builder
 │   │   └── shared/                # Config, types, API client, URL builder
 │   └── prompts/                   # Prompt markdown files (copied to dist/ at build)
-├── datadog/                   # Datadog dashboard definition for tool metrics
 ├── Dockerfile
 ├── docker-compose.mcp.yml        # Standalone MCP server
 └── package.json
@@ -107,13 +106,14 @@ environment:
 ### Datadog Tool Metrics
 
 Each MCP tool call emits one OpenTelemetry span (`mcp.tool/<tool>`) and
-DogStatsD metrics, matching the tool telemetry in
-[cbioportal-mcp](https://github.com/cBioPortal/cbioportal-mcp) so both servers
-can be charted on the same dashboard:
+DogStatsD metrics. It uses the same metric names as
+[cbioportal-mcp](https://github.com/cBioPortal/cbioportal-mcp), so the "MCP Tool
+Metrics" section of the cbioagent Datadog dashboard compares the two servers
+by their `service` tag (`cbioportal-mcp` vs `cbioportal-navigator`):
 
-- `cbioportal_navigator.tool.calls` (counter)
-- `cbioportal_navigator.tool.duration_ms` (distribution)
-- `cbioportal_navigator.tool.errors` (counter)
+- `cbioportal_mcp.tool.calls` (counter)
+- `cbioportal_mcp.tool.duration_ms` (distribution)
+- `cbioportal_mcp.tool.errors` (counter)
 
 Tags: `tool`, `success`, `client_kind`, `client_name`, `service`, `env`.
 Span attributes: `mcp.tool.name`, `mcp.tool.duration_ms`, `mcp.tool.success`,
@@ -134,16 +134,11 @@ Telemetry is off unless one of these is set:
 | `DD_SERVICE` / `OTEL_SERVICE_NAME` | Service name | `cbioportal-navigator` |
 | `DD_ENV` | `env` tag | – |
 | `CBIOPORTAL_NAVIGATOR_DD_METRICS_ENABLED` | Set `false` to disable metrics | `true` |
-| `CBIOPORTAL_NAVIGATOR_DD_METRIC_PREFIX` | Metric prefix | `cbioportal_navigator` |
+| `CBIOPORTAL_NAVIGATOR_DD_METRIC_PREFIX` | Metric prefix | `cbioportal_mcp` |
 
 On Kubernetes, set `DD_AGENT_HOST` from the node IP via the Downward API
 (`fieldRef: status.hostIP`); the Datadog agent needs DogStatsD on host port
 8125 and OTLP HTTP ingest on 4318.
-
-[`datadog/navigator-tool-metrics-dashboard.json`](datadog/navigator-tool-metrics-dashboard.json)
-mirrors the "MCP Tool Metrics" group of the cbioagent dashboard with the
-navigator's metric names. Import it, or copy its group into the cbioagent
-dashboard.
 
 ## Architecture
 
