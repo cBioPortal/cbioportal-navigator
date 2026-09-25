@@ -11,6 +11,7 @@
  * - `MCP_TRANSPORT`: Transport mode ('stdio' or 'http'), defaults to 'stdio'
  * - `CBIOPORTAL_BASE_URL`: Base URL for cBioPortal instance, defaults to https://www.cbioportal.org
  * - `PORT`: HTTP server port, defaults to 8002 (HTTP mode only)
+ * - Datadog/OpenTelemetry settings (`DD_AGENT_HOST`, etc.): see telemetry.ts
  *
  * HTTP mode endpoints:
  * - `GET /health`: Health check endpoint returning service status
@@ -27,6 +28,7 @@ import express from 'express';
 import { setConfig } from './tools/shared/config.js';
 import { initPrompts } from './tools/shared/promptLoader.js';
 import { registerTools } from './toolRegistry.js';
+import { configureTelemetry, shutdownTelemetry } from './telemetry.js';
 import { GIT_VERSION } from './version.js';
 
 function createMcpServer(): McpServer {
@@ -55,6 +57,7 @@ async function startStdio() {
 
     process.on('SIGINT', async () => {
         await server.close();
+        await shutdownTelemetry();
         process.exit(0);
     });
 }
@@ -132,16 +135,23 @@ async function startHttp() {
     });
 
     process.on('SIGTERM', async () => {
-        server.close(() => process.exit(0));
+        server.close(async () => {
+            await shutdownTelemetry();
+            process.exit(0);
+        });
     });
 
     process.on('SIGINT', async () => {
-        server.close(() => process.exit(0));
+        server.close(async () => {
+            await shutdownTelemetry();
+            process.exit(0);
+        });
     });
 }
 
 async function main() {
     initPrompts();
+    configureTelemetry();
 
     const mode = process.env.MCP_TRANSPORT || 'stdio';
     if (mode === 'http') {

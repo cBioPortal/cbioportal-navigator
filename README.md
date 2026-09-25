@@ -29,6 +29,7 @@ cbioportal-navigator/
 ├── src/
 │   ├── index.ts               # Entry point (stdio/HTTP mode selection, MCP server creation)
 │   ├── toolRegistry.ts        # Central tool registration
+│   ├── telemetry.ts           # Datadog DogStatsD metrics + OpenTelemetry spans per tool call
 │   ├── tools/
 │   │   ├── resolveAndRoute.ts     # Router tool
 │   │   ├── getStudyviewfilterOptions.ts
@@ -101,6 +102,43 @@ environment:
 | `CBIOPORTAL_BASE_URL` | cBioPortal instance URL | `https://www.cbioportal.org` |
 | `MCP_TRANSPORT` | Transport mode (`stdio` or `http`) | `stdio` |
 | `PORT` | HTTP server port (HTTP mode only) | `8002` |
+
+### Datadog Tool Metrics
+
+Each MCP tool call emits one OpenTelemetry span (`mcp.tool/<tool>`) and
+DogStatsD metrics. It uses the same metric names as
+[cbioportal-mcp](https://github.com/cBioPortal/cbioportal-mcp), so the "MCP Tool
+Metrics" section of the cbioagent Datadog dashboard compares the two servers
+by their `service` tag (`cbioportal-mcp` vs `cbioportal-navigator`):
+
+- `cbioportal_mcp.tool.calls` (counter)
+- `cbioportal_mcp.tool.duration_ms` (distribution)
+- `cbioportal_mcp.tool.errors` (counter)
+
+Tags: `tool`, `success`, `client_kind`, `client_name`, `service`, `env`.
+Span attributes: `mcp.tool.name`, `mcp.tool.duration_ms`, `mcp.tool.success`,
+`mcp.client_kind`, `mcp.client.name`, `mcp.session.id`, `enduser.id`,
+`network.client.ip`, `user_agent.original`, `error.type`.
+
+A call counts as failed if the tool throws or returns `{"success": false}`.
+`client_kind` is `librechat` when the `x-user-id` header is present, otherwise
+`direct`.
+
+Telemetry is off unless one of these is set:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DD_AGENT_HOST` | Datadog agent host; enables metrics and tracing | – |
+| `DD_DOGSTATSD_HOST` / `DD_DOGSTATSD_PORT` | DogStatsD endpoint | `DD_AGENT_HOST`:`8125` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP/HTTP endpoint; enables tracing | `http://DD_AGENT_HOST:4318` |
+| `DD_SERVICE` / `OTEL_SERVICE_NAME` | Service name | `cbioportal-navigator` |
+| `DD_ENV` | `env` tag | – |
+| `CBIOPORTAL_NAVIGATOR_DD_METRICS_ENABLED` | Set `false` to disable metrics | `true` |
+| `CBIOPORTAL_NAVIGATOR_DD_METRIC_PREFIX` | Metric prefix | `cbioportal_mcp` |
+
+On Kubernetes, set `DD_AGENT_HOST` from the node IP via the Downward API
+(`fieldRef: status.hostIP`); the Datadog agent needs DogStatsD on host port
+8125 and OTLP HTTP ingest on 4318.
 
 ## Architecture
 
