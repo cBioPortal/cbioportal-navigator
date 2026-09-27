@@ -54,6 +54,9 @@ import { buildStudyUrl } from './studyView/buildStudyUrl.js';
 import { validateTabAvailability } from './studyView/validateStudyViewTab.js';
 import { getResultsViewPageDescription } from './shared/pageDescriptions.js';
 import * as oqlParser from './resultsView/oql-parser.js';
+import { checkOql } from './resultsView/oqlChecks.js';
+
+const OQL_REFERENCE_URL = 'https://docs.cbioportal.org/user-guide/oql/';
 
 /**
  * Tool definition schema (without description, which is loaded at startup)
@@ -279,6 +282,24 @@ async function navigateToResultsView(
         });
     }
 
+    // 1b. Reject OQL that parses but wouldn't match what was asked for;
+    // simplify spelled-out driver terms to DRIVER.
+    const oqlCheck = checkOql(params.genes, (q) => oqlParser.parse(q));
+    if (oqlCheck.errors.length > 0) {
+        return createErrorResponse(
+            'OQL would not match the requested alterations',
+            {
+                problems: oqlCheck.errors,
+                oqlReference: OQL_REFERENCE_URL,
+            }
+        );
+    }
+    const oqlNormalized = oqlCheck.rewrites;
+    if (oqlNormalized.length > 0) {
+        const replacement = new Map(oqlNormalized.map((r) => [r.from, r.to]));
+        params.genes = params.genes.map((g) => replacement.get(g) ?? g);
+    }
+
     // Extract gene symbols from AST — handles plain genes, OQL statements,
     // merged tracks, and skips DATATYPES pseudo-gene
     const geneSymbols = (parsedOql ?? [])
@@ -437,6 +458,7 @@ async function navigateToResultsView(
                 sampleCount: s.allSampleCount,
             })),
             genes: validSymbols,
+            ...(oqlNormalized.length > 0 && { oqlNormalized }),
             filteredSampleCount: samples.length,
             caseSetId: '-1',
             sessionId,
@@ -552,6 +574,7 @@ async function navigateToResultsView(
             sampleCount: s.allSampleCount,
         })),
         genes: validSymbols,
+        ...(oqlNormalized.length > 0 && { oqlNormalized }),
         caseSetId,
         ...(oncoprintHeatmapTracks &&
             oncoprintHeatmapTracks.length > 0 && {
