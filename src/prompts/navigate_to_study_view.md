@@ -176,6 +176,8 @@ Values: `"2"` = Amp, `"1"` = Gain, `"0"` = Diploid, `"-1"` = Shallow del, `"-2"`
 {"hugoGeneSymbol": "EGFR", "profileType": "mrna_seq_v2_rsem_zscores_ref_all_samples", "values": [{"start": 2.0}]}
 ```
 
+**Specific variants or positions:** StudyView gene filters select alteration types, not protein changes or positions, so it can't express "IDH1 mutations other than R132" or "KRAS G12C". Don't approximate with a mutation-type filter (e.g. missense); use `navigate_to_results_view` with OQL (`IDH1: MUT != R132`, `KRAS: G12C`) instead.
+
 **Driver / VUS filtering:** StudyView does not support driver/VUS filtering via URL. For queries like "driver mutations in IDH1" or "exclude VUS", use `navigate_to_results_view` with OQL (`IDH1: MUT_DRIVER`) instead.
 
 ---
