@@ -34,7 +34,11 @@ import {
     createNavigateToGroupComparisonTool,
     handleNavigateToGroupComparison,
 } from './tools/navigateToGroupComparison.js';
-import { resolveCallerContext, traceToolCall } from './telemetry.js';
+import {
+    extractTraceContext,
+    resolveCallerContext,
+    traceToolCall,
+} from './telemetry.js';
 
 /**
  * Register all MCP tools with the server.
@@ -82,8 +86,11 @@ export function registerTools(server: McpServer): void {
                     server.server.getClientVersion()
                 );
                 try {
-                    const result = await traceToolCall(tool.name, caller, () =>
-                        handler(input)
+                    const result = await traceToolCall(
+                        tool.name,
+                        caller,
+                        () => handler(input),
+                        extractTraceContext(extra)
                     );
                     console.error(
                         `[Tool] ${tool.name} (${Date.now() - start}ms)`

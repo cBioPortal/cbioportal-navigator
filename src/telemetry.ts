@@ -32,6 +32,10 @@
  * - `CBIOPORTAL_NAVIGATOR_DD_METRIC_PREFIX`: metric prefix override
  *   (default: `cbioportal_mcp`).
  *
+ * Tool spans join the caller's trace when the MCP request carries a W3C
+ * `traceparent` header (LibreChat's dd-trace sends one), so they show up
+ * under the user's request in Datadog APM; otherwise each is a root span.
+ *
  * With none of these set (e.g. local stdio use) telemetry is a no-op.
  * Telemetry failures never fail a tool call.
  *
@@ -39,7 +43,15 @@
  */
 
 import dgram from 'node:dgram';
-import { SpanStatusCode, trace, type Tracer } from '@opentelemetry/api';
+import {
+    ROOT_CONTEXT,
+    SpanStatusCode,
+    trace,
+    type Context,
+    type TextMapGetter,
+    type Tracer,
+} from '@opentelemetry/api';
+import { W3CTraceContextPropagator } from '@opentelemetry/core';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import {
@@ -275,6 +287,33 @@ export function resolveCallerContext(
     };
 }
 
+const traceContextPropagator = new W3CTraceContextPropagator();
+
+const headerGetter: TextMapGetter<Headers> = {
+    keys: (headers) => Object.keys(headers),
+    get: (headers, key) => headers[key.toLowerCase()],
+};
+
+/**
+ * Extract the caller's W3C trace context (`traceparent` / `tracestate`)
+ * from the tool handler's `extra.requestInfo.headers`. A missing or
+ * malformed header, or any extraction failure, yields ROOT_CONTEXT so the
+ * tool span starts a new trace.
+ */
+export function extractTraceContext(extra: any): Context {
+    try {
+        const headers: Headers | undefined = extra?.requestInfo?.headers;
+        if (!headers) return ROOT_CONTEXT;
+        return traceContextPropagator.extract(
+            ROOT_CONTEXT,
+            headers,
+            headerGetter
+        );
+    } catch {
+        return ROOT_CONTEXT;
+    }
+}
+
 function emitToolMetrics(
     toolName: string,
     durationMs: number,
@@ -329,55 +368,62 @@ export function isFailedToolResult(result: unknown): boolean {
  * Run one tool call inside an `mcp.tool/<tool>` span and emit its metrics.
  *
  * A call counts as failed if the handler throws or returns a failure
- * result (see isFailedToolResult).
+ * result (see isFailedToolResult). `parentContext` (see
+ * extractTraceContext) makes the span a child of the caller's trace.
  */
 export async function traceToolCall<T>(
     toolName: string,
     caller: CallerContext,
-    run: () => Promise<T>
+    run: () => Promise<T>,
+    parentContext: Context = ROOT_CONTEXT
 ): Promise<T> {
     const started = performance.now();
-    return tracer().startActiveSpan(`mcp.tool/${toolName}`, async (span) => {
-        const attrs: Record<string, string | undefined> = {
-            'mcp.tool.name': toolName,
-            'mcp.client_kind': caller.clientKind,
-            'mcp.client.name': caller.clientName,
-            'mcp.client.version': caller.clientVersion,
-            'mcp.session.id': caller.sessionId,
-            'enduser.id': caller.userId,
-            'network.client.ip': caller.clientIp,
-            'user_agent.original': caller.userAgent,
-        };
-        for (const [key, value] of Object.entries(attrs)) {
-            if (value) span.setAttribute(key, value);
-        }
-
-        const finish = (success: boolean, error?: unknown) => {
-            const durationMs = performance.now() - started;
-            span.setAttribute('mcp.tool.duration_ms', durationMs);
-            span.setAttribute('mcp.tool.success', success);
-            if (error !== undefined) {
-                span.setAttribute(
-                    'error.type',
-                    error instanceof Error ? error.name : 'Error'
-                );
-                if (error instanceof Error) span.recordException(error);
-                span.setStatus({ code: SpanStatusCode.ERROR });
-            } else if (!success) {
-                span.setAttribute('error.type', 'ToolError');
-                span.setStatus({ code: SpanStatusCode.ERROR });
+    return tracer().startActiveSpan(
+        `mcp.tool/${toolName}`,
+        {},
+        parentContext,
+        async (span) => {
+            const attrs: Record<string, string | undefined> = {
+                'mcp.tool.name': toolName,
+                'mcp.client_kind': caller.clientKind,
+                'mcp.client.name': caller.clientName,
+                'mcp.client.version': caller.clientVersion,
+                'mcp.session.id': caller.sessionId,
+                'enduser.id': caller.userId,
+                'network.client.ip': caller.clientIp,
+                'user_agent.original': caller.userAgent,
+            };
+            for (const [key, value] of Object.entries(attrs)) {
+                if (value) span.setAttribute(key, value);
             }
-            span.end();
-            emitToolMetrics(toolName, durationMs, success, caller);
-        };
 
-        try {
-            const result = await run();
-            finish(!isFailedToolResult(result));
-            return result;
-        } catch (error) {
-            finish(false, error);
-            throw error;
+            const finish = (success: boolean, error?: unknown) => {
+                const durationMs = performance.now() - started;
+                span.setAttribute('mcp.tool.duration_ms', durationMs);
+                span.setAttribute('mcp.tool.success', success);
+                if (error !== undefined) {
+                    span.setAttribute(
+                        'error.type',
+                        error instanceof Error ? error.name : 'Error'
+                    );
+                    if (error instanceof Error) span.recordException(error);
+                    span.setStatus({ code: SpanStatusCode.ERROR });
+                } else if (!success) {
+                    span.setAttribute('error.type', 'ToolError');
+                    span.setStatus({ code: SpanStatusCode.ERROR });
+                }
+                span.end();
+                emitToolMetrics(toolName, durationMs, success, caller);
+            };
+
+            try {
+                const result = await run();
+                finish(!isFailedToolResult(result));
+                return result;
+            } catch (error) {
+                finish(false, error);
+                throw error;
+            }
         }
-    });
+    );
 }
