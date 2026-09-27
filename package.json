@@ -15,7 +15,8 @@
     "watch": "tsc --watch",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test": "node --import tsx --test 'test/**/*.test.ts'"
   },
   "keywords": [
     "cbioportal",
@@ -33,6 +34,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.26.0",
     "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/core": "^2.11.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
     "@opentelemetry/resources": "^2.11.0",
     "@opentelemetry/sdk-trace-base": "^2.11.0",
