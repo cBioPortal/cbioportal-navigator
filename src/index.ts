@@ -10,6 +10,8 @@
  * Environment variables:
  * - `MCP_TRANSPORT`: Transport mode ('stdio' or 'http'), defaults to 'stdio'
  * - `CBIOPORTAL_BASE_URL`: Base URL for cBioPortal instance, defaults to https://www.cbioportal.org
+ * - `CBIOPORTAL_API_URL`: Address for the navigator's own cBioPortal calls (API and
+ *   sessions), e.g. an internal hostname; defaults to `CBIOPORTAL_BASE_URL`
  * - `PORT`: HTTP server port, defaults to 8002 (HTTP mode only)
  * - Datadog/OpenTelemetry settings (`DD_AGENT_HOST`, etc.): see telemetry.ts
  *

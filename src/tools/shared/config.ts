@@ -25,17 +25,39 @@ export interface UrlConfig {
     protocol: string;
 }
 
+/** URLs follow the base URL's scheme (e.g. http for a local instance); https otherwise. */
+function protocolOf(baseUrl: string): string {
+    return /^http:\/\//i.test(baseUrl) ? 'http:' : 'https:';
+}
+
+const defaultBaseUrl =
+    process.env.CBIOPORTAL_BASE_URL || 'https://www.cbioportal.org';
+
 let config: UrlConfig = {
-    baseUrl: process.env.CBIOPORTAL_BASE_URL || 'https://www.cbioportal.org',
-    protocol: 'https:',
+    baseUrl: defaultBaseUrl,
+    protocol: protocolOf(defaultBaseUrl),
 };
 
 export function getConfig(): UrlConfig {
     return config;
 }
 
+/**
+ * Base URL for the navigator's own (server-side) cBioPortal calls: data
+ * queries and session creation. Defaults to the instance URL users open.
+ * Set CBIOPORTAL_API_URL when the navigator must reach the portal at a
+ * different address, e.g. an internal network name when it runs next to the
+ * portal and can't reach the public URL. Generated links always use baseUrl.
+ */
+export function getApiBaseUrl(): string {
+    return trimTrailingSlash(process.env.CBIOPORTAL_API_URL || config.baseUrl);
+}
+
 export function setConfig(newConfig: Partial<UrlConfig>): void {
-    config = { ...config, ...newConfig };
+    const protocol =
+        newConfig.protocol ??
+        (newConfig.baseUrl ? protocolOf(newConfig.baseUrl) : config.protocol);
+    config = { ...config, ...newConfig, protocol };
 }
 
 export function trimTrailingSlash(str: string): string {

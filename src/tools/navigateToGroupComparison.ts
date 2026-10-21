@@ -32,7 +32,7 @@ import {
     createNavigationResponse,
     createErrorResponse,
 } from './shared/responses.js';
-import { getConfig } from './shared/config.js';
+import { getApiBaseUrl } from './shared/config.js';
 import { loadPrompt } from './shared/promptLoader.js';
 import { getGroupComparisonPageDescription } from './shared/pageDescriptions.js';
 
@@ -343,8 +343,7 @@ export async function navigateToGroupComparison(
     ];
 
     // Create comparison session
-    const config = getConfig();
-    const sessionClient = new ComparisonSessionClient(config.baseUrl);
+    const sessionClient = new ComparisonSessionClient(getApiBaseUrl());
     const { id: sessionId } = await sessionClient.createSession({
         groups: sessionGroups,
         origin: studyIds,

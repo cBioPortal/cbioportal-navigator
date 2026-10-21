@@ -42,7 +42,7 @@ import {
 } from './resultsView/buildResultsUrl.js';
 import { MainSessionClient } from './resultsView/mainSessionClient.js';
 import { apiClient } from './shared/cbioportalClient.js';
-import { getConfig } from './shared/config.js';
+import { getApiBaseUrl } from './shared/config.js';
 import { buildCBioPortalPageUrl } from './shared/cbioportalUrlBuilder.js';
 import {
     createNavigationResponse,
@@ -383,8 +383,7 @@ async function navigateToResultsView(
             .map((s) => `${s.studyId}:${s.sampleId}`)
             .join('+');
 
-        const config = getConfig();
-        const sessionClient = new MainSessionClient(config.baseUrl);
+        const sessionClient = new MainSessionClient(getApiBaseUrl());
         const { id: sessionId } = await sessionClient.createSession({
             cancer_study_list: studyIds.join(','),
             gene_list: validGeneEntries.join('\n'),
