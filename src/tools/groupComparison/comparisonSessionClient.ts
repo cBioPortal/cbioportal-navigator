@@ -10,6 +10,7 @@
  */
 
 import { SessionGroupData } from './groupBuilder.js';
+import { portalAuthHeaders, toPortalAuthError } from '../shared/portalAuth.js';
 
 /**
  * Comparison session data structure
@@ -65,11 +66,14 @@ export class ComparisonSessionClient {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                ...portalAuthHeaders(),
             },
             body: JSON.stringify(session),
         });
 
         if (!response.ok) {
+            const authError = toPortalAuthError(response.status);
+            if (authError) throw authError;
             const errorText = await response.text();
             throw new Error(
                 `Failed to create comparison session (${response.status}): ${errorText}`
@@ -89,9 +93,11 @@ export class ComparisonSessionClient {
     async getSession(id: string): Promise<ComparisonSession & { id: string }> {
         const url = `${this.baseUrl}/api/session/comparison_session/${id}`;
 
-        const response = await fetch(url);
+        const response = await fetch(url, { headers: portalAuthHeaders() });
 
         if (!response.ok) {
+            const authError = toPortalAuthError(response.status);
+            if (authError) throw authError;
             const errorText = await response.text();
             throw new Error(
                 `Failed to retrieve comparison session (${response.status}): ${errorText}`

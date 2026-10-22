@@ -17,7 +17,8 @@
  *   OTLP/HTTP to the Datadog agent. Attributes match cbioportal-mcp:
  *   `mcp.tool.name`, `mcp.tool.duration_ms`, `mcp.tool.success`,
  *   `mcp.client_kind`, `mcp.client.name`, `mcp.client.version`,
- *   `mcp.session.id`, `enduser.id`, `network.client.ip`, `error.type`.
+ *   `mcp.session.id`, `enduser.id`, `enduser.email`, `network.client.ip`,
+ *   `error.type`.
  *
  * Environment variables:
  * - `DD_AGENT_HOST`: Datadog agent host (e.g. node IP via the Downward API).
@@ -226,9 +227,13 @@ export async function shutdownTelemetry(): Promise<void> {
 
 /** Who is calling a tool, resolved from the MCP request. */
 export interface CallerContext {
-    /** "librechat" when the x-user-id header is present, else "direct". */
+    /**
+     * "oauth" for a caller verified by this server's OAuth login,
+     * "librechat" when the x-user-id header is present, else "direct".
+     */
     clientKind: string;
     userId?: string;
+    userEmail?: string;
     clientName?: string;
     clientVersion?: string;
     sessionId?: string;
@@ -246,7 +251,8 @@ function firstHeader(headers: Headers, name: string): string | undefined {
 /**
  * Resolve caller identity from the tool handler's `extra` argument and the
  * MCP client's initialize handshake, using the same conventions as
- * cbioportal-mcp: LibreChat injects `x-user-id`, everything else is "direct".
+ * cbioportal-mcp: a verified OAuth token (MCP_AUTH_MODE=oauth) wins over the
+ * unverified `x-user-id` header LibreChat injects; everything else is "direct".
  *
  * This server is stateless (a new McpServer per POST), so `clientInfo` from
  * initialize is usually unavailable on tools/call; `userAgent` is recorded
@@ -258,15 +264,21 @@ export function resolveCallerContext(
 ): CallerContext {
     const headers: Headers = extra?.requestInfo?.headers ?? {};
     const hasHeaders = extra?.requestInfo !== undefined;
-    const userId = firstHeader(headers, 'x-user-id') || undefined;
+    const oauthUser = extra?.authInfo?.extra as
+        | { sub?: string; email?: string }
+        | undefined;
+    const headerUserId = firstHeader(headers, 'x-user-id') || undefined;
     const forwardedFor = firstHeader(headers, 'x-forwarded-for');
     return {
-        clientKind: !hasHeaders
-            ? 'unknown'
-            : 'x-user-id' in headers
-              ? 'librechat'
-              : 'direct',
-        userId,
+        clientKind: oauthUser?.sub
+            ? 'oauth'
+            : !hasHeaders
+              ? 'unknown'
+              : 'x-user-id' in headers
+                ? 'librechat'
+                : 'direct',
+        userId: oauthUser?.sub || headerUserId,
+        userEmail: oauthUser?.email || undefined,
         clientName: clientInfo?.name || undefined,
         clientVersion: clientInfo?.version || undefined,
         sessionId: extra?.sessionId || undefined,
@@ -345,6 +357,7 @@ export async function traceToolCall<T>(
             'mcp.client.version': caller.clientVersion,
             'mcp.session.id': caller.sessionId,
             'enduser.id': caller.userId,
+            'enduser.email': caller.userEmail,
             'network.client.ip': caller.clientIp,
             'user_agent.original': caller.userAgent,
         };

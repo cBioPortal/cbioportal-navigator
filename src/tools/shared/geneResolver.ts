@@ -25,6 +25,7 @@
  */
 
 import { apiClient } from './cbioportalClient.js';
+import { PortalAuthError } from './portalAuth.js';
 
 export class GeneResolver {
     /**
@@ -37,6 +38,7 @@ export class GeneResolver {
             await apiClient.getGene(normalizedSymbol);
             return true;
         } catch (error) {
+            if (error instanceof PortalAuthError) throw error;
             return false;
         }
     }

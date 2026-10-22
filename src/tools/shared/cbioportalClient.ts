@@ -28,11 +28,47 @@
  * (CBIOPORTAL_API_URL, falling back to CBIOPORTAL_BASE_URL). Session clients
  * use the same address, so all server-side calls go one way.
  *
+ * Every request carries the current caller's cBioPortal token, if any
+ * (see portalAuth.ts).
+ *
  * @packageDocumentation
  */
 
 import { CBioPortalAPI, CBioPortalAPIInternal } from 'cbioportal-ts-api-client';
 import { getApiBaseUrl } from './config.js';
+import { portalAuthHeaders, toPortalAuthError } from './portalAuth.js';
+
+/**
+ * Attach the caller's token to every request a generated client makes, and
+ * turn 401/403 into PortalAuthError. The generated clients build headers per
+ * call with no hook for extra ones, so wrap their shared `request` method.
+ */
+function withPortalAuth(client: object): void {
+    const target = client as { request: (...args: any[]) => void };
+    const request = target.request.bind(client);
+    target.request = (
+        method,
+        url,
+        body,
+        headers,
+        queryParameters,
+        form,
+        reject,
+        resolve,
+        errorHandlers
+    ) =>
+        request(
+            method,
+            url,
+            body,
+            { ...headers, ...portalAuthHeaders() },
+            queryParameters,
+            form,
+            (error: any) => reject(toPortalAuthError(error?.status) ?? error),
+            resolve,
+            errorHandlers
+        );
+}
 
 export class CbioportalApiClient {
     private api: CBioPortalAPI;
@@ -42,6 +78,8 @@ export class CbioportalApiClient {
         const apiBaseUrl = baseUrl || getApiBaseUrl();
         this.api = new CBioPortalAPI(apiBaseUrl);
         this.internalApi = new CBioPortalAPIInternal(apiBaseUrl);
+        withPortalAuth(this.api);
+        withPortalAuth(this.internalApi);
     }
 
     /**

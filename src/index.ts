@@ -13,11 +13,21 @@
  * - `CBIOPORTAL_API_URL`: Address for the navigator's own cBioPortal calls (API and
  *   sessions), e.g. an internal hostname; defaults to `CBIOPORTAL_BASE_URL`
  * - `PORT`: HTTP server port, defaults to 8002 (HTTP mode only)
+ * - `MCP_AUTH_MODE`: HTTP mode only. `none` (default) forwards no credentials;
+ *   `header` requires each request to carry the caller's cBioPortal data access
+ *   token in `x-auth-token` and forwards it to cBioPortal; `oauth` requires an
+ *   OAuth access token issued by this server after an upstream OIDC login
+ *   (see oauth/config.ts for its settings), and still forwards `x-auth-token`
+ *   when present. See tools/shared/portalAuth.ts.
+ * - `CBIOPORTAL_TOKEN`: stdio mode only. cBioPortal data access token forwarded
+ *   on every cBioPortal request. Ignored in HTTP mode.
  * - Datadog/OpenTelemetry settings (`DD_AGENT_HOST`, etc.): see telemetry.ts
  *
  * HTTP mode endpoints:
  * - `GET /health`: Health check endpoint returning service status
  * - `POST /mcp`: MCP protocol endpoint for tool invocations
+ * - `MCP_AUTH_MODE=oauth` only: OAuth metadata, `/register`, `/authorize`,
+ *   `/token`, `/revoke`, `/oauth/consent`, `/oauth/callback` (see oauth/index.ts)
  *
  * @packageDocumentation
  */
@@ -28,8 +38,15 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import express from 'express';
 
 import { setConfig } from './tools/shared/config.js';
+import {
+    TOKEN_HEADER,
+    getAuthMode,
+    normalizeToken,
+    setProcessPortalToken,
+} from './tools/shared/portalAuth.js';
 import { initPrompts } from './tools/shared/promptLoader.js';
 import { registerTools } from './toolRegistry.js';
+import { setupOAuth } from './oauth/index.js';
 import { configureTelemetry, shutdownTelemetry } from './telemetry.js';
 import { GIT_VERSION } from './version.js';
 
@@ -47,6 +64,9 @@ async function startStdio() {
         setConfig({ baseUrl: process.env.CBIOPORTAL_BASE_URL });
     }
 
+    // Single-user mode: one token for the whole process is safe here.
+    setProcessPortalToken(process.env.CBIOPORTAL_TOKEN);
+
     const server = createMcpServer();
     const transport = new StdioServerTransport();
     await server.connect(transport);
@@ -55,6 +75,9 @@ async function startStdio() {
     console.error(`Version: ${GIT_VERSION}`);
     console.error(
         `Base URL: ${process.env.CBIOPORTAL_BASE_URL || 'https://www.cbioportal.org'}`
+    );
+    console.error(
+        `cBioPortal token: ${process.env.CBIOPORTAL_TOKEN ? 'set' : 'not set'}`
     );
 
     process.on('SIGINT', async () => {
@@ -69,6 +92,13 @@ async function startHttp() {
         setConfig({ baseUrl: process.env.CBIOPORTAL_BASE_URL });
     }
 
+    const authMode = getAuthMode();
+    if (process.env.CBIOPORTAL_TOKEN) {
+        console.warn(
+            'CBIOPORTAL_TOKEN is ignored in HTTP mode; callers must send their own token'
+        );
+    }
+
     const app = express();
     app.use(express.json());
 
@@ -79,8 +109,36 @@ async function startHttp() {
             version: '1.0.0',
             baseUrl:
                 process.env.CBIOPORTAL_BASE_URL || 'https://www.cbioportal.org',
+            authMode,
         });
     });
+
+    // Header mode: reject requests without a token before any MCP handling,
+    // so a misconfigured connection fails at connect time, not mid-chat.
+    const requireTokenHeader = (
+        req: express.Request,
+        res: express.Response,
+        next: express.NextFunction
+    ) => {
+        if (normalizeToken(req.headers[TOKEN_HEADER])) return next();
+        res.status(401).json({
+            jsonrpc: '2.0',
+            error: {
+                code: -32001,
+                message: `Missing ${TOKEN_HEADER} header. This server requires the caller's cBioPortal data access token in the ${TOKEN_HEADER} request header.`,
+            },
+            id: null,
+        });
+    };
+    if (authMode === 'header') {
+        app.post('/mcp', requireTokenHeader);
+    }
+    if (authMode === 'oauth') {
+        // Behind the ingress, so per-IP rate limits on /authorize see the
+        // real client address (one trusted hop).
+        app.set('trust proxy', 1);
+        app.post('/mcp', setupOAuth(app));
+    }
 
     app.post('/mcp', async (req, res) => {
         try {
@@ -131,6 +189,7 @@ async function startHttp() {
         console.log(`Version: ${GIT_VERSION}`);
         console.log(`MCP endpoint: http://localhost:${port}/mcp`);
         console.log(`Health check: http://localhost:${port}/health`);
+        console.log(`Auth mode: ${authMode}`);
         console.log(
             `Base URL: ${process.env.CBIOPORTAL_BASE_URL || 'https://www.cbioportal.org'}`
         );

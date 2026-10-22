@@ -10,6 +10,8 @@
  * @packageDocumentation
  */
 
+import { portalAuthHeaders, toPortalAuthError } from '../shared/portalAuth.js';
+
 /**
  * Query parameters stored in a main session.
  * Mirrors the formOps object built in StudyViewPageStore.onSubmitQuery().
@@ -46,11 +48,16 @@ export class MainSessionClient {
 
         const response = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                ...portalAuthHeaders(),
+            },
             body: JSON.stringify(data),
         });
 
         if (!response.ok) {
+            const authError = toPortalAuthError(response.status);
+            if (authError) throw authError;
             const errorText = await response.text();
             throw new Error(
                 `Failed to create main session (${response.status}): ${errorText}`

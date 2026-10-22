@@ -35,6 +35,12 @@ import {
     handleNavigateToGroupComparison,
 } from './tools/navigateToGroupComparison.js';
 import { resolveCallerContext, traceToolCall } from './telemetry.js';
+import {
+    TOKEN_HEADER,
+    getAuthMode,
+    normalizeToken,
+    runWithPortalToken,
+} from './tools/shared/portalAuth.js';
 
 /**
  * Register all MCP tools with the server.
@@ -42,6 +48,8 @@ import { resolveCallerContext, traceToolCall } from './telemetry.js';
  * @param server - The MCP server instance
  */
 export function registerTools(server: McpServer): void {
+    // Required in header mode (enforced in index.ts), optional in oauth mode.
+    const readTokenHeader = getAuthMode() !== 'none';
     const tools = [
         { create: createResolveAndRouteTool, handler: handleResolveAndRoute },
         {
@@ -81,9 +89,16 @@ export function registerTools(server: McpServer): void {
                     extra,
                     server.server.getClientVersion()
                 );
+                // With a token header, every cBioPortal call made by this
+                // tool carries the caller's own token (see portalAuth.ts).
+                const token = readTokenHeader
+                    ? normalizeToken(
+                          extra?.requestInfo?.headers?.[TOKEN_HEADER]
+                      )
+                    : undefined;
                 try {
-                    const result = await traceToolCall(tool.name, caller, () =>
-                        handler(input)
+                    const result = await runWithPortalToken(token, () =>
+                        traceToolCall(tool.name, caller, () => handler(input))
                     );
                     console.error(
                         `[Tool] ${tool.name} (${Date.now() - start}ms)`

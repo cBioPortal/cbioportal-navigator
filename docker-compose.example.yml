@@ -1,16 +1,17 @@
-# Docker Compose for cBioPortal Navigator as MCP Server
-# Run this navigator as a standalone MCP server that other agents can connect to
+# Docker Compose for cBioPortal Navigator as a standalone MCP server
 #
 # Usage:
-#   docker compose -f docker-compose.mcp.yml up -d
+#   docker compose -f docker-compose.example.yml up -d
 #
 # The MCP server will be available at:
 #   http://localhost:8002/mcp
+#
+# Authentication modes and production setup: see DEPLOYMENT.md
 
 services:
   cbioportal-navigator:
-    # Use pre-built image
-    image: ghcr.io/fuzhaoyuan/cbioportal-navigator:master-studyview-url-shortened-chat-completions
+    # Published image (master); pin a master-<sha> tag for reproducible deploys
+    image: ghcr.io/cbioportal/cbioportal-navigator:latest
 
     # Or build from local source:
     # build:
@@ -25,8 +26,10 @@ services:
       - PORT=8002
 
       # cBioPortal configuration
-#      - CBIOPORTAL_BASE_URL=https://www.cbioportal.org
-      - CBIOPORTAL_BASE_URL=https://deploy-preview-5312--cbioportalfrontend.netlify.app
+      - CBIOPORTAL_BASE_URL=https://www.cbioportal.org
+
+      # Private instance: require each caller's cBioPortal token (x-auth-token header)
+      # - MCP_AUTH_MODE=header
 
     ports:
       - "8002:8002"

@@ -30,6 +30,7 @@ cbioportal-navigator/
 │   ├── index.ts               # Entry point (stdio/HTTP mode selection, MCP server creation)
 │   ├── toolRegistry.ts        # Central tool registration
 │   ├── telemetry.ts           # Datadog DogStatsD metrics + OpenTelemetry spans per tool call
+│   ├── oauth/                 # MCP_AUTH_MODE=oauth: authorization server, upstream OIDC login
 │   ├── tools/
 │   │   ├── resolveAndRoute.ts     # Router tool
 │   │   ├── getStudyviewfilterOptions.ts
@@ -37,15 +38,16 @@ cbioportal-navigator/
 │   │   ├── navigateToGroupComparison.ts
 │   │   ├── navigateToResultsView.ts
 │   │   ├── navigateToPatientView.ts
-│   │   ├── router/                # Study/gene/profile resolvers
 │   │   ├── studyView/             # URL builder, tab validator, schemas, data client
 │   │   ├── groupComparison/       # Group builder, binning, session client
 │   │   ├── resultsView/           # URL builder, main session client
 │   │   ├── patientView/           # URL builder
-│   │   └── shared/                # Config, types, API client, URL builder
+│   │   └── shared/                # Config, types, API client, URL builder, resolvers, portal token
 │   └── prompts/                   # Prompt markdown files (copied to dist/ at build)
+├── DESIGN.md                  # Design decisions
+├── DEPLOYMENT.md              # Auth modes and production deployment
 ├── Dockerfile
-├── docker-compose.mcp.yml        # Standalone MCP server
+├── docker-compose.example.yml # Standalone MCP server
 └── package.json
 ```
 
@@ -77,7 +79,7 @@ cbioportal-navigator/
 
 1. **Start**:
    ```bash
-   docker compose -f docker-compose.mcp.yml up -d
+   docker compose -f docker-compose.example.yml up -d
    ```
 
 2. **Verify**:
@@ -87,7 +89,7 @@ cbioportal-navigator/
 
 3. **Connect**: MCP endpoint at `http://localhost:8002/mcp`
 
-**Configuration** — edit `docker-compose.mcp.yml`:
+**Configuration** — edit `docker-compose.example.yml`:
 ```yaml
 environment:
   - MCP_TRANSPORT=http
@@ -103,6 +105,45 @@ environment:
 | `CBIOPORTAL_API_URL` | Address the navigator itself uses for cBioPortal API calls and session creation, e.g. an internal hostname when it runs next to the portal and can't reach the public URL. Links returned to users always use `CBIOPORTAL_BASE_URL` | `CBIOPORTAL_BASE_URL` |
 | `MCP_TRANSPORT` | Transport mode (`stdio` or `http`) | `stdio` |
 | `PORT` | HTTP server port (HTTP mode only) | `8002` |
+| `MCP_AUTH_MODE` | HTTP mode only: `none`, `header`, or `oauth`. See [Authentication](#authentication) | `none` |
+| `CBIOPORTAL_TOKEN` | stdio mode only: cBioPortal data access token sent on every cBioPortal request | – |
+
+### Authentication
+
+`MCP_AUTH_MODE` selects what HTTP callers must send. The navigator never checks
+study permissions itself: when a caller sends a cBioPortal data access token,
+it is forwarded on every cBioPortal request, and the portal decides which
+studies the caller can see.
+
+- `none` (default): no credentials. For portals with public data.
+- `header`: for private instances (`authenticate=saml`/`oauth2` with
+  `dat.method` set). Every request must carry the caller's portal token in the
+  `x-auth-token` header; requests without it get HTTP 401.
+- `oauth`: MCP clients (Claude.ai, Claude Desktop, Claude Code, ...) sign in
+  through the navigator, which delegates the login to an upstream OpenID Connect
+  provider such as Google. Identifies the caller (`client_kind:oauth`,
+  `enduser.id`/`enduser.email` in telemetry) and can restrict sign-in by email.
+  It does not grant access to a private portal; `x-auth-token` is still
+  forwarded when present.
+
+In stdio mode, set `CBIOPORTAL_TOKEN` instead. HTTP mode ignores it, so a
+shared server never acts with one person's token.
+
+`oauth` mode settings:
+
+| Variable | Description |
+|----------|-------------|
+| `MCP_PUBLIC_URL` | Public origin, e.g. `https://navigator.example.org`. Must be its own hostname with no path prefix |
+| `MCP_AUTH_SECRET` | At least 32 characters, stable across restarts and shared by all replicas. Signs and encrypts everything the server issues |
+| `MCP_AUTH_SECRET_PREVIOUS` | Optional, during rotation: still accepted, never used to issue |
+| `OAUTH_ISSUER` | Upstream OIDC issuer, e.g. `https://accounts.google.com` |
+| `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` | The navigator's client at the upstream provider, with redirect URI `<MCP_PUBLIC_URL>/oauth/callback` |
+| `OAUTH_SCOPES` | Upstream scopes (default `openid email profile`) |
+| `OAUTH_ALLOWED_EMAIL_DOMAINS` / `OAUTH_ALLOWED_EMAILS` | Optional comma-separated allowlists of verified emails; empty means any upstream account |
+
+[DEPLOYMENT.md](DEPLOYMENT.md) covers choosing a mode, the portal and identity
+provider setup each mode needs, ingress requirements, client setup, and
+post-deploy checks.
 
 ### Datadog Tool Metrics
 

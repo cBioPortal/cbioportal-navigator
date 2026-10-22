@@ -25,6 +25,7 @@
  */
 
 import { apiClient } from './cbioportalClient.js';
+import { PortalAuthError } from './portalAuth.js';
 
 export interface ResolvedStudy {
     studyId: string;
@@ -75,6 +76,7 @@ export class StudyResolver {
             await apiClient.getStudy(studyId);
             return true;
         } catch (error) {
+            if (error instanceof PortalAuthError) throw error;
             return false;
         }
     }
