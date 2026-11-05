@@ -48,8 +48,7 @@ import {
  * @param server - The MCP server instance
  */
 export function registerTools(server: McpServer): void {
-    // Required in header mode (enforced in index.ts), optional in oauth mode.
-    const readTokenHeader = getAuthMode() !== 'none';
+    const authMode = getAuthMode();
     const tools = [
         { create: createResolveAndRouteTool, handler: handleResolveAndRoute },
         {
@@ -89,13 +88,16 @@ export function registerTools(server: McpServer): void {
                     extra,
                     server.server.getClientVersion()
                 );
-                // With a token header, every cBioPortal call made by this
-                // tool carries the caller's own token (see portalAuth.ts).
-                const token = readTokenHeader
-                    ? normalizeToken(
-                          extra?.requestInfo?.headers?.[TOKEN_HEADER]
-                      )
-                    : undefined;
+                // Every cBioPortal call made by this tool carries the
+                // caller's own token, if any (see portalAuth.ts).
+                const token =
+                    authMode === 'header'
+                        ? normalizeToken(
+                              extra?.requestInfo?.headers?.[TOKEN_HEADER]
+                          )
+                        : authMode === 'oauth'
+                          ? extra?.authInfo?.extra?.portalToken
+                          : undefined;
                 try {
                     const result = await runWithPortalToken(token, () =>
                         traceToolCall(tool.name, caller, () => handler(input))

@@ -123,8 +123,9 @@ studies the caller can see.
   through the navigator, which delegates the login to an upstream OpenID Connect
   provider such as Google. Identifies the caller (`client_kind:oauth`,
   `enduser.id`/`enduser.email` in telemetry) and can restrict sign-in by email.
-  It does not grant access to a private portal; `x-auth-token` is still
-  forwarded when present.
+  By default no portal token is forwarded. With `OAUTH_FORWARD_REFRESH_TOKEN=true`
+  (portals with `dat.method=oauth2`), the refresh token from the sign-in is
+  forwarded as the caller's portal token. `x-auth-token` is not read in this mode.
 
 In stdio mode, set `CBIOPORTAL_TOKEN` instead. HTTP mode ignores it, so a
 shared server never acts with one person's token.
@@ -139,6 +140,7 @@ shared server never acts with one person's token.
 | `OAUTH_ISSUER` | Upstream OIDC issuer, e.g. `https://accounts.google.com` |
 | `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` | The navigator's client at the upstream provider, with redirect URI `<MCP_PUBLIC_URL>/oauth/callback` |
 | `OAUTH_SCOPES` | Upstream scopes (default `openid email profile`) |
+| `OAUTH_FORWARD_REFRESH_TOKEN` | `true` to forward the upstream refresh token to cBioPortal (default `false`). Requires the portal's `dat.oauth2` client as the upstream client; see [DEPLOYMENT.md](DEPLOYMENT.md#forwarding-the-sign-in-to-cbioportal) |
 | `OAUTH_ALLOWED_EMAIL_DOMAINS` / `OAUTH_ALLOWED_EMAILS` | Optional comma-separated allowlists of verified emails; empty means any upstream account |
 
 [DEPLOYMENT.md](DEPLOYMENT.md) covers choosing a mode, the portal and identity

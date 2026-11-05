@@ -11,8 +11,9 @@
  *    transaction as `state`.
  * 3. /oauth/callback -> verify the upstream ID token, apply the email
  *    allowlist, redirect back to the client with an encrypted 60s code.
- * 4. /token -> signed access token (1h) + encrypted refresh token (30d,
- *    rotated on every use).
+ * 4. /token -> encrypted access token (1h) + encrypted refresh token (30d,
+ *    rotated on every use). With OAUTH_FORWARD_REFRESH_TOKEN both carry the
+ *    upstream refresh token, which is forwarded to cBioPortal.
  *
  * Nothing is stored server-side except the replay guard (replayGuard.ts),
  * which makes codes single-use and detects refresh token reuse.
@@ -382,6 +383,7 @@ export class NavigatorOAuthProvider implements OAuthServerProvider {
                 em: identity.email,
                 ev: identity.emailVerified,
                 nm: identity.name,
+                pt: identity.refreshToken,
                 jti: randomId(),
             },
             CODE_TTL
@@ -495,10 +497,18 @@ export class NavigatorOAuthProvider implements OAuthServerProvider {
     ): Promise<OAuthTokens> {
         const cid = fingerprint(client.client_id);
         const sub = String(user.sub);
-        const accessToken = await this.keyring.signAccessToken(
-            { cid, email: user.em, name: user.nm, ...(scope && { scope }) },
-            sub,
-            this.config.resource,
+        const accessToken = await this.keyring.seal(
+            'access',
+            {
+                cid,
+                sub,
+                aud: this.config.resource,
+                email: user.em,
+                name: user.nm,
+                pt: user.pt,
+                ...(scope && { scope }),
+                jti: randomId(),
+            },
             ACCESS_TOKEN_TTL
         );
         const refreshToken = await this.keyring.seal(
@@ -509,6 +519,7 @@ export class NavigatorOAuthProvider implements OAuthServerProvider {
                 em: user.em,
                 ev: user.ev,
                 nm: user.nm,
+                pt: user.pt,
                 sc: scope,
                 fam: family,
                 jti: randomId(),
@@ -525,7 +536,8 @@ export class NavigatorOAuthProvider implements OAuthServerProvider {
     }
 
     async verifyAccessToken(token: string): Promise<AuthInfo> {
-        const claims = await this.keyring.verifyAccessToken(
+        const claims = await this.keyring.open(
+            'access',
             token,
             this.config.resource
         );
@@ -542,6 +554,7 @@ export class NavigatorOAuthProvider implements OAuthServerProvider {
                 sub: claims.sub,
                 email: str(claims.email),
                 name: str(claims.name),
+                portalToken: str(claims.pt),
             },
         };
     }

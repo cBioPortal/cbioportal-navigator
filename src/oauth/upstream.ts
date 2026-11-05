@@ -4,8 +4,9 @@
  * redirect URI (`<MCP_PUBLIC_URL>/oauth/callback`), and uses PKCE and a nonce
  * on every login.
  *
- * Only the verified ID token is used: the user's identity (sub, email) is all
- * the navigator needs, so upstream access/refresh tokens are discarded.
+ * The verified ID token gives the user's identity (sub, email). The upstream
+ * access token is always discarded; the refresh token is kept only with
+ * OAUTH_FORWARD_REFRESH_TOKEN, as the caller's cBioPortal token.
  *
  * @packageDocumentation
  */
@@ -19,6 +20,8 @@ export interface UpstreamIdentity {
     email?: string;
     emailVerified: boolean;
     name?: string;
+    /** Upstream refresh token, only with OAUTH_FORWARD_REFRESH_TOKEN. */
+    refreshToken?: string;
 }
 
 interface Discovery {
@@ -105,6 +108,7 @@ export class UpstreamProvider {
         });
         const body = (await response.json().catch(() => ({}))) as {
             id_token?: string;
+            refresh_token?: string;
             error?: string;
         };
         if (!response.ok || !body.id_token) {
@@ -124,6 +128,11 @@ export class UpstreamProvider {
         if (!payload.sub) {
             throw new Error('Upstream ID token has no subject');
         }
+        if (this.config.forwardRefreshToken && !body.refresh_token) {
+            throw new Error(
+                'Upstream returned no refresh token (is offline_access allowed for this client?)'
+            );
+        }
         return {
             sub: payload.sub,
             email:
@@ -134,6 +143,9 @@ export class UpstreamProvider {
                 payload.email_verified === true ||
                 payload.email_verified === 'true',
             name: typeof payload.name === 'string' ? payload.name : undefined,
+            refreshToken: this.config.forwardRefreshToken
+                ? body.refresh_token
+                : undefined,
         };
     }
 }

@@ -10,8 +10,10 @@
  * - HTTP mode, `MCP_AUTH_MODE=header`: the `x-auth-token` request header.
  *   index.ts rejects requests without it before any tool runs.
  * - HTTP mode, `MCP_AUTH_MODE=none` (default): no token is forwarded.
- * - HTTP mode, `MCP_AUTH_MODE=oauth`: `x-auth-token` if present (optional;
- *   the OAuth login identifies the caller, the header grants portal access).
+ * - HTTP mode, `MCP_AUTH_MODE=oauth`: the upstream refresh token from the
+ *   caller's sign-in, carried inside the navigator's own access token, when
+ *   `OAUTH_FORWARD_REFRESH_TOKEN=true`; otherwise none. `x-auth-token` is
+ *   not read in this mode.
  * - stdio mode: `CBIOPORTAL_TOKEN`, read once at startup. HTTP mode never
  *   falls back to it, so a shared server cannot act with one person's token.
  *
@@ -89,7 +91,12 @@ export class PortalAuthError extends Error {
     constructor(readonly status: 401 | 403) {
         super(
             status === 401
-                ? 'cBioPortal rejected the request as unauthenticated (HTTP 401). ' +
+                ? getAuthMode() === 'oauth'
+                    ? 'cBioPortal rejected the request as unauthenticated (HTTP 401). ' +
+                      'The cBioPortal sign-in behind this connection is missing, ' +
+                      'expired, or was revoked. Reconnect the connector in the MCP ' +
+                      'client to sign in again.'
+                    : 'cBioPortal rejected the request as unauthenticated (HTTP 401). ' +
                       'The cBioPortal data access token for this connection is missing, ' +
                       'expired, or was replaced by a newer token. Download a new token ' +
                       `from the cBioPortal web page and update the connection's ` +

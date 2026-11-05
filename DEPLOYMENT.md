@@ -17,16 +17,16 @@ environment).
 | Public cBioPortal, in-cluster client such as LibreChat | `none` | nothing |
 | Public cBioPortal, Claude clients connect directly and must sign in (usage attributed to a verified user) | `oauth` | OAuth access token (handled by the client) |
 | Private cBioPortal (login required), each user connects with their own portal token | `header` | `x-auth-token: <portal token>` |
-| Private cBioPortal, and users must also sign in | `oauth` | OAuth access token and `x-auth-token` |
+| Private cBioPortal with `dat.method=oauth2`, users sign in with the portal's identity provider | `oauth` with `OAUTH_FORWARD_REFRESH_TOKEN=true` | OAuth access token (handled by the client) |
 | One user on their own machine (Claude Desktop over stdio) | stdio, `CBIOPORTAL_TOKEN` | – |
 
 The navigator never checks study permissions itself. When a caller sends a
 portal token, the navigator forwards it to cBioPortal, which decides what the
 caller can see (a denied study returns a 403 message, keyword search only
-lists permitted studies). OAuth sign-in only identifies the caller and does
-not grant access to a private portal, so in `oauth` mode against a private
-portal callers still need `x-auth-token`. Without it, tool calls fail with a
-401 message from the portal.
+lists permitted studies). In `oauth` mode the only portal token is the one
+from the caller's sign-in, forwarded with `OAUTH_FORWARD_REFRESH_TOKEN=true`;
+without it, `oauth` mode is for portals with public data. `x-auth-token` is
+not read in `oauth` mode, so portals with `dat.method=uuid` use `header`.
 
 ## Requirements for every mode
 
@@ -54,7 +54,8 @@ The portal must issue data access tokens: `dat.method=uuid` in its
 with `authenticate=saml` and `dat.method=uuid`, which matches DFCI's setup
 except that DFCI does not set `dat.method` yet. Portals with
 `dat.method=oauth2` issue Keycloak offline tokens instead; forwarding those
-should work the same way but has not been tested.
+works the same way (tested locally with `authenticate=saml` and
+`dat.method=oauth2`).
 
 Relevant portal settings:
 
@@ -192,6 +193,49 @@ With an allowlist set, only verified emails matching it can sign in. After
 someone is removed from it and the change is deployed, their access ends
 within an hour (at their next token refresh).
 
+### Forwarding the sign-in to cBioPortal
+
+With `OAUTH_FORWARD_REFRESH_TOKEN=true`, signing in to the navigator also
+gives access to a private portal: the navigator requests `offline_access`,
+keeps the refresh token the identity provider returns, and forwards it as the
+caller's portal token. The portal exchanges it at the identity provider on
+every request and reads the user's roles from the result, exactly as for a
+data access token the user downloads. The navigator reads no claims.
+
+Requirements:
+
+- The portal uses `dat.method=oauth2` (for example the MSK portals).
+- `OAUTH_ISSUER` is the portal's `dat.oauth2.issuer`, and
+  `OAUTH_CLIENT_ID`/`OAUTH_CLIENT_SECRET` are the portal's
+  `dat.oauth2.clientId`/`clientSecret`: the identity provider only lets the
+  client a refresh token was issued to redeem it. Add
+  `https://<host>/oauth/callback` to that client's valid redirect URIs (it
+  already has the portal's `/api/data-access-token/oauth2`).
+- Users can get offline tokens (Keycloak: the `offline_access` role, part of
+  the realm's default roles).
+- Refresh tokens are not rotated (Keycloak realm setting "Revoke Refresh
+  Token" off, the default). Otherwise the portal's first exchange invalidates
+  the forwarded token. Tokens users download from the portal have the same
+  requirement.
+
+A sign-in lasts as long as both the offline session (Keycloak "Offline
+Session Idle", default 30 days, renewed by each portal request) and the
+navigator's refresh token (30 days). When either ends, tool calls return a
+401 message asking the user to reconnect. Revoking the user's offline session
+or consent in the identity provider, or changing their roles, takes effect on
+the next tool call.
+
+The forwarded token is a long-lived credential and is only stored inside the
+navigator's encrypted tokens, so `MCP_AUTH_SECRET` protects it.
+
+```
+OAUTH_ISSUER=https://keycloak.example.org/realms/<realm>
+OAUTH_CLIENT_ID=<portal's dat.oauth2.clientId>
+OAUTH_CLIENT_SECRET=<portal's dat.oauth2.clientSecret>
+OAUTH_FORWARD_REFRESH_TOKEN=true
+CBIOPORTAL_BASE_URL=https://cbioportal.example.org
+```
+
 ### Replicas
 
 Run one replica. Single-use authorization codes and refresh-token reuse
@@ -204,8 +248,7 @@ store (Redis) can be added when more replicas are needed.
 - **Claude.ai / Claude Desktop**: add a custom connector with the URL
   `https://<host>/mcp` and **Authentication: Sign in**. Leave the OAuth client
   fields empty: the client registers itself. Claude's hosted callback skips
-  the navigator's consent page and goes straight to the provider's login. For
-  a private portal, also add `x-auth-token` under **Request headers**.
+  the navigator's consent page and goes straight to the provider's login.
 - **Claude Code**: `claude mcp add --transport http navigator https://<host>/mcp`,
   then `/mcp` to sign in. Claude Code uses a loopback redirect, so users see
   the navigator's consent page first.

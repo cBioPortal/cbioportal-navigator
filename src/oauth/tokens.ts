@@ -3,10 +3,11 @@
  * own state, so any replica with the same secret can verify it and restarts
  * don't invalidate anything.
  *
- * - Encrypted (JWE, `dir` + A256GCM): client registrations, the upstream
- *   login transaction, authorization codes, refresh tokens. Their contents
- *   (PKCE verifiers, emails) must not be readable by clients.
- * - Signed (JWS, HS256): access tokens. Readable by the holder, unforgeable.
+ * All of them are encrypted (JWE, `dir` + A256GCM): client registrations,
+ * the upstream login transaction, authorization codes, refresh tokens and
+ * access tokens. Their contents (PKCE verifiers, emails, the forwarded
+ * cBioPortal token) must not be readable by clients or anyone who sees a
+ * token in transit.
  *
  * Each artifact has a `typ` claim so one kind can't be replayed as another
  * (e.g. an authorization code presented as a refresh token). Keys are
@@ -19,14 +20,12 @@
 import { createHash, createHmac, hkdfSync, randomBytes } from 'node:crypto';
 import {
     EncryptJWT,
-    SignJWT,
     decodeProtectedHeader,
     jwtDecrypt,
-    jwtVerify,
     type JWTPayload,
 } from 'jose';
 
-export type ArtifactType = 'client' | 'txn' | 'code' | 'refresh';
+export type ArtifactType = 'client' | 'txn' | 'code' | 'refresh' | 'access';
 
 interface Key {
     kid: string;
@@ -99,16 +98,18 @@ export class Keyring {
         return jwt.encrypt(this.current.encrypt);
     }
 
-    /** Decrypt and validate an artifact; undefined if invalid, expired, or of another type. */
+    /** Decrypt and validate an artifact; undefined if invalid, expired, of another type, or for another audience. */
     async open(
         typ: ArtifactType,
-        token: string
+        token: string,
+        audience?: string
     ): Promise<JWTPayload | undefined> {
         const key = this.keyFor(token);
         if (!key) return undefined;
         try {
             const { payload } = await jwtDecrypt(token, key.encrypt, {
                 issuer: this.issuer,
+                ...(audience !== undefined && { audience }),
             });
             return payload.typ === typ ? payload : undefined;
         } catch {
@@ -123,40 +124,5 @@ export class Keyring {
         return createHmac('sha256', key.sign)
             .update(`client-secret:${clientId}`)
             .digest('base64url');
-    }
-
-    async signAccessToken(
-        claims: JWTPayload,
-        subject: string,
-        audience: string,
-        ttlSeconds: number
-    ): Promise<string> {
-        return new SignJWT(claims)
-            .setProtectedHeader({ alg: 'HS256', kid: this.current.kid })
-            .setIssuer(this.issuer)
-            .setSubject(subject)
-            .setAudience(audience)
-            .setIssuedAt()
-            .setExpirationTime(`${ttlSeconds}s`)
-            .setJti(randomId())
-            .sign(this.current.sign);
-    }
-
-    async verifyAccessToken(
-        token: string,
-        audience: string
-    ): Promise<JWTPayload | undefined> {
-        const key = this.keyFor(token);
-        if (!key) return undefined;
-        try {
-            const { payload } = await jwtVerify(token, key.sign, {
-                issuer: this.issuer,
-                audience,
-                algorithms: ['HS256'],
-            });
-            return payload;
-        } catch {
-            return undefined;
-        }
     }
 }

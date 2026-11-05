@@ -62,6 +62,9 @@ export function setupOAuth(app: express.Express): express.RequestHandler {
     console.log(
         `OAuth issuer: ${config.issuer} (upstream ${config.upstream.issuer})`
     );
+    console.log(
+        `Upstream refresh token forwarded to cBioPortal: ${config.forwardRefreshToken ? 'yes' : 'no'}`
+    );
     return requireBearerAuth({
         verifier: provider,
         resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(

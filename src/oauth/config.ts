@@ -18,6 +18,10 @@
  * - `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET`: this server's client at the
  *   upstream provider. Register `<MCP_PUBLIC_URL>/oauth/callback` there.
  * - `OAUTH_SCOPES`: upstream scopes, default `openid email profile`.
+ * - `OAUTH_FORWARD_REFRESH_TOKEN`: `true` forwards the upstream refresh token
+ *   to cBioPortal as the caller's token (portals with `dat.method=oauth2`) and
+ *   adds `offline_access`. `OAUTH_CLIENT_ID`/`OAUTH_CLIENT_SECRET` must then be
+ *   the portal's `dat.oauth2` client; see DEPLOYMENT.md. Default `false`.
  * - `OAUTH_ALLOWED_EMAIL_DOMAINS` / `OAUTH_ALLOWED_EMAILS`: optional
  *   comma-separated allowlists. When either is set, only matching verified
  *   emails may sign in; when both are empty, any upstream account may.
@@ -42,6 +46,8 @@ export interface OAuthConfig {
         clientSecret: string;
         scopes: string;
     };
+    /** Forward the upstream refresh token to cBioPortal (OAUTH_FORWARD_REFRESH_TOKEN). */
+    forwardRefreshToken: boolean;
     allowedEmailDomains: string[];
     allowedEmails: string[];
 }
@@ -90,6 +96,22 @@ export function loadOAuthConfig(env = process.env): OAuthConfig {
         );
     }
 
+    const forward = (env.OAUTH_FORWARD_REFRESH_TOKEN || 'false')
+        .trim()
+        .toLowerCase();
+    if (forward !== 'true' && forward !== 'false') {
+        throw new Error(
+            `OAUTH_FORWARD_REFRESH_TOKEN must be true or false (got '${forward}')`
+        );
+    }
+    const forwardRefreshToken = forward === 'true';
+    const scopes = (env.OAUTH_SCOPES?.trim() || 'openid email profile')
+        .split(/\s+/)
+        .filter(Boolean);
+    if (forwardRefreshToken && !scopes.includes('offline_access')) {
+        scopes.push('offline_access');
+    }
+
     const publicUrl = url.origin;
     return {
         publicUrl,
@@ -101,8 +123,9 @@ export function loadOAuthConfig(env = process.env): OAuthConfig {
             issuer: env.OAUTH_ISSUER!.trim().replace(/\/$/, ''),
             clientId: env.OAUTH_CLIENT_ID!.trim(),
             clientSecret: env.OAUTH_CLIENT_SECRET!.trim(),
-            scopes: env.OAUTH_SCOPES?.trim() || 'openid email profile',
+            scopes: scopes.join(' '),
         },
+        forwardRefreshToken,
         allowedEmailDomains: list(env.OAUTH_ALLOWED_EMAIL_DOMAINS),
         allowedEmails: list(env.OAUTH_ALLOWED_EMAILS),
     };

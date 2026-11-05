@@ -17,8 +17,8 @@
  *   `header` requires each request to carry the caller's cBioPortal data access
  *   token in `x-auth-token` and forwards it to cBioPortal; `oauth` requires an
  *   OAuth access token issued by this server after an upstream OIDC login
- *   (see oauth/config.ts for its settings), and still forwards `x-auth-token`
- *   when present. See tools/shared/portalAuth.ts.
+ *   (see oauth/config.ts for its settings) and forwards the upstream refresh
+ *   token when `OAUTH_FORWARD_REFRESH_TOKEN=true`. See tools/shared/portalAuth.ts.
  * - `CBIOPORTAL_TOKEN`: stdio mode only. cBioPortal data access token forwarded
  *   on every cBioPortal request. Ignored in HTTP mode.
  * - Datadog/OpenTelemetry settings (`DD_AGENT_HOST`, etc.): see telemetry.ts
