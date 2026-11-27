@@ -11,6 +11,7 @@
  */
 
 import { apiClient } from '../shared/cbioportalClient.js';
+import { getApiBaseUrl } from '../shared/config.js';
 import _ from 'lodash';
 import type {
     ClinicalAttribute,
@@ -471,12 +472,28 @@ export class StudyViewDataClient {
     async getTreatments(studyIds: string[]): Promise<string[]> {
         const studyViewFilter = { studyIds } as StudyViewFilter;
 
-        const report =
-            await this.internalApi.fetchPatientTreatmentCountsUsingPOST({
-                studyViewFilter,
-            });
+        // cbioportal-ts-api-client posts to /api/column-store/..., which
+        // current portals no longer serve.
+        const response = await fetch(
+            `${getApiBaseUrl()}/api/treatments/patient-counts/fetch`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify(studyViewFilter),
+            }
+        );
+        if (!response.ok) {
+            throw new Error(
+                `Treatment counts request failed: ${response.status} ${response.statusText}`
+            );
+        }
+        const report = (await response.json()) as {
+            patientTreatments: { treatment: string }[];
+        };
 
-        // Extract and sort treatment names
         return report.patientTreatments.map((t) => t.treatment).sort();
     }
 }
