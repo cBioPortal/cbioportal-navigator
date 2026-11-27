@@ -24,25 +24,22 @@
  * - `getInternalApi()`: Access underlying CBioPortalAPIInternal for StudyView endpoints
  *
  * Configuration:
- * The base URL is determined by (in priority order):
- * 1. Constructor parameter
- * 2. CBIOPORTAL_API_URL environment variable
- * 3. Default: https://www.cbioportal.org
+ * The base URL is the constructor parameter, else getApiBaseUrl()
+ * (CBIOPORTAL_API_URL, falling back to CBIOPORTAL_BASE_URL). Session clients
+ * use the same address, so all server-side calls go one way.
  *
  * @packageDocumentation
  */
 
 import { CBioPortalAPI, CBioPortalAPIInternal } from 'cbioportal-ts-api-client';
+import { getApiBaseUrl } from './config.js';
 
 export class CbioportalApiClient {
     private api: CBioPortalAPI;
     private internalApi: CBioPortalAPIInternal;
 
     constructor(baseUrl?: string) {
-        const apiBaseUrl =
-            baseUrl ||
-            process.env.CBIOPORTAL_API_URL ||
-            'https://www.cbioportal.org';
+        const apiBaseUrl = baseUrl || getApiBaseUrl();
         this.api = new CBioPortalAPI(apiBaseUrl);
         this.internalApi = new CBioPortalAPIInternal(apiBaseUrl);
     }

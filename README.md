@@ -100,6 +100,7 @@ environment:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `CBIOPORTAL_BASE_URL` | cBioPortal instance URL | `https://www.cbioportal.org` |
+| `CBIOPORTAL_API_URL` | Address the navigator itself uses for cBioPortal API calls and session creation, e.g. an internal hostname when it runs next to the portal and can't reach the public URL. Links returned to users always use `CBIOPORTAL_BASE_URL` | `CBIOPORTAL_BASE_URL` |
 | `MCP_TRANSPORT` | Transport mode (`stdio` or `http`) | `stdio` |
 | `PORT` | HTTP server port (HTTP mode only) | `8002` |
 
