@@ -33,6 +33,10 @@ import { geneResolver } from './shared/geneResolver.js';
 import { buildStudyUrl } from './studyView/buildStudyUrl.js';
 import { validateTabAvailability } from './studyView/validateStudyViewTab.js';
 import {
+    collectClinicalFilters,
+    validateClinicalFilters,
+} from './studyView/validateClinicalFilters.js';
+import {
     createNavigationResponse,
     createErrorResponse,
 } from './shared/responses.js';
@@ -187,6 +191,21 @@ async function navigateToStudyView(
                 }
             );
         }
+    }
+
+    const filterProblems = await validateClinicalFilters(
+        studyIds,
+        collectClinicalFilters(params)
+    );
+    if (filterProblems.length > 0) {
+        return createErrorResponse(
+            'Clinical filter does not match the study data; no link was built',
+            {
+                problems: filterProblems,
+                suggestion:
+                    'Call get_studyviewfilter_options for exact attribute IDs and values. If the concept is not a clinical attribute (e.g. a treatment event), use patientTreatmentFilters or say the portal cannot filter on it.',
+            }
+        );
     }
 
     // Resolve gene symbols in plots selections to Entrez IDs
