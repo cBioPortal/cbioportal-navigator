@@ -30,15 +30,17 @@ For `tab: "plots"`, the gene dropdown on each axis is populated only from this l
 
 **Mutations**
 - `MUT` — all non-synonymous mutations
-- `MUT = V600E` — specific amino acid change (shorthand: `BRAF: V600E`)
+- `MUT = V600E` — specific amino acid change (shorthand: `BRAF: V600E`). Protein changes never take a `p.` prefix (`KRAS: G12C`, not `KRAS: p.G12C`)
 - `MUT = MISSENSE` / `NONSENSE` / `NONSTART` / `NONSTOP` / `FRAMESHIFT` / `TRUNC` / `INFRAME` / `SPLICE` / `PROMOTER` — by type (`INFRAME` = in-frame insertions/deletions; `FRAMESHIFT` = frameshift insertions/deletions)
 - When user language maps ambiguously to OQL types, explain your interpretation. E.g. "indels" strictly means `INFRAME` + `FRAMESHIFT`, but clinical context may favor one — state which you used and why.
 - `MUT = (12-13)` — position range (overlapping mutations); `(12-13*)` — fully contained only; `(12-)` / `(-13)` — open-ended
 - **Amino acid vs position**: if the user specifies an amino acid symbol (e.g. "G12", "G12 or G13"), use amino acid notation (`MUT = G12`, or shorthand `G12 G13`). Use position range only when the user gives a numeric position without an amino acid (e.g. "codon 12", "position 12").
 - `MUT != MISSENSE` — exclude a mutation type; `!=` also works with specific protein changes (e.g. `!= T790M`) and amino acid positions (e.g. `!= V600`), but **not** with position ranges — `MUT != (12-12)` is silently ignored
-- **Excluding a position:** two options depending on precision needed:
-  - `MUT != G12` — simpler; uses amino acid notation; also excludes mutations that overlap position 12 (e.g. A11_G12dup)
-  - `MUT = (-11); MUT = (13-)` — precise; excludes only mutations starting at position 12, preserves overlapping mutations like A11_G12dup. Prefer this when the user wants to retain edge cases
+- **Only one exclusion per gene.** OQL ORs its terms, so two `!=` terms, or `!=` with any other mutation term (`MUT = V600 MUT != V600E`, `MUT MUT != G12`), match all mutations. To exclude more than one position, include the ranges around them instead.
+- **Excluding a position** ("not at codon 12", "other than R132"): never drop the filter and never query the gene alone. Two options:
+  - `KRAS: MUT != G12` — simpler; amino acid notation; also excludes mutations that overlap position 12 (e.g. A11_G12dup). `G12*` is the nonsense change G12*, not "anything at 12" — don't use it to exclude a position
+  - `KRAS: MUT = (-11) MUT = (13-)` — precise; one entry, space-separated (a `;` would end the statement); excludes only mutations at position 12, keeps overlapping ones like A11_G12dup. Also the way to exclude several positions, e.g. `KRAS: MUT = (-11) MUT = (14-)` for "not at codon 12 or 13"
+- Study view can't filter on a specific protein change or position; variant-level requests ("IDH1 mutations other than R132") belong here, as results view OQL.
 
 **Copy number**
 - `AMP` — amplification
@@ -61,8 +63,8 @@ For `tab: "plots"`, the gene dropdown on each axis is populated only from this l
 - **Gene pair or orientation-specific queries** — when the user specifies a fusion gene pair (e.g. `TMPRSS2::ERG`, `BCR-ABL`, "TMPRSS2 fused to ERG") or asks for one gene as the upstream/downstream partner (e.g. "TMPRSS2 as the 5' partner", "ERG downstream"): SV data in cBioPortal does not reliably record upstream/downstream orientation, so exact pair or orientation filtering is not possible. Explain this limitation, then query the relevant gene(s) with FUSION OQL — e.g. `["TMPRSS2: FUSION", "ERG: FUSION"]` — and use `tab: "structuralVariants"` if the study has an SV profile. This returns samples where either gene carries a fusion; in the right disease context most will be the target pair.
 
 **Modifiers** — append with `_`, alteration type comes first:
-- `DRIVER` — **all** driver alterations (mutation, CNA, fusion); use when the user says "driver events" without specifying a type. E.g. `KRAS: DRIVER`
-- `MUT_DRIVER` / `FUSION_DRIVER` / `AMP_DRIVER` — driver events for a specific alteration type only (OncoKB/CancerHotspots)
+- `DRIVER` — **all** driver alterations (mutation, CNA, fusion); use when the user says "driver events" / "limited to drivers" without specifying a type. E.g. `KRAS: DRIVER`; for several genes, one `GENE: DRIVER` entry per gene. Don't spell it out as `MUT_DRIVER AMP_DRIVER …` (the tool rewrites that to `DRIVER` and reports it in `oqlNormalized`)
+- `MUT_DRIVER` / `FUSION_DRIVER` / `AMP_DRIVER` — driver events for a specific alteration type only (OncoKB/CancerHotspots); use only when the user restricts to that type
 - `MUT_GERMLINE` / `MUT_SOMATIC` — by mutation origin
 - Can also use modifier alone: `BRCA1: GERMLINE` (shorthand for germline mutations)
 - Chain multiple: `TRUNC_GERMLINE_DRIVER` — truncating, germline, driver
@@ -102,7 +104,10 @@ For `tab: "plots"`, the gene dropdown on each axis is populated only from this l
 | "Driver mutations in KRAS" | `["KRAS: MUT_DRIVER"]` |
 | "TP53 mutations except missense" | `["TP53: MUT != MISSENSE"]` |
 | "KRAS codon 12 mutations" | `["KRAS: MUT = (12-12)"]` |
-| "KRAS mutations except codon 12" | `["KRAS: MUT = (-11)", "KRAS: MUT = (13-)"]` |
+| "KRAS mutations not at position 12" | `["KRAS: MUT != G12"]` or `["KRAS: MUT = (-11) MUT = (13-)"]` |
+| "IDH1 mutations other than R132" | `["IDH1: MUT != R132"]` |
+| "KRAS mutations except codons 12 and 13" | `["KRAS: MUT = (-11) MUT = (14-)"]` |
+| "RTK genes, driver events only" | `["EGFR: DRIVER", "ERBB2: DRIVER", "MET: DRIVER", "ALK: DRIVER", "ROS1: DRIVER", "RET: DRIVER"]` |
 | "EGFR driver fusions" | `["EGFR: FUSION_DRIVER"]` |
 | "BRCA1 truncating germline driver" | `["BRCA1: TRUNC_GERMLINE_DRIVER"]` |
 | "EGFR phospho-Y992 overexpression" | `["EGFR_PY992: PROT > 2"]` |
@@ -110,6 +115,8 @@ For `tab: "plots"`, the gene dropdown on each axis is populated only from this l
 | "AMP or HOMDEL across panel" | `["DATATYPES: AMP HOMDEL; EGFR KRAS TP53 PTEN"]` |
 
 Use plain symbols when the user has not specified a particular alteration type. Use OQL only when the user's request implies a specific subset of alterations.
+
+The tool rejects OQL that parses but wouldn't match the request (e.g. `!=` with a range, two exclusions, a `p.` prefix) and says how to fix it. When a correct query matches no samples, say that the study has no matching samples; don't invent OQL syntax to explain it (the reference is https://docs.cbioportal.org/user-guide/oql/).
 
 ### tab (optional)
 | Tab | Available when |
